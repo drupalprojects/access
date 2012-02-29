@@ -166,6 +166,41 @@ function access_scheme_save($info) {
 }
 
 /**
+ * Implements hook_access_scheme_update().
+ */
+function access_access_scheme_update($scheme) {
+  // If the machine name was changed, we need to update the scheme's containers.
+  if (!empty($scheme->old_scheme) && $scheme->old_scheme != $scheme->scheme) {
+    $count = access_scheme_update_containers($scheme->old_scheme, $scheme->scheme);
+
+    if ($count) {
+      drupal_set_message(format_plural($count,
+        'Changed the access scheme of 1 container from %old to %new.',
+        'Changed the access scheme of @count containers from %old to %new.',
+        array('%old' => $scheme->old_scheme, '%new' => $scheme->scheme)));
+    }
+  }
+}
+
+/**
+ * Updates all access containers of one scheme to be of another scheme.
+ *
+ * @param $old
+ *   The scheme of the access containers to be changed.
+ * @param $new
+ *   The new scheme for the containers.
+ *
+ * @return
+ *   The number of access containers whose scheme field was modified.
+ */
+function access_scheme_update_containers($old, $new) {
+  return db_update('access_container')
+    ->fields(array('scheme' => $new))
+    ->condition('scheme', $old)
+    ->execute();
+}
+
+/**
  * Implements hook_permission().
  */
 function access_permission() {
