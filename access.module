@@ -166,6 +166,22 @@ function access_scheme_save($info) {
 }
 
 /**
+ * Deletes an access scheme from the database.
+ *
+ * @param $scheme
+ *   The machine-readable name of the access scheme to be deleted.
+ */
+function access_scheme_delete($scheme) {
+  $info = access_scheme_get_scheme($scheme);
+  db_delete('access_scheme')
+    ->condition('scheme', $scheme)
+    ->execute();
+  // Notify the Field API and other interested modules of the deletion.
+  field_attach_delete_bundle('access_container', $scheme);
+  module_invoke_all('access_scheme_delete', $info);
+}
+
+/**
  * Implements hook_access_scheme_update().
  */
 function access_access_scheme_update($scheme) {
