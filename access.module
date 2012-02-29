@@ -55,8 +55,13 @@ function access_container_uri() {}
 
 /**
  * Returns a list of all defined access scheme names.
+ *
+ * @return
+ *   An array of scheme names, keyed by machine name.
  */
-function access_scheme_get_names() {}
+function access_scheme_get_names() {
+  return db_query('SELECT scheme, name FROM {access_scheme} ORDER BY scheme', array(), array('fetch' => PDO::FETCH_ASSOC));
+}
 
 /**
  * Implements hook_permission().
