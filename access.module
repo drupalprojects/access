@@ -1,0 +1,78 @@
+<?php
+/**
+ * @file
+ * The access control kit module.
+ */
+
+/**
+ * Implements hook_entity_info().
+ */
+function access_entity_info() {
+  // Access containers.
+  $types['access_container'] = array(
+    'label' => t('Access container'),
+    'base table' => 'access_container',
+    'uri callback' => 'access_container_uri',
+    'fieldable' => TRUE,
+    'entity keys' => array(
+      'id' => 'cid',
+      'bundle' => 'scheme',
+      'label' => 'name',
+    ),
+    'bundle keys' => array(
+      'bundle' => 'scheme',
+    ),
+    'bundles' => array(),
+    'view modes' => array(
+      'full' => array(
+        'label' => t('Access container page'),
+        'custom settings' => FALSE,
+      ),
+    ),
+  );
+
+  // Bundles are access schemes; some fields represent conditions for
+  // considering an object to be a member of an access container.
+  foreach (access_scheme_get_names() as $scheme => $name) {
+    $types['access_container']['bundles'][$scheme] = array(
+      'label' => $name,
+      'admin' => array(
+        'path' => 'admin/structure/access/manage/%access_scheme',
+        'real path' => 'admin/structure/access/manage/' . str_replace('_', '-', $scheme),
+        'bundle argument' => 4,
+        'access arguments' => array('administer access control kit'),
+      ),
+    );
+  }
+
+  return $types;
+}
+
+/**
+ * Entity URI callback; access container.
+ */
+function access_container_uri() {}
+
+/**
+ * Returns a list of all defined access scheme names.
+ */
+function access_scheme_get_names() {}
+
+/**
+ * Implements hook_permission().
+ */
+function access_permission() {
+  $perms['administer access control kit'] = array(
+    'title' => t('Administer access control kit'),
+    'description' => t('Add, edit, and delete access schemes and containers'),
+  );
+  return $perms;
+}
+
+/**
+ * Implements hook_menu().
+ */
+function access_menu() {
+//  $items['admin/structure/access/manage/%access_scheme'] = array();
+//  return $items;
+}
