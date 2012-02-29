@@ -40,7 +40,7 @@ function access_entity_info() {
         'path' => 'admin/structure/access/manage/%access_scheme',
         'real path' => 'admin/structure/access/manage/' . str_replace('_', '-', $scheme),
         'bundle argument' => 4,
-        'access arguments' => array('administer access control kit'),
+        'access arguments' => array('administer access schemes'),
       ),
     );
   }
@@ -220,9 +220,8 @@ function access_scheme_update_containers($old, $new) {
  * Implements hook_permission().
  */
 function access_permission() {
-  $perms['administer access control kit'] = array(
-    'title' => t('Administer access control kit'),
-    'description' => t('Add, edit, and delete access schemes and containers'),
+  $perms['administer access schemes'] = array(
+    'title' => t('Administer access schemes'),
     'restrict access' => TRUE,
   );
   return $perms;
@@ -232,7 +231,23 @@ function access_permission() {
  * Implements hook_menu().
  */
 function access_menu() {
-//  $items['admin/structure/access/manage/%access_scheme'] = array();
+  // Manage access containers.
 //  $items['admin/structure/access/container/%access_container'] = array();
-//  return $items;
+
+  // Manage access schemes.
+  $items['admin/structure/access'] = array(
+    'title' => 'Access schemes',
+    'description' => 'Define access control schemes.',
+    'page callback' => 'access_overview_schemes',
+    'access arguments' => array('administer access schemes'),
+    'file' => 'access_schemes.admin.inc',
+  );
+  $items['admin/structure/access/list'] = array(
+    'title' => 'List',
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'weight' => -10,
+  );
+//  $items['admin/structure/access/manage/%access_scheme'] = array();
+
+  return $items;
 }
