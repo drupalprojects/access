@@ -1,1 +1,4 @@
-name = Access Control Kit
+name = Access control kit
+description = "Customizable access control schemes."
+core = 7.x
+package = Access control kit
