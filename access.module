@@ -82,7 +82,7 @@ function access_scheme_set_defaults($info = array()) {
  *   An array of scheme names, keyed by machine name.
  */
 function access_scheme_get_names() {
-  return db_query('SELECT scheme, name FROM {access_scheme} ORDER BY scheme', array(), array('fetch' => PDO::FETCH_ASSOC));
+  return db_query('SELECT scheme, name FROM {access_scheme} ORDER BY scheme')->fetchAllKeyed();
 }
 
 /**
@@ -96,7 +96,7 @@ function access_scheme_get_names() {
  */
 function access_scheme_get_scheme($container) {
   $scheme = is_object($container) ? $container->scheme : $container;
-  return db_query('SELECT * FROM {access_scheme} WHERE scheme = :scheme', array(':scheme' => $scheme));
+  return db_query('SELECT * FROM {access_scheme} WHERE scheme = :scheme', array(':scheme' => $scheme))->fetchObject();
 }
 
 /**
