@@ -1,0 +1,79 @@
+<?php
+/**
+ * @file
+ * Install, update, and uninstall functions for the access control kit module.
+ */
+
+/**
+ * Implements hook_schema().
+ */
+function access_schema() {
+  // The access container (entity) table.
+  $schema['access_container'] = array(
+    'description' => 'The base table for access containers.',
+    'fields' => array(
+      'cid' => array(
+        'description' => 'The primary identifier for an access container.',
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'scheme' => array(
+        'description' => 'The {access_scheme}.scheme of this container.',
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'machine_name' => array(
+        'description' => 'The machine-readable name of this container.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'name' => array(
+        'description' => 'The human-readable name of this container.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+    ),
+    'primary key' => array('cid'),
+    'unique keys' => array(
+      'machine_name' => array('machine_name'),
+    ),
+    'indexes' => array(
+      'container_scheme' => array(array('scheme', 4)),
+    ),
+  );
+
+  // The access scheme (bundle) table.
+  $schema['access_scheme'] = array(
+    'description' => 'Stores information about all defined {access_container} schemes.',
+    'fields' => array(
+      'scheme' => array(
+        'description' => 'The machine-readable name of this scheme.',
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+      ),
+      'name' => array(
+        'description' => 'The human-readable name of this scheme.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'description' => array(
+        'description' => 'A brief description of this access scheme.',
+        'type' => 'text',
+        'not null' => FALSE,
+      ),
+    ),
+    'primary key' => array('scheme'),
+  );
+
+  return $schema;
+}
