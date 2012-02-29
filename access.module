@@ -52,7 +52,7 @@ function access_entity_info() {
  * Entity URI callback; access container.
  */
 function access_container_uri($container) {
-  return array('path' => 'admin/structure/access/container/' . $container->cid);
+  return array('path' => 'admin/access/container/' . $container->cid);
 }
 
 /**
@@ -232,7 +232,7 @@ function access_permission() {
  */
 function access_menu() {
   // Manage access containers.
-//  $items['admin/structure/access/container/%access_container'] = array();
+//  $items['admin/access/container/%access_container'] = array();
 
   // Manage access schemes.
   $items['admin/structure/access'] = array(
