@@ -56,6 +56,26 @@ function access_container_uri($container) {
 }
 
 /**
+ * Sets the default values for an access scheme.
+ *
+ * @param $info
+ *   An object or array containing values to override the defaults.
+ *
+ * @return
+ *   An access scheme object.
+ */
+function access_scheme_set_defaults($info = array()) {
+  $info = (array) $info;
+  $new_scheme = $info + array(
+    'scheme' => '',
+    'name' => '',
+    'description' => '',
+  );
+  $new_scheme = (object) $new_scheme;
+  return $new_scheme;
+}
+
+/**
  * Returns a list of all defined access scheme names.
  *
  * @return
@@ -90,6 +110,59 @@ function access_scheme_get_scheme($container) {
  */
 function access_scheme_load($scheme) {
   return access_scheme_get_scheme(strtr($scheme, array('-' => '_')));
+}
+
+/**
+ * Saves an access scheme to the database.
+ *
+ * @param $info
+ *   The access scheme to save, as an object.
+ *
+ * @return
+ *   Status flag indicating the outcome of the database operation.
+ */
+function access_scheme_save($info) {
+  // Check whether this is a new scheme or an update of an existing one.
+  $existing_scheme = !empty($info->old_scheme) ? $info->old_scheme : $info->scheme;
+  $is_existing = (bool) db_query_range('SELECT 1 FROM {access_scheme} WHERE scheme = :scheme', 0, 1, array(':scheme' => $existing_scheme))->fetchField();
+
+  // Set the field values for the insert/update query.
+  $scheme = access_scheme_set_defaults($info);
+  $fields = array(
+    'scheme' => (string) $scheme->scheme,
+    'name' => (string) $scheme->name,
+    'description' => (string) $scheme->description,
+  );
+
+  if ($is_existing) {
+    db_update('access_scheme')
+      ->fields($fields)
+      ->condition('scheme', $existing_scheme)
+      ->execute();
+    $status = SAVED_UPDATED;
+
+    // If the machine name was changed, we need to notify the Field API.
+    if (!empty($scheme->old_scheme) && $scheme->old_scheme != $scheme->scheme) {
+      field_attach_rename_bundle('access_container', $scheme->old_scheme, $scheme->scheme);
+    }
+
+    // Allow other modules to react to the change.
+    module_invoke_all('access_scheme_update', $scheme);
+  }
+  else {
+    db_insert('access_scheme')
+      ->fields($fields)
+      ->execute();
+    $status = SAVED_NEW;
+
+    // Notify the Field API of the new bundle.
+    field_attach_create_bundle('access_container', $scheme->scheme);
+
+    // Allow other modules to react to the new scheme definition.
+    module_invoke_all('access_scheme_insert', $scheme);
+  }
+
+  return $status;
 }
 
 /**
