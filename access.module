@@ -72,6 +72,7 @@ function access_permission() {
   $perms['administer access control kit'] = array(
     'title' => t('Administer access control kit'),
     'description' => t('Add, edit, and delete access schemes and containers'),
+    'restrict access' => TRUE,
   );
   return $perms;
 }
