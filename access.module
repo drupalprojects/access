@@ -66,6 +66,33 @@ function access_scheme_get_names() {
 }
 
 /**
+ * Returns the access scheme for a given container.
+ *
+ * @param $container
+ *   An access container object, or an access scheme machine name string.
+ *
+ * @return
+ *   A single access scheme object, or FALSE if not found.
+ */
+function access_scheme_get_scheme($container) {
+  $scheme = is_object($container) ? $container->scheme : $container;
+  return db_query('SELECT * FROM {access_scheme} WHERE scheme = :scheme', array(':scheme' => $scheme));
+}
+
+/**
+ * Loads an access scheme by machine name.
+ *
+ * @param $scheme
+ *   The machine-readable name of a scheme, where '_' is replaced with '-'.
+ *
+ * @return
+ *   An access scheme object, or FALSE if $scheme does not exist.
+ */
+function access_scheme_load($scheme) {
+  return access_scheme_get_scheme(strtr($scheme, array('-' => '_')));
+}
+
+/**
  * Implements hook_permission().
  */
 function access_permission() {
