@@ -343,6 +343,7 @@ function access_menu() {
     'page callback' => 'access_container_view',
     'page arguments' => array(3),
     'access arguments' => array('administer access containers'),
+    'file' => 'access_containers.admin.inc',
   );
   $items['admin/access/container/%access_container/view'] = array(
     'title' => 'View',
