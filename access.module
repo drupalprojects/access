@@ -281,6 +281,10 @@ function access_permission() {
     'title' => t('Administer access schemes'),
     'restrict access' => TRUE,
   );
+  $perms['administer access containers'] = array(
+    'title' => t('Administer access containers'),
+    'restrict access' => TRUE,
+  );
   return $perms;
 }
 
@@ -289,6 +293,20 @@ function access_permission() {
  */
 function access_menu() {
   // Manage access containers.
+  $items['admin/access'] = array(
+    'title' => 'Access',
+    'description' => 'Manage access control containers.',
+    'page callback' => 'access_overview_containers',
+    'access arguments' => array('administer access containers'),
+    // -2 places it between "People" and "Modules" on the default admin menu.
+    'weight' => -2,
+    'file' => 'access_containers.admin.inc',
+  );
+  $items['admin/access/list'] = array(
+    'title' => 'List',
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'weight' => -10,
+  );
 //  $items['admin/access/container/%access_container'] = array();
 
   // Manage access schemes.
