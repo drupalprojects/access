@@ -62,3 +62,9 @@ function theme_access_schemes_overview($variables) {
   $output .= '<div class="description">' . filter_xss_admin($scheme->description) . '</div>';
   return $output;
 }
+
+// @todo
+function access_scheme_form() {}
+
+// @todo
+function access_scheme_delete_confirm() {}

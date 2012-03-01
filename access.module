@@ -226,6 +226,9 @@ function access_scheme_update_containers($old, $new) {
     ->execute();
 }
 
+// @todo
+function access_scheme_page_title() {}
+
 /**
  * Implements hook_permission().
  */
@@ -257,7 +260,33 @@ function access_menu() {
     'type' => MENU_DEFAULT_LOCAL_TASK,
     'weight' => -10,
   );
-//  $items['admin/structure/access/manage/%access_scheme'] = array();
+  $items['admin/structure/access/add'] = array(
+    'title' => 'Add access scheme',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('access_scheme_form'),
+    'access arguments' => array('administer access schemes'),
+    'type' => MENU_LOCAL_ACTION,
+    'file' => 'access_schemes.admin.inc',
+  );
+  $items['admin/structure/access/manage/%access_scheme'] = array(
+    'title' => 'Edit access scheme',
+    'title callback' => 'access_scheme_page_title',
+    'title arguments' => array(4),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('access_scheme_form', 4),
+    'access arguments' => array('administer access schemes'),
+    'file' => 'access_schemes.admin.inc',
+  );
+  $items['admin/structure/access/manage/%access_scheme/edit'] = array(
+    'title' => 'Edit',
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+  );
+  $items['admin/structure/access/manage/%access_scheme/delete'] = array(
+    'title' => 'Delete',
+    'page arguments' => array('access_scheme_delete_confirm', 4),
+    'access arguments' => array('administer access schemes'),
+    'file' => 'access_schemes.admin.inc',
+  );
 
   return $items;
 }
