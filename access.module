@@ -56,6 +56,46 @@ function access_container_uri($container) {
 }
 
 /**
+ * Loads an access container from the database.
+ *
+ * @param $cid
+ *   The container ID.
+ * @param $reset
+ *   Whether to reset the internal cache.
+ *
+ * @return
+ *   An access container object, or FALSE if the container is not found.
+ */
+function access_container_load($cid = NULL, $reset = FALSE) {
+  $cids = isset($cid) ? array($cid) : array();
+  $container = access_container_load_multiple($cids, $reset);
+  return $container ? reset($container) : FALSE;
+}
+
+/**
+ * Loads access containers from the database.
+ *
+ * Rather than accepting the deprecated $conditions parameter, as entity_load()
+ * does, this function instead enforces the new preferred approach of using
+ * EntityFieldQuery to get a list of container IDs before calling this function.
+ *
+ * @param $cids
+ *   An array of container IDs, or FALSE to load all containers.
+ * @param $reset
+ *   Whether to reset the internal cache.
+ *
+ * @return
+ *   An array of access container objects indexed by their IDs. When no results
+ *   are found, an empty array is returned.
+ *
+ * @see entity_load()
+ * @see EntityFieldQuery
+ */
+function access_container_load_multiple($cids = FALSE, $reset = FALSE) {
+  return entity_load('access_container', $cids, array(), $reset);
+}
+
+/**
  * Sets the default values for an access scheme.
  *
  * @param $info
