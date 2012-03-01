@@ -86,6 +86,16 @@ function access_scheme_get_names() {
 }
 
 /**
+ * Returns a list of all defined access schemes.
+ *
+ * @return
+ *   An array of access scheme objects, keyed by machine name.
+ */
+function access_scheme_get_schemes() {
+  return db_query('SELECT * FROM {access_scheme} ORDER BY scheme')->fetchAllAssoc('scheme');
+}
+
+/**
  * Returns the access scheme for a given container.
  *
  * @param $container
@@ -250,4 +260,16 @@ function access_menu() {
 //  $items['admin/structure/access/manage/%access_scheme'] = array();
 
   return $items;
+}
+
+/**
+ * Implements hook_theme().
+ */
+function access_theme() {
+  return array(
+    'access_schemes_overview' => array(
+      'variables' => array('scheme' => NULL),
+      'file' => 'access_schemes.admin.inc',
+    ),
+  );
 }
