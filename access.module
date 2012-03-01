@@ -96,6 +96,13 @@ function access_container_load_multiple($cids = FALSE, $reset = FALSE) {
 }
 
 /**
+ * Menu title callback for an access container.
+ */
+function access_container_page_title($container) {
+  return $container->name;
+}
+
+/**
  * Menu title callback for adding a container within a scheme.
  */
 function access_container_add_page_title($scheme) {
@@ -330,7 +337,18 @@ function access_menu() {
     'access arguments' => array('administer access containers'),
     'file' => 'access_containers.admin.inc',
   );
-//  $items['admin/access/container/%access_container'] = array();
+  $items['admin/access/container/%access_container'] = array(
+    'title callback' => 'access_container_page_title',
+    'title arguments' => array(3),
+    'page callback' => 'access_container_view',
+    'page arguments' => array(3),
+    'access arguments' => array('administer access containers'),
+  );
+  $items['admin/access/container/%access_container/view'] = array(
+    'title' => 'View',
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'weight' => -10,
+  );
 
   // Manage access schemes.
   $items['admin/structure/access'] = array(

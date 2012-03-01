@@ -47,3 +47,10 @@ function access_container_add_list() {
 function access_container_add($scheme) {
   return '@todo';
 }
+
+/**
+ * Menu page callback; view a single access container.
+ */
+function access_container_view($container) {
+  return 'todo';
+}
