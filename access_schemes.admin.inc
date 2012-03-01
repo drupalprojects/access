@@ -183,5 +183,39 @@ function access_scheme_form_submit($form, &$form_state) {
   return;
 }
 
-// @todo
-function access_scheme_delete_confirm() {}
+/**
+ * Form constructor for the access scheme delete confirmation form.
+ *
+ * @see access_scheme_delete_confirm_submit()
+ */
+function access_scheme_delete_confirm($form, &$form_state, $scheme) {
+  $form['scheme'] = array('#type' => 'value', '#value' => $scheme->scheme);
+  $form['name'] = array('#type' => 'value', '#value' => $scheme->name);
+
+  $message = t('Are you sure you want to delete the access scheme %scheme?', array('%scheme' => $scheme->name));
+  $caption = '';
+
+  $num_containers = db_query('SELECT COUNT(*) FROM {access_container} WHERE scheme = :scheme', array(':scheme' => $scheme->scheme))->fetchField();
+  if ($num_containers) {
+    $caption .= '<p>' . format_plural($num_containers, '%scheme is used by 1 access container on your site. If you remove this scheme, you will not be able to edit the %scheme container and users may not be able to exercise permissions based on roles assigned within that container.', '%scheme is used by @count access containers on your site. If you remove this scheme, you will not be able to edit the %scheme containers and users may not be able to exercise permissions based on roles assigned within those containers.', array('%scheme' => $scheme->name)) . '</p>';
+  }
+
+  $caption .= '<p>' . t('This action cannot be undone.') . '</p>';
+
+  return confirm_form($form, $message, 'admin/structure/access', $caption, t('Delete'));
+}
+
+/**
+ * Form submission handler for access_scheme_delete_confirm().
+ */
+function access_scheme_delete_confirm_submit($form, &$form_state) {
+  access_scheme_delete($form_state['values']['scheme']);
+  menu_rebuild();
+
+  $t_args = array('%name' => $form_state['values']['name']);
+  drupal_set_message(t('The access scheme %name has been deleted.', $t_args));
+  watchdog('access', 'Deleted access scheme %name.', $t_args, WATCHDOG_NOTICE);
+
+  $form_state['redirect'] = 'admin/structure/access';
+  return;
+}
