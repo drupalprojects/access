@@ -226,8 +226,12 @@ function access_scheme_update_containers($old, $new) {
     ->execute();
 }
 
-// @todo
-function access_scheme_page_title() {}
+/**
+ * Menu title callback for an access scheme.
+ */
+function access_scheme_page_title($scheme) {
+  return $scheme->name;
+}
 
 /**
  * Implements hook_permission().
