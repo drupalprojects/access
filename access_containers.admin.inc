@@ -49,6 +49,16 @@ function access_container_add($scheme) {
 }
 
 /**
+ * Menu page callback; edit an access container.
+ *
+ * @param $container
+ *   The access container to edit.
+ */
+function access_container_edit($container) {
+  return '@todo';
+}
+
+/**
  * Menu page callback; view a single access container.
  */
 function access_container_view($container) {

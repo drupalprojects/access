@@ -349,6 +349,14 @@ function access_menu() {
     'type' => MENU_DEFAULT_LOCAL_TASK,
     'weight' => -10,
   );
+  $items['admin/access/container/%access_container/edit'] = array(
+    'title' => 'Edit',
+    'page callback' => 'access_container_edit',
+    'page arguments' => array(3),
+    'access arguments' => array('administer access containers'),
+    'type' => MENU_LOCAL_TASK,
+    'file' => 'access_containers.admin.inc',
+  );
 
   // Manage access schemes.
   $items['admin/structure/access'] = array(
