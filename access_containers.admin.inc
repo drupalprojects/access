@@ -45,7 +45,8 @@ function access_container_add_list() {
  *   The access scheme in which to create a new container.
  */
 function access_container_add($scheme) {
-  return '@todo';
+  $container = (object) array('scheme' => $scheme->scheme);
+  return drupal_get_form('access_container_form', $container);
 }
 
 /**
@@ -55,7 +56,22 @@ function access_container_add($scheme) {
  *   The access container to edit.
  */
 function access_container_edit($container) {
-  return '@todo';
+  $scheme = access_scheme_get_scheme($container);
+  drupal_set_title(t('<em>Edit @scheme</em> @container', array('@scheme' => $scheme->name, '@container' => $container->name)), PASS_THROUGH);
+  return drupal_get_form('access_container_form', $container);
+}
+
+/**
+ * Form constructor for the access container add/edit form.
+ *
+ * @param $container
+ *   The access container to edit.
+ *
+ * @see access_container_form_validate()
+ * @see access_container_form_submit()
+ */
+function access_container_form($form, &$form_state, $container) {
+  // @todo
 }
 
 /**
