@@ -195,9 +195,9 @@ function access_scheme_delete_confirm($form, &$form_state, $scheme) {
   $message = t('Are you sure you want to delete the access scheme %scheme?', array('%scheme' => $scheme->name));
   $caption = '';
 
-  $num_containers = db_query('SELECT COUNT(*) FROM {access_container} WHERE scheme = :scheme', array(':scheme' => $scheme->scheme))->fetchField();
-  if ($num_containers) {
-    $caption .= '<p>' . format_plural($num_containers, '%scheme is used by 1 access container on your site. If you remove this scheme, you will not be able to edit the %scheme container and users may not be able to exercise permissions based on roles assigned within that container.', '%scheme is used by @count access containers on your site. If you remove this scheme, you will not be able to edit the %scheme containers and users may not be able to exercise permissions based on roles assigned within those containers.', array('%scheme' => $scheme->name)) . '</p>';
+  $num_grants = db_query('SELECT COUNT(*) FROM {access_grant} WHERE scheme = :scheme', array(':scheme' => $scheme->scheme))->fetchField();
+  if ($num_grants) {
+    $caption .= '<p>' . format_plural($num_grants, '%scheme is used by 1 access grant on your site. If you remove this scheme, you will not be able to edit the %scheme grant and users may not be able to exercise permissions based on roles assigned by that grant.', '%scheme is used by @count access grants on your site. If you remove this scheme, you will not be able to edit the %scheme grants and users may not be able to exercise permissions based on roles assigned by those grants.', array('%scheme' => $scheme->name)) . '</p>';
   }
 
   $caption .= '<p>' . t('This action cannot be undone.') . '</p>';

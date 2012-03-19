@@ -8,54 +8,60 @@
  * Implements hook_schema().
  */
 function access_schema() {
-  // The access container (entity) table.
-  $schema['access_container'] = array(
-    'description' => 'The base table for access containers.',
+  // The access grant (entity) table.
+  $schema['access_grant'] = array(
+    'description' => 'The base table for access grants.',
     'fields' => array(
-      'cid' => array(
-        'description' => 'The primary identifier for an access container.',
+      'gid' => array(
+        'description' => 'The primary identifier for an access grant.',
         'type' => 'serial',
         'unsigned' => TRUE,
         'not null' => TRUE,
       ),
+      'uid' => array(
+        'description' => 'The {users}.uid of the user granted access.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'rid' => array(
+        'description' => 'The {role}.rid of the role assigned by this grant.',
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
       'scheme' => array(
-        'description' => 'The {access_scheme}.scheme of this container.',
+        'description' => 'The {access_scheme}.scheme of this grant.',
         'type' => 'varchar',
         'length' => 32,
         'not null' => TRUE,
         'default' => '',
       ),
-      /*
-      'machine_name' => array(
-        'description' => 'The machine-readable name of this container.',
-        'type' => 'varchar',
-        'length' => 255,
-        'not null' => TRUE,
-        'default' => '',
-      ),
-      */
-      'name' => array(
-        'description' => 'The human-readable name of this container.',
-        'type' => 'varchar',
-        'length' => 255,
-        'not null' => TRUE,
-        'default' => '',
-      ),
     ),
-    'primary key' => array('cid'),
-    /*
-    'unique keys' => array(
-      'machine_name' => array('machine_name'),
-    ),
-    */
+    'primary key' => array('gid'),
     'indexes' => array(
-      'container_scheme' => array(array('scheme', 4)),
+      'uid' => array('uid'),
+      'scheme' => array(array('scheme', 4)),
+    ),
+    'foreign keys' => array(
+      'grant_user' => array(
+        'table' => 'users',
+        'columns' => array('uid' => 'uid'),
+      ),
+      'grant_role' => array(
+        'table' => 'role',
+        'columns' => array('rid' => 'rid'),
+      ),
+      'grant_scheme' => array(
+        'table' => 'access_scheme',
+        'columns' => array('scheme' => 'scheme'),
+      ),
     ),
   );
 
   // The access scheme (bundle) table.
   $schema['access_scheme'] = array(
-    'description' => 'Stores information about all defined {access_container} schemes.',
+    'description' => 'Stores information about all defined {access_grant} schemes.',
     'fields' => array(
       'scheme' => array(
         'description' => 'The machine-readable name of this scheme.',

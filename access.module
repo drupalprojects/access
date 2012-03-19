@@ -8,16 +8,16 @@
  * Implements hook_entity_info().
  */
 function access_entity_info() {
-  // Access containers.
-  $types['access_container'] = array(
-    'label' => t('Access container'),
-    'base table' => 'access_container',
-    'uri callback' => 'access_container_uri',
+  // Access grants.
+  $types['access_grant'] = array(
+    'label' => t('Access grant'),
+    'base table' => 'access_grant',
+    'uri callback' => 'access_grant_uri',
+    'label callback' => 'access_grant_label',
     'fieldable' => TRUE,
     'entity keys' => array(
-      'id' => 'cid',
+      'id' => 'gid',
       'bundle' => 'scheme',
-      'label' => 'name',
     ),
     'bundle keys' => array(
       'bundle' => 'scheme',
@@ -25,16 +25,16 @@ function access_entity_info() {
     'bundles' => array(),
     'view modes' => array(
       'full' => array(
-        'label' => t('Access container page'),
+        'label' => t('Access grant page'),
         'custom settings' => FALSE,
       ),
     ),
   );
 
   // Bundles are access schemes; some fields represent conditions for
-  // considering an object to be a member of an access container.
+  // determining which objects are accessible to a user via an access grant.
   foreach (access_scheme_get_names() as $scheme => $name) {
-    $types['access_container']['bundles'][$scheme] = array(
+    $types['access_grant']['bundles'][$scheme] = array(
       'label' => $name,
       'admin' => array(
         'path' => 'admin/structure/access/manage/%access_scheme',
@@ -49,64 +49,71 @@ function access_entity_info() {
 }
 
 /**
- * Entity URI callback; access container.
+ * Entity URI callback for an access grant.
  */
-function access_container_uri($container) {
-  return array('path' => 'admin/access/container/' . $container->cid);
+function access_grant_uri($grant) {
+  return array('path' => 'admin/access/grant/' . $grant->gid);
 }
 
 /**
- * Loads an access container from the database.
+ * Entity label callback for an access grant.
+ */
+function access_grant_label($grant, $scheme) {
+  return '@todo';
+}
+
+/**
+ * Loads an access grant from the database.
  *
- * @param $cid
- *   The container ID.
+ * @param $gid
+ *   The grant ID.
  * @param $reset
  *   Whether to reset the internal cache.
  *
  * @return
- *   An access container object, or FALSE if the container is not found.
+ *   An access grant object, or FALSE if the grant is not found.
  */
-function access_container_load($cid = NULL, $reset = FALSE) {
-  $cids = isset($cid) ? array($cid) : array();
-  $container = access_container_load_multiple($cids, $reset);
-  return $container ? reset($container) : FALSE;
+function access_grant_load($gid = NULL, $reset = FALSE) {
+  $gids = isset($gid) ? array($gid) : array();
+  $grant = access_grant_load_multiple($gids, $reset);
+  return $grant ? reset($grant) : FALSE;
 }
 
 /**
- * Loads access containers from the database.
+ * Loads access grants from the database.
  *
  * Rather than accepting the deprecated $conditions parameter, as entity_load()
  * does, this function instead enforces the new preferred approach of using
- * EntityFieldQuery to get a list of container IDs before calling this function.
+ * EntityFieldQuery to get a list of grant IDs before calling this function.
  *
- * @param $cids
- *   An array of container IDs, or FALSE to load all containers.
+ * @param $gids
+ *   An array of grant IDs, or FALSE to load all grants.
  * @param $reset
  *   Whether to reset the internal cache.
  *
  * @return
- *   An array of access container objects indexed by their IDs. When no results
+ *   An array of access grant objects indexed by their IDs. When no results
  *   are found, an empty array is returned.
  *
  * @see entity_load()
  * @see EntityFieldQuery
  */
-function access_container_load_multiple($cids = FALSE, $reset = FALSE) {
-  return entity_load('access_container', $cids, array(), $reset);
+function access_grant_load_multiple($gids = FALSE, $reset = FALSE) {
+  return entity_load('access_grant', $gids, array(), $reset);
 }
 
 /**
- * Menu title callback for an access container.
+ * Menu title callback for an access grant.
  */
-function access_container_page_title($container) {
-  return $container->name;
+function access_grant_page_title($grant) {
+  return '@todo';
 }
 
 /**
- * Menu title callback for adding a container within a scheme.
+ * Menu title callback for adding a grant within a scheme.
  */
-function access_container_add_page_title($scheme) {
-  return t('Create @name', array('@name' => $scheme->name));
+function access_grant_add_page_title($scheme) {
+  return t('Grant access by @name', array('@name' => $scheme->name));
 }
 
 /**
@@ -150,16 +157,16 @@ function access_scheme_get_schemes() {
 }
 
 /**
- * Returns the access scheme for a given container.
+ * Returns the scheme for a given access grant.
  *
- * @param $container
- *   An access container object, or an access scheme machine name string.
+ * @param $grant
+ *   An access grant object, or an access scheme machine name string.
  *
  * @return
  *   A single access scheme object, or FALSE if not found.
  */
-function access_scheme_get_scheme($container) {
-  $scheme = is_object($container) ? $container->scheme : $container;
+function access_scheme_get_scheme($grant) {
+  $scheme = is_object($grant) ? $grant->scheme : $grant;
   return db_query('SELECT * FROM {access_scheme} WHERE scheme = :scheme', array(':scheme' => $scheme))->fetchObject();
 }
 
@@ -207,7 +214,7 @@ function access_scheme_save($info) {
 
     // If the machine name was changed, we need to notify the Field API.
     if (!empty($scheme->old_scheme) && $scheme->old_scheme != $scheme->scheme) {
-      field_attach_rename_bundle('access_container', $scheme->old_scheme, $scheme->scheme);
+      field_attach_rename_bundle('access_grant', $scheme->old_scheme, $scheme->scheme);
     }
 
     // Allow other modules to react to the change.
@@ -220,7 +227,7 @@ function access_scheme_save($info) {
     $status = SAVED_NEW;
 
     // Notify the Field API of the new bundle.
-    field_attach_create_bundle('access_container', $scheme->scheme);
+    field_attach_create_bundle('access_grant', $scheme->scheme);
 
     // Allow other modules to react to the new scheme definition.
     module_invoke_all('access_scheme_insert', $scheme);
@@ -241,7 +248,7 @@ function access_scheme_delete($scheme) {
     ->condition('scheme', $scheme)
     ->execute();
   // Notify the Field API and other interested modules of the deletion.
-  field_attach_delete_bundle('access_container', $scheme);
+  field_attach_delete_bundle('access_grant', $scheme);
   module_invoke_all('access_scheme_delete', $info);
 }
 
@@ -249,32 +256,32 @@ function access_scheme_delete($scheme) {
  * Implements hook_access_scheme_update().
  */
 function access_access_scheme_update($scheme) {
-  // If the machine name was changed, we need to update the scheme's containers.
+  // If the machine name was changed, we need to update the scheme's grants.
   if (!empty($scheme->old_scheme) && $scheme->old_scheme != $scheme->scheme) {
-    $count = access_scheme_update_containers($scheme->old_scheme, $scheme->scheme);
+    $count = access_scheme_update_grants($scheme->old_scheme, $scheme->scheme);
 
     if ($count) {
       drupal_set_message(format_plural($count,
-        'Changed the access scheme of 1 container from %old to %new.',
-        'Changed the access scheme of @count containers from %old to %new.',
+        'Changed the scheme of 1 access grant from %old to %new.',
+        'Changed the scheme of @count access grants from %old to %new.',
         array('%old' => $scheme->old_scheme, '%new' => $scheme->scheme)));
     }
   }
 }
 
 /**
- * Updates all access containers of one scheme to be of another scheme.
+ * Updates all access grants of one scheme to be of another scheme.
  *
  * @param $old
- *   The scheme of the access containers to be changed.
+ *   The scheme of the access grants to be changed.
  * @param $new
- *   The new scheme for the containers.
+ *   The new scheme for the grants.
  *
  * @return
- *   The number of access containers whose scheme field was modified.
+ *   The number of access grants whose scheme field was modified.
  */
-function access_scheme_update_containers($old, $new) {
-  return db_update('access_container')
+function access_scheme_update_grants($old, $new) {
+  return db_update('access_grant')
     ->fields(array('scheme' => $new))
     ->condition('scheme', $old)
     ->execute();
@@ -295,8 +302,8 @@ function access_permission() {
     'title' => t('Administer access schemes'),
     'restrict access' => TRUE,
   );
-  $perms['administer access containers'] = array(
-    'title' => t('Administer access containers'),
+  $perms['administer access grants'] = array(
+    'title' => t('Administer access grants'),
     'restrict access' => TRUE,
   );
   return $perms;
@@ -306,15 +313,15 @@ function access_permission() {
  * Implements hook_menu().
  */
 function access_menu() {
-  // Manage access containers.
+  // Manage access grants.
   $items['admin/access'] = array(
     'title' => 'Access',
-    'description' => 'Manage access control containers.',
-    'page callback' => 'access_overview_containers',
-    'access arguments' => array('administer access containers'),
+    'description' => 'Manage access grants.',
+    'page callback' => 'access_overview_grants',
+    'access arguments' => array('administer access grants'),
     // -2 places it between "People" and "Modules" on the default admin menu.
     'weight' => -2,
-    'file' => 'access_containers.admin.inc',
+    'file' => 'access_grants.admin.inc',
   );
   $items['admin/access/list'] = array(
     'title' => 'List',
@@ -322,41 +329,41 @@ function access_menu() {
     'weight' => -10,
   );
   $items['admin/access/add'] = array(
-    'title' => 'Add access container',
-    'page callback' => 'access_container_add_list',
-    'access arguments' => array('administer access containers'),
+    'title' => 'Add access grant',
+    'page callback' => 'access_grant_add_list',
+    'access arguments' => array('administer access grants'),
     'type' => MENU_LOCAL_ACTION,
-    'file' => 'access_containers.admin.inc',
+    'file' => 'access_grants.admin.inc',
   );
   $items['admin/access/add/%access_scheme'] = array(
-    'title' => 'Add access container for scheme',
-    'title callback' => 'access_container_add_page_title',
+    'title' => 'Add access grant for scheme',
+    'title callback' => 'access_grant_add_page_title',
     'title arguments' => array(3),
-    'page callback' => 'access_container_add',
+    'page callback' => 'access_grant_add',
     'page arguments' => array(3),
-    'access arguments' => array('administer access containers'),
-    'file' => 'access_containers.admin.inc',
+    'access arguments' => array('administer access grants'),
+    'file' => 'access_grants.admin.inc',
   );
-  $items['admin/access/container/%access_container'] = array(
-    'title callback' => 'access_container_page_title',
+  $items['admin/access/grant/%access_grant'] = array(
+    'title callback' => 'access_grant_page_title',
     'title arguments' => array(3),
-    'page callback' => 'access_container_view',
+    'page callback' => 'access_grant_view',
     'page arguments' => array(3),
-    'access arguments' => array('administer access containers'),
-    'file' => 'access_containers.admin.inc',
+    'access arguments' => array('administer access grants'),
+    'file' => 'access_grants.admin.inc',
   );
-  $items['admin/access/container/%access_container/view'] = array(
+  $items['admin/access/grant/%access_grant/view'] = array(
     'title' => 'View',
     'type' => MENU_DEFAULT_LOCAL_TASK,
     'weight' => -10,
   );
-  $items['admin/access/container/%access_container/edit'] = array(
+  $items['admin/access/grant/%access_grant/edit'] = array(
     'title' => 'Edit',
-    'page callback' => 'access_container_edit',
+    'page callback' => 'access_grant_edit',
     'page arguments' => array(3),
-    'access arguments' => array('administer access containers'),
+    'access arguments' => array('administer access grants'),
     'type' => MENU_LOCAL_TASK,
-    'file' => 'access_containers.admin.inc',
+    'file' => 'access_grants.admin.inc',
   );
 
   // Manage access schemes.
