@@ -71,7 +71,125 @@ function access_grant_edit($grant) {
  * @see access_grant_form_submit()
  */
 function access_grant_form($form, &$form_state, $grant) {
-  // @todo
+  // During initial form build, add the grant entity to the form state for use
+  // during form building and processing. During a rebuild, use what is in the
+  // form state.
+  if (!isset($form_state['grant'])) {
+    $form_state['grant'] = $grant;
+  }
+  else {
+    $grant = $form_state['grant'];
+  }
+
+  // Basic grant information.  Not user-configurable.
+  foreach (array('gid', 'uid', 'rid', 'scheme') as $key) {
+    $form[$key] = array(
+      '#type' => 'value',
+      '#value' => isset($grant->$key) ? $grant->$key : NULL,
+    );
+  }
+
+  // The built-in user reference field.
+  $form['user'] = array(
+    '#type' => 'textfield',
+    '#title' => t('User'),
+    '#maxlength' => 60,
+    '#weight' => -5,
+  );
+  // Only allow the user to be set on add; it can't be edited once saved.
+  if (empty($grant->uid)) {
+    $form['user']['#autocomplete_path'] = 'user/autocomplete';
+    $form['user']['#default_value'] = '';
+    $form['user']['#required'] = TRUE;
+  }
+  else {
+    $account = user_load($grant->uid);
+    $form['user']['#default_value'] = check_plain($account->name);
+    $form['user']['#disabled'] = TRUE;
+  }
+
+  // The built-in role reference field.
+  $form['role'] = array(
+    '#type' => 'select',
+    '#title' => t('Role'),
+    '#weight' => -4,
+  );
+  // As above, the role can't be changed after creation, either.
+  if (empty($grant->rid)) {
+    $roles = user_roles(TRUE);
+    unset($roles[DRUPAL_AUTHENTICATED_RID]);
+    $form['role']['#options'] = $roles;
+    $form['role']['#required'] = TRUE;
+  }
+  else {
+    $role = user_role_load($grant->rid);
+    $form['role']['#options'] = array($role->rid => $role->name);
+    $form['role']['#default_value'] = $role->rid;
+    $form['role']['#disabled'] = TRUE;
+  }
+
+  $form['actions'] = array('#type' => 'actions');
+  $form['actions']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Save'),
+    '#weight' => 5,
+  );
+  if (!empty($grant->gid)) {
+    $form['actions']['delete'] = array(
+      '#type' => 'submit',
+      '#value' => t('Delete'),
+      '#weight' => 10,
+    );
+  }
+
+  field_attach_form('access_grant', $grant, $form, $form_state);
+  return $form;
+}
+
+/**
+ * Form validation handler for access_grant_form().
+ *
+ * @see access_grant_form_submit()
+ */
+function access_grant_form_validate($form, &$form_state) {
+  $grant = (object) $form_state['values'];
+
+  // Validate the user reference. Only matters if the UID isn't already set.
+  if (empty($grant->uid) && !empty($grant->user) && !($account = user_load_by_name($grant->user))) {
+    form_set_error('user', t('The username %name does not exist.', array('%name' => $grant->user)));
+  }
+
+  entity_form_field_validate('access_grant', $form, $form_state);
+}
+
+/**
+ * Form submission handler for access_grant_form().
+ *
+ * @see access_grant_form_validate()
+ */
+function access_grant_form_submit($form, &$form_state) {
+  // @todo Need to handle the "Delete" case.
+
+  $grant = access_grant_form_submit_build_grant($form, $form_state);
+  // @todo Need a save function to call here.
+}
+
+/**
+ * Updates the form state's grant entity by processing the submission values.
+ */
+function access_grant_form_submit_build_grant($form, &$form_state) {
+  $grant = $form_state['grant'];
+  entity_form_submit_build_entity('access_grant', $grant, $form, $form_state);
+
+  if (empty($grant->uid)) {
+    $account = user_load_by_name($form_state['values']['user']);
+    $grant->uid = $account->uid;
+  }
+  if (empty($grant->rid)) {
+    $grant->rid = $form_state['values']['role'];
+  }
+
+  return $grant;
 }
 
 /**
