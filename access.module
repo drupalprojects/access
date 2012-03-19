@@ -68,12 +68,12 @@ function access_grant_label($grant, $scheme) {
 function access_field_extra_fields() {
   $extra = array();
   $fields = array(
-    'uid' => array(
+    'user' => array(
       'label' => t('User'),
       'description' => t('Access control kit user reference'),
       'weight'=> -5,
     ),
-    'rid' => array(
+    'role' => array(
       'label' => t('Role'),
       'description' => t('Access control kit role reference'),
       'weight' => -4,
