@@ -63,6 +63,34 @@ function access_grant_label($grant, $scheme) {
 }
 
 /**
+ * Implements hook_field_extra_fields().
+ */
+function access_field_extra_fields() {
+  $extra = array();
+  $fields = array(
+    'uid' => array(
+      'label' => t('User'),
+      'description' => t('Access control kit user reference'),
+      'weight'=> -5,
+    ),
+    'rid' => array(
+      'label' => t('Role'),
+      'description' => t('Access control kit role reference'),
+      'weight' => -4,
+    ),
+  );
+
+  foreach (access_scheme_get_names() as $scheme => $name) {
+    $extra['access_grant'][$scheme] = array(
+      'form' => $fields,
+      'display' => $fields,
+    );
+  }
+
+  return $extra;
+}
+
+/**
  * Loads an access grant from the database.
  *
  * @param $gid
