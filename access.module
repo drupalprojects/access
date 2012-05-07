@@ -323,6 +323,182 @@ function access_scheme_page_title($scheme) {
 }
 
 /**
+ * Implements hook_field_info().
+ *
+ * @see list_field_info()
+ */
+function access_field_info() {
+  $settings = array(
+    'allowed_values' => array(
+      array(
+        'callback' => '',
+        'arguments' => array(),
+      ),
+    ),
+  );
+
+  // This is similar to the field types defined in the list module, but with a
+  // configurable allowed_values callback and no_ui set to prevent access fields
+  // from being reused across entity bundles.
+  return array(
+    'access_integer' => array(
+      'label' => t('Access (integer)'),
+      'description' => t('Controls access via an integer value.'),
+      'settings' => $settings,
+      'default_widget' => 'options_select',
+      'default_formatter' => 'access_default',
+//       'no_ui' => TRUE,
+    ),
+    'access_float' => array(
+      'label' => t('Access (float)'),
+      'description' => t('Controls access via a float value.'),
+      'settings' => $settings,
+      'default_widget' => 'options_select',
+      'default_formatter' => 'access_default',
+//       'no_ui' => TRUE,
+    ),
+    'access_text' => array(
+      'label' => t('Access (text)'),
+      'description' => t('Controls access via a text value.'),
+      'settings' => $settings,
+      'default_widget' => 'options_select',
+      'default_formatter' => 'access_default',
+//       'no_ui' => TRUE,
+    ),
+    'access_boolean' => array(
+      'label' => t('Access (boolean)'),
+      'description' => t('Controls access via a boolean value.'),
+      'settings' => $settings,
+      'default_widget' => 'options_buttons',
+      'default_formatter' => 'access_default',
+//       'no_ui' => TRUE,
+    ),
+  );
+}
+
+/**
+ * Implements hook_field_validate().
+ *
+ * Possible error codes:
+ * - 'access_illegal_value': The value is not in the list of allowed values.
+ *
+ * @see list_field_validate()
+ */
+function access_field_validate($entity_type, $entity, $field, $instance, $langcode, $items, &$errors) {
+  $allowed_values = access_allowed_values($field);
+  foreach ($items as $delta => $item) {
+    if (!empty($item['value'])) {
+      if (!empty($allowed_values) && !isset($allowed_values[$item['value']])) {
+        $errors[$field['field_name']][$langcode][$delta][] = array(
+          'error' => 'access_illegal_value',
+          'message' => t('%name: illegal value.', array('%name' => $instance['label'])),
+        );
+      }
+    }
+  }
+}
+
+/**
+ * Implements hook_field_is_empty().
+ *
+ * @see list_field_is_empty()
+ */
+function access_field_is_empty($item, $field) {
+  if (empty($item['value']) && (string) $item['value'] !== '0') {
+    return TRUE;
+  }
+  return FALSE;
+}
+
+/**
+ * Returns the set of allowed values for an access condition field.
+ *
+ * @param $field
+ *   The field definition.
+ *
+ * @return
+ *   The array of allowed values. Keys of the array are the raw stored values
+ *   (number or text), values of the array are the display labels.
+ */
+function access_allowed_values($field) {
+  $values = array();
+  foreach ($field['settings']['allowed_values'] as $tree) {
+    $function = isset($tree['callback']) ? $tree['callback'] : FALSE;
+    $arguments = !empty($tree['arguments']) ? $tree['arguments'] : array();
+    // Execute the access condition's allowed values callback.
+    if (!empty($function) && function_exists($function)) {
+      $values = array_merge($values, $function($arguments));
+    }
+  }
+  return $values;
+}
+
+/**
+ * Implements hook_field_widget_info_alter().
+ *
+ * @see list_field_widget_info_alter()
+ */
+function access_field_widget_info_alter(&$info) {
+  $widgets = array(
+    'options_select' => array('access_integer', 'access_float', 'access_text'),
+    'options_buttons' => array('access_integer', 'access_float', 'access_text', 'access_boolean'),
+    'options_onoff' => array('access_boolean'),
+  );
+
+  foreach ($widgets as $widget => $field_types) {
+    $info[$widget]['field types'] = array_merge($info[$widget]['field types'], $field_types);
+  }
+}
+
+/**
+ * Implements hook_options_list().
+ */
+function access_options_list($field, $instance, $entity_type, $entity) {
+  return access_allowed_values($field);
+}
+
+/**
+ * Implements hook_field_formatter_info().
+ *
+ * @see list_field_formatter_info()
+ */
+function access_field_formatter_info() {
+  return array(
+    'access_default' => array(
+      'label' => t('Default'),
+      'field types' => array('access_integer', 'access_float', 'access_text', 'access_boolean'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_field_formatter_view().
+ *
+ * @see list_field_formatter_view()
+ */
+function access_field_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display) {
+  $element = array();
+
+  switch ($display['type']) {
+    case 'access_default':
+      $allowed_values = access_allowed_values($field);
+      foreach ($items as $delta => $item) {
+        if (isset($allowed_values[$item['value']])) {
+          $output = field_filter_xss($allowed_values[$item['value']]);
+        }
+        else {
+          // If no match was found in allowed values, fall back to the key.
+          $output = field_filter_xss($item['value']);
+        }
+        $element[$delta] = array('#markup' => $output);
+      }
+      break;
+  }
+
+  return $element;
+}
+
+/**
  * Implements hook_permission().
  */
 function access_permission() {

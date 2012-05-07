@@ -87,3 +87,48 @@ function access_schema() {
 
   return $schema;
 }
+
+/**
+ * Implements hook_field_schema().
+ *
+ * @see list_field_schema()
+ */
+function access_field_schema($field) {
+  // This is basically the same as list_field_schema() from core's list module,
+  // but with the type strings changed.  Unfortunately, we can't reuse list's
+  // field type definitions because we need to set no_ui on our access fields.
+  switch ($field['type']) {
+    case 'access_text':
+      $columns = array(
+        'value' => array(
+          'type' => 'varchar',
+          'length' => 255,
+          'not null' => FALSE,
+        ),
+      );
+      break;
+    case 'access_float':
+      $columns = array(
+        'value' => array(
+          'type' => 'float',
+          'not null' => FALSE,
+        ),
+      );
+      break;
+    case 'access_integer':
+    case 'access_boolean':
+      $columns = array(
+        'value' => array(
+          'type' => 'int',
+          'not null' => FALSE,
+        ),
+      );
+      break;
+  }
+  return array(
+    'columns' => $columns,
+    'indexes' => array(
+      'value' => array('value'),
+    ),
+  );
+}
