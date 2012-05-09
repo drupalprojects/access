@@ -158,6 +158,7 @@ function access_scheme_set_defaults($info = array()) {
   $new_scheme = $info + array(
     'scheme' => '',
     'name' => '',
+    'type' => '',
     'description' => '',
   );
   $new_scheme = (object) $new_scheme;
@@ -199,6 +200,52 @@ function access_scheme_get_scheme($grant) {
 }
 
 /**
+ * Returns a list of all available access scheme types.
+ *
+ * @param $format
+ *   A string specifying how to return the scheme type data. Allowed values are
+ *   'types' (the default), 'list', and 'grouped'.
+ *
+ * @return
+ *   - If $format is 'types', an array as defined by hook_access_info().
+ *   - If $format is 'list', an array where the keys are the scheme type machine
+ *     names and the values are scheme type labels.
+ *   - If $format is 'grouped', a nested array where the outer keys are the
+ *     the modules that provide the scheme types, and the inner keys and values
+ *     are as in the 'list' format.
+ *
+ * @see hook_access_info()
+ */
+function access_scheme_get_types($format = 'types') {
+  $info = module_invoke_all('access_info');
+  switch ($format) {
+    case 'types':
+      return $info;
+    case 'list':
+      $list = array();
+      foreach ($info as $module => $types) {
+        foreach ($types as $key => $type) {
+          $list[$key] = $type['label'];
+        }
+      }
+      asort($list);
+      return $list;
+    case 'grouped':
+      $grouped = array();
+      foreach ($info as $module => $types) {
+        $list = array();
+        foreach ($types as $key => $type) {
+          $list[$key] = $type['label'];
+        }
+        arsort($list);
+        $grouped[$module] = $list;
+      }
+      arsort($grouped);
+      return $grouped;
+  }
+}
+
+/**
  * Loads an access scheme by machine name.
  *
  * @param $scheme
@@ -230,6 +277,7 @@ function access_scheme_save($info) {
   $fields = array(
     'scheme' => (string) $scheme->scheme,
     'name' => (string) $scheme->name,
+    'type' => (string) $scheme->type,
     'description' => (string) $scheme->description,
   );
 
@@ -624,4 +672,12 @@ function access_theme() {
       'file' => 'access_schemes.admin.inc',
     ),
   );
+}
+
+/**
+ * Implements hook_hook_info().
+ */
+function access_hook_info() {
+  $hooks['access_info'] = array('group' => 'access');
+  return $hooks;
 }

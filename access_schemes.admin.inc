@@ -98,6 +98,15 @@ function access_scheme_form($form, &$form_state, $scheme = NULL) {
     '#description' => t('A unique machine-readable name for this access scheme. It must only contain lowercase letters, numbers, and underscores.'),
   );
 
+  $form['type'] = array(
+    '#title' => t('Define access boundaries based on'),
+    '#type' => 'select',
+    '#options' => access_scheme_get_types('grouped'),
+    '#default_value' => $scheme->type,
+    '#required' => TRUE,
+    '#disabled' => !empty($scheme->type),
+  );
+
   $form['description'] = array(
     '#title' => t('Description'),
     '#type' => 'textarea',
@@ -160,6 +169,7 @@ function access_scheme_form_submit($form, &$form_state) {
   $scheme->scheme = trim($form_state['values']['scheme']);
   $scheme->old_scheme = isset($form_state['values']['old_scheme']) ? $form_state['values']['old_scheme'] : $scheme->scheme;
   $scheme->name = trim($form_state['values']['name']);
+  $scheme->type = $form_state['values']['type'];
   $scheme->description = $form_state['values']['description'];
 
   if ($op == t('Delete access scheme')) {

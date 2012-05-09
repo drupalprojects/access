@@ -76,6 +76,13 @@ function access_schema() {
         'not null' => TRUE,
         'default' => '',
       ),
+      'type' => array(
+        'description' => 'The type of access boundary used in this scheme.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
       'description' => array(
         'description' => 'A brief description of this access scheme.',
         'type' => 'text',
