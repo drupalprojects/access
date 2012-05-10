@@ -13,7 +13,7 @@ function access_access_info() {
   foreach ($modules as $module) {
     if (module_exists($module)) {
       $function = '_access_access_info_' . $module;
-      $info[$module] = $function();
+      $info += $function();
     }
   }
   return $info;
@@ -25,7 +25,8 @@ function access_access_info() {
 function _access_access_info_user() {
   $info['user'] = array(
     'label' => t('a user account'),
-    'type' => 'int',
+    'type' => 'integer',
+    'group' => t('User'),
   );
   // @todo Support access to nodes based on authorship, menu items based on the
   // authorship of the node it links to, etc. (ex. "You can edit any nodes
@@ -40,6 +41,7 @@ function _access_access_info_list() {
   $info['list_text'] = array(
     'label' => t("a text list field's allowed values"),
     'type' => 'text',
+    'group' => t('List'),
   );
   // @todo Support the other list field types.
   return $info;
@@ -51,7 +53,8 @@ function _access_access_info_list() {
 function _access_access_info_taxonomy() {
   $info['taxonomy_term'] = array(
     'label' => t('a term'),
-    'type' => 'int',
+    'type' => 'integer',
+    'group' => t('Taxonomy'),
   );
   // @todo Support cascading hierarchical privileges as an option.
   // @todo Support relationships based on fields and on taxonomy_index.

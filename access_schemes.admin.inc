@@ -91,7 +91,7 @@ function access_scheme_form($form, &$form_state, $scheme = NULL) {
   $form['scheme'] = array(
     '#type' => 'machine_name',
     '#default_value' => $scheme->scheme,
-    '#maxlength' => 32,
+    '#maxlength' => 28,
     '#machine_name' => array(
       'exists' => 'access_scheme_load',
     ),

@@ -211,8 +211,7 @@ function access_scheme_get_scheme($grant) {
  *   - If $format is 'list', an array where the keys are the scheme type machine
  *     names and the values are scheme type labels.
  *   - If $format is 'grouped', a nested array where the outer keys are the
- *     the modules that provide the scheme types, and the inner keys and values
- *     are as in the 'list' format.
+ *     types' groups, and the inner keys and values are as in the 'list' format.
  *
  * @see hook_access_info()
  */
@@ -221,26 +220,25 @@ function access_scheme_get_types($format = 'types') {
   switch ($format) {
     case 'types':
       return $info;
+
     case 'list':
       $list = array();
-      foreach ($info as $module => $types) {
-        foreach ($types as $key => $type) {
-          $list[$key] = $type['label'];
-        }
+      foreach ($info as $key => $type) {
+        $list[$key] = filter_xss_admin($type['label']);
       }
       asort($list);
       return $list;
+
     case 'grouped':
       $grouped = array();
-      foreach ($info as $module => $types) {
-        $list = array();
-        foreach ($types as $key => $type) {
-          $list[$key] = $type['label'];
-        }
-        arsort($list);
-        $grouped[$module] = $list;
+      foreach ($info as $key => $type) {
+        $group = isset($type['group']) ? check_plain($type['group']) : t('Other');
+        $grouped[$group][$key] = filter_xss_admin($type['label']);
       }
-      arsort($grouped);
+      foreach (array_keys($grouped) as $group) {
+        asort($grouped[$group]);
+      }
+      ksort($grouped);
       return $grouped;
   }
 }
@@ -329,6 +327,60 @@ function access_scheme_delete($scheme) {
 }
 
 /**
+ * Implements hook_access_scheme_insert().
+ */
+function access_access_scheme_insert($scheme) {
+  // Create an access field for the scheme.
+  $types = access_scheme_get_types();
+  if (isset($scheme->type) && isset($types[$scheme->type])) {
+    $info = $types[$scheme->type];
+    $field_type = 'access_' . $info['type'];
+    $field_name = 'ack_' . $scheme->scheme;
+
+    // Make sure the field type is supported.
+    $supported_types = access_field_info();
+    if (!isset($supported_types[$field_type])) {
+      return;
+    }
+
+    // Create the field.
+    $field = field_info_field($field_name);
+    if (empty($field)) {
+      $field = array(
+        'field_name' => $field_name,
+        'type' => $field_type,
+        'entity_types' => array('access_grant'),
+        'cardinality' => -1,
+        'locked' => TRUE,
+        'settings' => array(
+          'allowed_values' => array(
+            array(
+              'callback' => '',
+              'arguments' => array(),
+            ),
+          ),
+        ),
+      );
+      $field = field_create_field($field);
+    }
+
+    // Create the instance.
+    $instance = field_info_instance('access_grant', $field_name, $scheme->scheme);
+    if (empty($instance)) {
+      $instance = array(
+        'field_name' => $field_name,
+        'entity_type' => 'access_grant',
+        'bundle' => $scheme->scheme,
+        'label' => t('Grant access to'),
+        'description' => t('Limit application of the role to these areas of the site.'),
+        'required' => TRUE,
+      );
+      $instance = field_create_instance($instance);
+    }
+  }
+}
+
+/**
  * Implements hook_access_scheme_update().
  */
 function access_access_scheme_update($scheme) {
@@ -390,36 +442,36 @@ function access_field_info() {
   // from being reused across entity bundles.
   return array(
     'access_integer' => array(
-      'label' => t('Access (integer)'),
+      'label' => t('Access control kit boundary (integer)'),
       'description' => t('Controls access via an integer value.'),
       'settings' => $settings,
       'default_widget' => 'options_select',
       'default_formatter' => 'access_default',
-//       'no_ui' => TRUE,
+      'no_ui' => TRUE,
     ),
     'access_float' => array(
-      'label' => t('Access (float)'),
+      'label' => t('Access control kit boundary (float)'),
       'description' => t('Controls access via a float value.'),
       'settings' => $settings,
       'default_widget' => 'options_select',
       'default_formatter' => 'access_default',
-//       'no_ui' => TRUE,
+      'no_ui' => TRUE,
     ),
     'access_text' => array(
-      'label' => t('Access (text)'),
+      'label' => t('Access control kit boundary (text)'),
       'description' => t('Controls access via a text value.'),
       'settings' => $settings,
       'default_widget' => 'options_select',
       'default_formatter' => 'access_default',
-//       'no_ui' => TRUE,
+      'no_ui' => TRUE,
     ),
     'access_boolean' => array(
-      'label' => t('Access (boolean)'),
+      'label' => t('Access control kit boundary (boolean)'),
       'description' => t('Controls access via a boolean value.'),
       'settings' => $settings,
       'default_widget' => 'options_buttons',
       'default_formatter' => 'access_default',
-//       'no_ui' => TRUE,
+      'no_ui' => TRUE,
     ),
   );
 }
