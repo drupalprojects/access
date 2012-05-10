@@ -221,7 +221,16 @@ function access_scheme_get_scheme($grant) {
 function access_scheme_get_types($format = 'types') {
   switch ($format) {
     case 'types':
-      return module_invoke_all('access_info');
+      $types = array();
+      foreach (module_implements('access_info') as $module) {
+        $info = module_invoke($module, 'access_info');
+        // Add the owning module to the data retrieved from hook_access_info().
+        foreach (array_keys($info) as $key) {
+          $info[$key]['module'] = $module;
+        }
+        $types += $info;
+      }
+      return $types;
 
     case 'list':
       $list = array();
