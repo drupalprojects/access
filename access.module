@@ -204,26 +204,28 @@ function access_scheme_get_scheme($grant) {
  *
  * @param $format
  *   A string specifying how to return the scheme type data. Allowed values are
- *   'types' (the default), 'list', and 'grouped'.
+ *   'types' (the default), 'list', 'grouped', and 'modules'.
  *
  * @return
- *   - If $format is 'types', an array as defined by hook_access_info().
- *   - If $format is 'list', an array where the keys are the scheme type machine
- *     names and the values are scheme type labels.
- *   - If $format is 'grouped', a nested array where the outer keys are the
- *     types' groups, and the inner keys and values are as in the 'list' format.
+ *   Depends on the value of $format as follows:
+ *   - 'types': an array as defined by hook_access_info().
+ *   - 'list': an array where each key is a scheme type machine name and each
+ *     value is the scheme type label.
+ *   - 'grouped': a nested array where the outer keys are the types' groups, and
+ *     the inner keys and values are as in the 'list' format.
+ *   - 'modules': an array where each key is a scheme type machine name and each
+ *     value is the module responsible for that scheme type.
  *
  * @see hook_access_info()
  */
 function access_scheme_get_types($format = 'types') {
-  $info = module_invoke_all('access_info');
   switch ($format) {
     case 'types':
-      return $info;
+      return module_invoke_all('access_info');
 
     case 'list':
       $list = array();
-      foreach ($info as $key => $type) {
+      foreach (module_invoke_all('access_info') as $key => $type) {
         $list[$key] = filter_xss_admin($type['label']);
       }
       asort($list);
@@ -231,7 +233,7 @@ function access_scheme_get_types($format = 'types') {
 
     case 'grouped':
       $grouped = array();
-      foreach ($info as $key => $type) {
+      foreach (module_invoke_all('access_info') as $key => $type) {
         $group = isset($type['group']) ? check_plain($type['group']) : t('Other');
         $grouped[$group][$key] = filter_xss_admin($type['label']);
       }
@@ -240,6 +242,15 @@ function access_scheme_get_types($format = 'types') {
       }
       ksort($grouped);
       return $grouped;
+
+    case 'modules':
+      $modules = array();
+      foreach (module_implements('access_info') as $module) {
+        foreach (module_invoke($module, 'access_info') as $key => $type) {
+          $modules[$key] = $module;
+        }
+      }
+      return $modules;
   }
 }
 
