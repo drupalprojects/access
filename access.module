@@ -373,12 +373,9 @@ function access_access_scheme_insert($scheme) {
         'cardinality' => -1,
         'locked' => TRUE,
         'settings' => array(
-          'allowed_values' => array(
-            array(
-              'callback' => '',
-              'arguments' => array(),
-            ),
-          ),
+          'boundary module' => $info['module'],
+          'boundary type' => $scheme->type,
+          'boundary arguments' => array(),
         ),
       );
       $field = field_create_field($field);
@@ -449,17 +446,14 @@ function access_scheme_page_title($scheme) {
  */
 function access_field_info() {
   $settings = array(
-    'allowed_values' => array(
-      array(
-        'callback' => '',
-        'arguments' => array(),
-      ),
-    ),
+    'boundary module' => '',
+    'boundary type' => '',
+    'boundary arguments' => array(),
   );
 
-  // This is similar to the field types defined in the list module, but with a
-  // configurable allowed_values callback and no_ui set to prevent access fields
-  // from being reused across entity bundles.
+  // This is similar to the field types defined in the list module, but with
+  // additional settings to be used by ACK plugins and no_ui set to prevent
+  // access fields from being reused across access scheme bundles.
   return array(
     'access_integer' => array(
       'label' => t('Access control kit boundary (integer)'),
@@ -541,16 +535,11 @@ function access_field_is_empty($item, $field) {
  *   (number or text), values of the array are the display labels.
  */
 function access_allowed_values($field) {
-  $values = array();
-  foreach ($field['settings']['allowed_values'] as $tree) {
-    $function = isset($tree['callback']) ? $tree['callback'] : FALSE;
-    $arguments = !empty($tree['arguments']) ? $tree['arguments'] : array();
-    // Execute the access condition's allowed values callback.
-    if (!empty($function) && function_exists($function)) {
-      $values = array_merge($values, $function($arguments));
-    }
-  }
-  return $values;
+  $module = $field['settings']['boundary module'];
+  $type = $field['settings']['boundary type'];
+  $arguments = $field['settings']['boundary arguments'];
+
+  return module_invoke($module, 'access_field_allowed_values', $type, $arguments);
 }
 
 /**
@@ -575,6 +564,21 @@ function access_field_widget_info_alter(&$info) {
  */
 function access_options_list($field, $instance, $entity_type, $entity) {
   return access_allowed_values($field);
+}
+
+/**
+ * Implements hook_field_settings_form().
+ */
+function access_field_settings_form($field, $instance, $has_data) {
+  $module = $field['settings']['boundary module'];
+  $type = $field['settings']['boundary type'];
+  $arguments = $field['settings']['boundary arguments'];
+
+  // Get the config form from the access type handler module.
+  $form['boundary arguments'] = module_invoke($module, 'access_field_settings_form', $type, $arguments);
+  $form['boundary arguments']['#tree'] = TRUE;
+
+  return $form;
 }
 
 /**
@@ -751,5 +755,7 @@ function access_theme() {
  */
 function access_hook_info() {
   $hooks['access_info'] = array('group' => 'access');
+  $hooks['access_field_allowed_values'] = array('group' => 'access');
+  $hooks['access_field_settings_form'] = array('group' => 'access');
   return $hooks;
 }
