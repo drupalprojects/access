@@ -114,7 +114,7 @@ function access_grant_form($form, &$form_state, $grant) {
     '#title' => t('Role'),
     '#weight' => -4,
   );
-  // As above, the role can't be changed after creation, either.
+  // As with the user reference above, the role can't be changed after creation.
   if (empty($grant->rid)) {
     $roles = user_roles(TRUE);
     unset($roles[DRUPAL_AUTHENTICATED_RID]);

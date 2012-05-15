@@ -31,8 +31,8 @@ function access_entity_info() {
     ),
   );
 
-  // Bundles are access schemes; some fields represent conditions for
-  // determining which objects are accessible to a user via an access grant.
+  // Bundles are access schemes; the access realm field in the bundle determines
+  // which objects are accessible to a user via an access grant.
   foreach (access_scheme_get_names() as $scheme => $name) {
     $types['access_grant']['bundles'][$scheme] = array(
       'label' => $name,
@@ -59,7 +59,7 @@ function access_grant_uri($grant) {
  * Entity label callback for an access grant.
  */
 function access_grant_label($grant, $scheme) {
-  return '@todo';
+  return '@todo How to format an access grant label?';
 }
 
 /**
@@ -134,7 +134,7 @@ function access_grant_load_multiple($gids = FALSE, $reset = FALSE) {
  * Menu title callback for an access grant.
  */
 function access_grant_page_title($grant) {
-  return '@todo';
+  return '@todo How to format an access grant page title?';
 }
 
 /**
@@ -158,7 +158,7 @@ function access_scheme_set_defaults($info = array()) {
   $new_scheme = $info + array(
     'scheme' => '',
     'name' => '',
-    'type' => '',
+    'realm_type' => '',
     'description' => '',
   );
   $new_scheme = (object) $new_scheme;
@@ -200,71 +200,7 @@ function access_scheme_get_scheme($grant) {
 }
 
 /**
- * Returns a list of all available access scheme types.
- *
- * @param $format
- *   A string specifying how to return the scheme type data. Allowed values are
- *   'types' (the default), 'list', 'grouped', and 'modules'.
- *
- * @return
- *   Depends on the value of $format as follows:
- *   - 'types': an array as defined by hook_access_info().
- *   - 'list': an array where each key is a scheme type machine name and each
- *     value is the scheme type label.
- *   - 'grouped': a nested array where the outer keys are the types' groups, and
- *     the inner keys and values are as in the 'list' format.
- *   - 'modules': an array where each key is a scheme type machine name and each
- *     value is the module responsible for that scheme type.
- *
- * @see hook_access_info()
- */
-function access_scheme_get_types($format = 'types') {
-  switch ($format) {
-    case 'types':
-      $types = array();
-      foreach (module_implements('access_info') as $module) {
-        $info = module_invoke($module, 'access_info');
-        // Add the owning module to the data retrieved from hook_access_info().
-        foreach (array_keys($info) as $key) {
-          $info[$key]['module'] = $module;
-        }
-        $types += $info;
-      }
-      return $types;
-
-    case 'list':
-      $list = array();
-      foreach (module_invoke_all('access_info') as $key => $type) {
-        $list[$key] = filter_xss_admin($type['label']);
-      }
-      asort($list);
-      return $list;
-
-    case 'grouped':
-      $grouped = array();
-      foreach (module_invoke_all('access_info') as $key => $type) {
-        $group = isset($type['group']) ? check_plain($type['group']) : t('Other');
-        $grouped[$group][$key] = filter_xss_admin($type['label']);
-      }
-      foreach (array_keys($grouped) as $group) {
-        asort($grouped[$group]);
-      }
-      ksort($grouped);
-      return $grouped;
-
-    case 'modules':
-      $modules = array();
-      foreach (module_implements('access_info') as $module) {
-        foreach (module_invoke($module, 'access_info') as $key => $type) {
-          $modules[$key] = $module;
-        }
-      }
-      return $modules;
-  }
-}
-
-/**
- * Loads an access scheme by machine name.
+ * Loads an access scheme by its URL-friendly machine name.
  *
  * @param $scheme
  *   The machine-readable name of a scheme, where '_' is replaced with '-'.
@@ -295,7 +231,7 @@ function access_scheme_save($info) {
   $fields = array(
     'scheme' => (string) $scheme->scheme,
     'name' => (string) $scheme->name,
-    'type' => (string) $scheme->type,
+    'realm_type' => (string) $scheme->realm_type,
     'description' => (string) $scheme->description,
   );
 
@@ -350,16 +286,15 @@ function access_scheme_delete($scheme) {
  * Implements hook_access_scheme_insert().
  */
 function access_access_scheme_insert($scheme) {
-  // Create an access field for the scheme.
-  $types = access_scheme_get_types();
-  if (isset($scheme->type) && isset($types[$scheme->type])) {
-    $info = $types[$scheme->type];
-    $field_type = 'access_' . $info['type'];
+  // Create the realm field for the scheme.
+  if ($info = access_realm_info($scheme->realm_type)) {
+    // Schemes and realm fields have a one-to-one relationship, so naming the
+    // field after the scheme should guarantee uniqueness.
     $field_name = 'ack_' . $scheme->scheme;
 
     // Make sure the field type is supported.
-    $supported_types = access_field_info();
-    if (!isset($supported_types[$field_type])) {
+    $field_types = access_field_info();
+    if (!isset($field_types[$info['field_type']])) {
       return;
     }
 
@@ -368,14 +303,12 @@ function access_access_scheme_insert($scheme) {
     if (empty($field)) {
       $field = array(
         'field_name' => $field_name,
-        'type' => $field_type,
+        'type' => $info['field_type'],
         'entity_types' => array('access_grant'),
         'cardinality' => -1,
         'locked' => TRUE,
         'settings' => array(
-          'boundary module' => $info['module'],
-          'boundary type' => $scheme->type,
-          'boundary arguments' => array(),
+          'arguments' => isset($info['arguments']) ? $info['arguments'] : array(),
         ),
       );
       $field = field_create_field($field);
@@ -388,8 +321,8 @@ function access_access_scheme_insert($scheme) {
         'field_name' => $field_name,
         'entity_type' => 'access_grant',
         'bundle' => $scheme->scheme,
-        'label' => t('Grant access to'),
-        'description' => t('Limit application of the role to these areas of the site.'),
+        'label' => check_plain($scheme->name),
+        'description' => filter_xss($scheme->description),
         'required' => TRUE,
       );
       $instance = field_create_instance($instance);
@@ -436,7 +369,71 @@ function access_scheme_update_grants($old, $new) {
  * Menu title callback for an access scheme.
  */
 function access_scheme_page_title($scheme) {
-  return $scheme->name;
+  return check_plain($scheme->name);
+}
+
+/**
+ * Returns access realm info.
+ *
+ * @param $realm_type
+ *   (optional) A realm type string.
+ *
+ * @return
+ *   The information array for the requested $realm_type, or FALSE if not found.
+ *   If $realm_type is omitted, returns information for all available types.
+ *
+ * @see hook_access_realm_info()
+ */
+function access_realm_info($realm_type = NULL) {
+  $types = array();
+  foreach (module_implements('access_realm_info') as $module) {
+    $info = module_invoke($module, 'access_realm_info');
+    foreach (array_keys($info) as $type) {
+      $info[$type]['module'] = $module;
+      $info[$type]['realm_type'] = $type;
+    }
+    $types += $info;
+  }
+
+  if (isset($realm_type)) {
+    return isset($types[$realm_type]) ? $types[$realm_type] : FALSE;
+  }
+  return $types;
+}
+
+/**
+ * Returns the access realm info for a given access field.
+ *
+ * @param $field
+ *   A field definition, as returned by field_info_field().
+ *
+ * @return
+ *   The information array for the field's realm type, or FALSE if not found.
+ */
+function access_realm_info_by_field($field) {
+  // Make sure the field is an access field.
+  // Only supports a one-to-one relationship between schemes and access fields.
+  $info = access_field_info();
+  if (isset($info[$field['type']]) && !empty($field['bundles']['access_grant']) && $scheme = access_scheme_get_scheme(reset($field['bundles']['access_grant']))) {
+    return access_realm_info($scheme->realm_type);
+  }
+  return FALSE;
+}
+
+/**
+ * Returns an options list of all available realm types.
+ *
+ * @return
+ *   An array where the keys are realm types and values are realm type labels.
+ */
+function access_realm_options() {
+  $options = array();
+  $realms = access_realm_info();
+  foreach ($realms as $realm_type => $info) {
+    $options[$realm_type] = $info['label'];
+  }
+  asort($options);
+  return $options;
 }
 
 /**
@@ -446,17 +443,15 @@ function access_scheme_page_title($scheme) {
  */
 function access_field_info() {
   $settings = array(
-    'boundary module' => '',
-    'boundary type' => '',
-    'boundary arguments' => array(),
+    'arguments' => array(),
   );
 
-  // This is similar to the field types defined in the list module, but with
-  // additional settings to be used by ACK plugins and no_ui set to prevent
-  // access fields from being reused across access scheme bundles.
+  // These are similar to the field types defined in list.module, but with an
+  // 'arguments' setting to be used by ACK realm plugins and 'no_ui' set to
+  // prevent access fields from being reused in other scheme bundles.
   return array(
     'access_integer' => array(
-      'label' => t('Access control kit boundary (integer)'),
+      'label' => t('Access control kit realm (integer)'),
       'description' => t('Controls access via an integer value.'),
       'settings' => $settings,
       'default_widget' => 'options_select',
@@ -464,7 +459,7 @@ function access_field_info() {
       'no_ui' => TRUE,
     ),
     'access_float' => array(
-      'label' => t('Access control kit boundary (float)'),
+      'label' => t('Access control kit realm (float)'),
       'description' => t('Controls access via a float value.'),
       'settings' => $settings,
       'default_widget' => 'options_select',
@@ -472,7 +467,7 @@ function access_field_info() {
       'no_ui' => TRUE,
     ),
     'access_text' => array(
-      'label' => t('Access control kit boundary (text)'),
+      'label' => t('Access control kit realm (text)'),
       'description' => t('Controls access via a text value.'),
       'settings' => $settings,
       'default_widget' => 'options_select',
@@ -480,7 +475,7 @@ function access_field_info() {
       'no_ui' => TRUE,
     ),
     'access_boolean' => array(
-      'label' => t('Access control kit boundary (boolean)'),
+      'label' => t('Access control kit realm (boolean)'),
       'description' => t('Controls access via a boolean value.'),
       'settings' => $settings,
       'default_widget' => 'options_buttons',
@@ -502,7 +497,7 @@ function access_field_validate($entity_type, $entity, $field, $instance, $langco
   $allowed_values = access_allowed_values($field);
   foreach ($items as $delta => $item) {
     if (!empty($item['value'])) {
-      if (!empty($allowed_values) && !isset($allowed_values[$item['value']])) {
+      if (empty($allowed_values) || !isset($allowed_values[$item['value']])) {
         $errors[$field['field_name']][$langcode][$delta][] = array(
           'error' => 'access_illegal_value',
           'message' => t('%name: illegal value.', array('%name' => $instance['label'])),
@@ -525,7 +520,7 @@ function access_field_is_empty($item, $field) {
 }
 
 /**
- * Returns the set of allowed values for an access condition field.
+ * Returns the set of allowed values (realms) for an access field.
  *
  * @param $field
  *   The field definition.
@@ -533,13 +528,14 @@ function access_field_is_empty($item, $field) {
  * @return
  *   The array of allowed values. Keys of the array are the raw stored values
  *   (number or text), values of the array are the display labels.
+ *
+ * @see hook_access_realms()
  */
 function access_allowed_values($field) {
-  $module = $field['settings']['boundary module'];
-  $type = $field['settings']['boundary type'];
-  $arguments = $field['settings']['boundary arguments'];
-
-  return module_invoke($module, 'access_field_allowed_values', $type, $arguments);
+  $info = access_realm_info_by_field($field);
+  if ($info) {
+    return module_invoke($info['module'], 'access_realms', $info['realm_type'], $field['settings']['arguments']);
+  }
 }
 
 /**
@@ -568,16 +564,13 @@ function access_options_list($field, $instance, $entity_type, $entity) {
 
 /**
  * Implements hook_field_settings_form().
+ *
+ * @see hook_access_realm_settings()
  */
 function access_field_settings_form($field, $instance, $has_data) {
-  $module = $field['settings']['boundary module'];
-  $type = $field['settings']['boundary type'];
-  $arguments = $field['settings']['boundary arguments'];
-
-  // Get the config form from the access type handler module.
-  $form['boundary arguments'] = module_invoke($module, 'access_field_settings_form', $type, $arguments);
-  $form['boundary arguments']['#tree'] = TRUE;
-
+  $info = access_realm_info_by_field($field);
+  $form['arguments'] = module_invoke($info['module'], 'access_realm_settings', $info['realm_type'], $field['settings']['arguments']);
+  $form['arguments']['#tree'] = TRUE;
   return $form;
 }
 
@@ -754,8 +747,11 @@ function access_theme() {
  * Implements hook_hook_info().
  */
 function access_hook_info() {
-  $hooks['access_info'] = array('group' => 'access');
-  $hooks['access_field_allowed_values'] = array('group' => 'access');
-  $hooks['access_field_settings_form'] = array('group' => 'access');
+  $group = array('group' => 'access');
+  $list = array('access_realm_info', 'access_realms', 'access_realm_settings');
+  $hooks = array();
+  foreach ($list as $hook) {
+    $hooks[$hook] = $group;
+  }
   return $hooks;
 }

@@ -10,69 +10,123 @@
  */
 
 /**
- * Declares information about access controls.
+ * Declares information about access realm types.
  *
- * @todo Explain proper usage.
+ * Modules can implement this hook to make various types of Drupal objects and
+ * values (such as taxonomy terms, lists, etc.) available as access realms.
+ *
+ * @return
+ *   An associative array defining one or more access realm types. The keys are
+ *   the machine names for the realm types, which must be unique among all
+ *   modules implementing this hook; module authors are advised to prefix these
+ *   machine names with the name of their module (e.g. "modulename_realmtype").
+ *   The array values are associative arrays describing the new realm type, and
+ *   should contain the following key=>value pairs:
+ *
+ *   - 'label': the human-readable name for the realm type (e.g. "a taxonomy
+ *     term"). This will be displayed in the realm type field when creating an
+ *     access scheme.
+ *
+ *   - 'field_type': the type of access field to be used to store realm values.
+ *     This must be one of the following, based on the data type required by the
+ *     new realm type: 'access_text', 'access_float', 'access_integer', or
+ *     'access_boolean'. For example, for realms based on taxonomy terms, the
+ *     field type would be 'access_integer' because terms are identified by tid.
+ *
+ *   - 'arguments': (optional) an associative array where the keys are
+ *     configuration variables needed by the realm type, and the values are the
+ *     default values for those variables. For example, taxonomy realms would
+ *     need to set this equal to array('vocabulary' => '') in order to specify
+ *     which vocabulary is to be used for access control. Modules making use of
+ *     this option should also implement hook_access_realm_settings() in order
+ *     to provide the form elements needed to set these argument values.
  */
-function hook_access_info() {
+function hook_access_realm_info() {
   $info['taxonomy_term'] = array(
-    'label' => t('a term'),
-    'type' => 'integer',
-    'group' => t('Taxonomy'),
+    'label' => t('a taxonomy term'),
+    'field_type' => 'access_integer',
+    'arguments' => array('vocabulary' => ''),
   );
   return $info;
 }
 
 /**
- * Adds settings to an access field's settings form.
+ * Provides the form elements needed to configure a realm type for a scheme.
  *
- * Modules that implement hook_access_info() can implement this hook to gather
- * any additional arguments that they need to generate an allowed values list.
- * Settings added here will be available in the $arguments parameter of
- * hook_access_field_allowed_values().
+ * Modules that implement hook_access_realm_info() and use the 'arguments' key
+ * for one or more of their defined realm types should implement this hook to
+ * provide the form elements needed to set those argument values when creating
+ * an access scheme based on those realm types.
  *
- * @param $type
- *   The access boundary type.
+ * @param $realm_type
+ *   The access realm type machine name, as defined in hook_access_realm_info().
  * @param $values
- *   The current values of the access field's boundary arguments.
+ *   The current values of the realm type arguments. When creating a new access
+ *   scheme, these will be the defaults set in hook_access_realm_info(). When
+ *   editing an existing access scheme, these will be the values previously set
+ *   by the scheme administrator.
  *
  * @return
- *   Field elements to populate the access field's settings form.
+ *   Field elements to populate the access scheme's realm settings form. The
+ *   field keys should correspond to the 'arguments' array keys set for the
+ *   $realm_type in hook_access_realm_info().
  */
-function hook_access_field_settings_form($type, $values = array()) {
-  // @todo Provide example usage of the settings form hook.
+function hook_access_realm_settings($realm_type, $values = array()) {
+  $form = array();
+  switch ($realm_type) {
+    case 'taxonomy_term':
+      $vocabularies = taxonomy_get_vocabularies();
+      $options = array();
+      foreach ($vocabularies as $vocabulary) {
+        $options[$vocabulary->machine_name] = $vocabulary->name;
+      }
+      $form['vocabulary'] = array(
+        '#type' => 'select',
+        '#title' => t('Vocabulary'),
+        '#default_value' => $values['vocabulary'],
+        '#options' => $options,
+        '#required' => TRUE,
+      );
+      break;
+  }
+  return $form;
 }
 
 /**
- * Returns the allowed values list for an access boundary field.
+ * Returns the list of realms for an access scheme.
  *
- * Modules that implement hook_access_info() should also implement this hook to
- * provide the list of allowed values for the module's access field types.
+ * Modules that implement hook_access_realm_info() must also implement this hook
+ * to provide the list of realms when one of the module's defined realm types is
+ * used in an access scheme. The return value of this hook will be used as the
+ * allowed values list for the access field when creating new access grants.
  *
- * @param $type
- *   The access boundary type.
+ * @param $realm_type
+ *   The access realm type machine name, as defined in hook_access_realm_info().
  * @param $arguments
- *   (optional) An array of additional arguments defined by the access boundary
- *   module in hook_access_field_settings_form().
+ *   (optional) An array of configuration values set for this realm type on a
+ *   scheme. See hook_access_realm_info() and hook_access_realm_settings() for
+ *   information on how modules can define and set the configuration values
+ *   needed for their realm type implementations.
  *
  * @return
- *   The array of allowed values for the field. Array keys are the values to be
- *   stored, and should match the data type declared for the field. Array values
- *   are the labels to display within the field's widget.  These labels should
- *   NOT be sanitized; options.module will handle that in the widget.
+ *   The array of available realms. Array keys are the values to be stored, and
+ *   should match the data type declared for the realm type's 'field_type' in
+ *   hook_access_realm_info(). Array values are the labels to display within
+ *   the access field's widget. These labels should NOT be sanitized;
+ *   options.module will handle that in the widget.
  */
-function hook_access_field_allowed_values($type, $arguments = array()) {
-  if ($type == 'example') {
-    return array(
-      0 => t('Zero'),
-      1 => t('One'),
-      2 => t('Two'),
-    );
+function hook_access_realms($realm_type, $arguments = array()) {
+  switch ($realm_type) {
+    case 'taxonomy_term':
+      // Re-use the allowed values function for term reference fields.
+      $field = array();
+      $field['settings']['allowed_values'][] = array('vocabulary' => $arguments['vocabulary'], 'parent' => 0);
+      return taxonomy_allowed_values($field);
   }
 }
 
 /**
- * Act on access schemes when inserted.
+ * Act on access schemes when created.
  *
  * Modules implementing this hook can act on the scheme object after it has been
  * saved to the database.
@@ -81,7 +135,7 @@ function hook_access_field_allowed_values($type, $arguments = array()) {
  *   An access scheme object.
  */
 function hook_access_scheme_insert($scheme) {
-  if ($scheme->type == 'example') {
+  if ($scheme->realm_type == 'example') {
     variable_set('access_scheme_example', TRUE);
   }
 }
@@ -96,12 +150,12 @@ function hook_access_scheme_insert($scheme) {
  *   An access scheme object.
  */
 function hook_access_scheme_update($scheme) {
-  $status = ($scheme->type == 'example') ? TRUE : FALSE;
+  $status = ($scheme->realm_type == 'example') ? TRUE : FALSE;
   variable_set('access_scheme_example', $status);
 }
 
 /**
- * Respond to the deletion on access schemes.
+ * Respond to the deletion of access schemes.
  *
  * Modules implementing this hook can respond to the deletion of access schemes
  * from the database.
@@ -110,7 +164,7 @@ function hook_access_scheme_update($scheme) {
  *   An access scheme object.
  */
 function hook_access_scheme_delete($scheme) {
-  if ($scheme->type == 'example') {
+  if ($scheme->realm_type == 'example') {
     variable_del('access_scheme_example');
   }
 }

@@ -10,7 +10,7 @@
 function access_schema() {
   // The access grant (entity) table.
   $schema['access_grant'] = array(
-    'description' => 'The base table for access grants.',
+    'description' => 'The base table for access grants. Each combination of uid, rid, and scheme must be unique.',
     'fields' => array(
       'gid' => array(
         'description' => 'The primary identifier for an access grant.',
@@ -39,6 +39,9 @@ function access_schema() {
       ),
     ),
     'primary key' => array('gid'),
+    'unique keys' => array(
+      'uid_rid_scheme' => array('uid', 'rid', 'scheme'),
+    ),
     'indexes' => array(
       'uid' => array('uid'),
       'scheme' => array(array('scheme', 4)),
@@ -76,8 +79,8 @@ function access_schema() {
         'not null' => TRUE,
         'default' => '',
       ),
-      'type' => array(
-        'description' => 'The type of access boundary used in this scheme.',
+      'realm_type' => array(
+        'description' => 'The realm type used in this scheme.',
         'type' => 'varchar',
         'length' => 255,
         'not null' => TRUE,
@@ -103,7 +106,7 @@ function access_schema() {
 function access_field_schema($field) {
   // This is basically the same as list_field_schema() from core's list module,
   // but with the type strings changed.  Unfortunately, we can't reuse list's
-  // field type definitions because we need to set no_ui on our access fields.
+  // definitions because we need 'no_ui' and custom 'settings' on our fields.
   switch ($field['type']) {
     case 'access_text':
       $columns = array(

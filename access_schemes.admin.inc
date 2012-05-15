@@ -85,7 +85,7 @@ function access_scheme_form($form, &$form_state, $scheme = NULL) {
     '#default_value' => $scheme->name,
     '#description' => t('The human-readable name of this access scheme. It is recommended that this name begin with a capital letter and contain only letters, numbers, and spaces. This name must be unique.'),
     '#required' => TRUE,
-    '#size' => 30,
+    '#size' => 28,
   );
 
   $form['scheme'] = array(
@@ -98,13 +98,14 @@ function access_scheme_form($form, &$form_state, $scheme = NULL) {
     '#description' => t('A unique machine-readable name for this access scheme. It must only contain lowercase letters, numbers, and underscores.'),
   );
 
-  $form['type'] = array(
-    '#title' => t('Define access boundaries based on'),
+  $form['realm_type'] = array(
+    '#title' => t('Realm type'),
     '#type' => 'select',
-    '#options' => access_scheme_get_types('grouped'),
-    '#default_value' => $scheme->type,
+    '#options' => access_realm_options(),
+    '#default_value' => $scheme->realm_type,
+    '#description' => t('@todo Realm type field description'),
     '#required' => TRUE,
-    '#disabled' => !empty($scheme->type),
+    '#disabled' => !empty($scheme->realm_type),
   );
 
   $form['description'] = array(
@@ -169,7 +170,7 @@ function access_scheme_form_submit($form, &$form_state) {
   $scheme->scheme = trim($form_state['values']['scheme']);
   $scheme->old_scheme = isset($form_state['values']['old_scheme']) ? $form_state['values']['old_scheme'] : $scheme->scheme;
   $scheme->name = trim($form_state['values']['name']);
-  $scheme->type = $form_state['values']['type'];
+  $scheme->realm_type = $form_state['values']['realm_type'];
   $scheme->description = $form_state['values']['description'];
 
   if ($op == t('Delete access scheme')) {
