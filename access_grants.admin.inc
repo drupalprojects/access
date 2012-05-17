@@ -116,9 +116,7 @@ function access_grant_form($form, &$form_state, $grant) {
   );
   // As with the user reference above, the role can't be changed after creation.
   if (empty($grant->rid)) {
-    $roles = user_roles(TRUE);
-    unset($roles[DRUPAL_AUTHENTICATED_RID]);
-    $form['role']['#options'] = $roles;
+    $form['role']['#options'] = access_realm_roles();
     $form['role']['#required'] = TRUE;
   }
   else {

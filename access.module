@@ -437,6 +437,21 @@ function access_realm_options() {
 }
 
 /**
+ * Returns a list of user roles available for use within access realms.
+ */
+function access_realm_roles() {
+  $realm_roles = variable_get('access_realm_roles', array());
+  $roles = user_roles(TRUE);
+  unset($roles[DRUPAL_AUTHENTICATED_RID]);
+  foreach (array_keys($roles) as $rid) {
+    if (empty($realm_roles[$rid])) {
+      unset($roles[$rid]);
+    }
+  }
+  return $roles;
+}
+
+/**
  * Implements hook_field_info().
  *
  * @see list_field_info()
@@ -629,6 +644,11 @@ function access_permission() {
     'description' => t('Assign roles to users within access realms.'),
     'restrict access' => TRUE,
   );
+  $perms['administer access control kit'] = array(
+    'title' => t('Administer access control kit'),
+    'description' => t('Change ACK module settings that affect all schemes and grants.'),
+    'restrict access' => TRUE,
+  );
   return $perms;
 }
 
@@ -728,6 +748,16 @@ function access_menu() {
     'page arguments' => array('access_scheme_delete_confirm', 4),
     'access arguments' => array('administer access schemes'),
     'file' => 'access_schemes.admin.inc',
+  );
+
+  // Administer module settings.
+  $items['admin/config/people/access'] = array(
+    'title' => 'Access control kit',
+    'description' => 'Configure access control kit settings that affect all access schemes and grants.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('access_admin_settings'),
+    'access arguments' => array('administer access control kit'),
+    'file' => 'access.admin.inc',
   );
 
   return $items;
