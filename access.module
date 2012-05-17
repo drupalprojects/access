@@ -621,10 +621,12 @@ function access_field_formatter_view($entity_type, $entity, $field, $instance, $
 function access_permission() {
   $perms['administer access schemes'] = array(
     'title' => t('Administer access schemes'),
+    'description' => t('Define the means by which objects in the site are divided into access realms.'),
     'restrict access' => TRUE,
   );
   $perms['administer access grants'] = array(
     'title' => t('Administer access grants'),
+    'description' => t('Assign roles to users within access realms.'),
     'restrict access' => TRUE,
   );
   return $perms;
