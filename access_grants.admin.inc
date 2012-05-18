@@ -8,7 +8,7 @@
  * Menu page callback; the access grants overview page.
  */
 function access_overview_grants() {
-  return '@todo';
+  return '@todo grant overview page';
 }
 
 /**
@@ -276,5 +276,5 @@ function access_grant_delete_confirm_submit($form, &$form_state) {
  * Menu page callback; view a single access grant.
  */
 function access_grant_view($grant) {
-  return '@todo';
+  return '@todo grant view page';
 }

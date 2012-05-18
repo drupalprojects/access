@@ -30,7 +30,6 @@ function access_access_realm_info() {
       'field_type' => 'access_integer',
       'arguments' => array('vocabulary' => ''),
     );
-    // @todo Add a 'settings' key to declare defaults for 'boundary arguments', so we don't have to keep checking if they're empty.
     // @todo Support cascading hierarchical privileges as an option.
     // @todo Support relationships based on fields and on taxonomy_index.
   }
@@ -39,9 +38,7 @@ function access_access_realm_info() {
     'label' => t('a user account'),
     'field_type' => 'access_integer',
   );
-  // @todo Support access to nodes based on authorship, menu items based on the
-  // authorship of the node it links to, etc. (ex. "You can edit any nodes
-  // written by Bob and any menu links that point to them.").
+  // @todo Support access to nodes based on authorship, menu items based on the authorship of the node it links to, etc. (ex. "You can edit any nodes written by Bob and any menu links that point to them.").
 
   return $info;
 }
