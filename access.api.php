@@ -126,7 +126,7 @@ function hook_access_realms($realm_type, $arguments = array()) {
 }
 
 /**
- * Act on access schemes when created.
+ * Act on access schemes when inserted.
  *
  * Modules implementing this hook can act on the scheme object after it has been
  * saved to the database.
@@ -166,6 +166,64 @@ function hook_access_scheme_update($scheme) {
 function hook_access_scheme_delete($scheme) {
   if ($scheme->realm_type == 'example') {
     variable_del('access_scheme_example');
+  }
+}
+
+/**
+ * Act on an access grant before it is saved.
+ *
+ * Modules implementing this hook can act on the access grant object before it
+ * is inserted or updated.
+ *
+ * @param $grant
+ *   An access grant object.
+ */
+function hook_access_grant_presave($grant) {
+  $grant->foo = 'bar';
+}
+
+/**
+ * Act on access grants when inserted.
+ *
+ * Modules implementing this hook can act on the grant object after it has been
+ * saved to the database.
+ *
+ * @param $grant
+ *   An access grant object.
+ */
+function hook_access_grant_insert($grant) {
+  if ($grant->uid == 1) {
+    drupal_set_message('An access grant has been created for the site administrator.');
+  }
+}
+
+/**
+ * Act on access grants when updated.
+ *
+ * Modules implementing this hook can act on the grant object after it has been
+ * updated in the database.
+ *
+ * @param $grant
+ *   An access grant object.
+ */
+function hook_access_grant_update($grant) {
+  if ($grant->uid == 1) {
+    drupal_set_message('Access changed for the site administrator.');
+  }
+}
+
+/**
+ * Respond to the deletion of access grants.
+ *
+ * Modules implementing this hook can respond to the deletion of access grants
+ * from the database.
+ *
+ * @param $grant
+ *   An access grant object.
+ */
+function hook_access_grant_delete($grant) {
+  if ($grant->uid == 1) {
+    drupal_set_message('An access grant was revoked for the site administrator.');
   }
 }
 

@@ -108,6 +108,45 @@ function access_grant_load($gid = NULL, $reset = FALSE) {
 }
 
 /**
+ * Loads access grants from the database based on a set of conditions.
+ *
+ * @param $conditions
+ *   An array of search conditions. Valid conditions are:
+ *   - 'scheme': a scheme name.
+ *   - 'uid': a user ID.
+ *   - 'rid': a role ID.
+ *   - 'realms': an array of realm values.  Only used if 'scheme' is provided.
+ *
+ * @return
+ *   An array of access grant objects matching the given parameters.
+ */
+function access_grant_load_by_condition($conditions = array()) {
+  $query = new EntityFieldQuery();
+  $query->entityCondition('entity_type', 'access_grant');
+
+  if (isset($conditions['scheme'])) {
+    $query->entityCondition('bundle', $conditions['scheme']);
+    if (isset($conditions['realms'])) {
+      $field_name = 'ack_' . $conditions['scheme'];
+      $query->fieldCondition($field_name, 'value', $conditions['realms']);
+    }
+  }
+  if (isset($conditions['uid'])) {
+    $query->propertyCondition('uid', $conditions['uid']);
+  }
+  if (isset($conditions['rid'])) {
+    $query->propertyCondition('rid', $conditions['rid']);
+  }
+
+  $result = $query->execute();
+  if (empty($result)) {
+    return array();
+  }
+  $gids = array_keys($result['access_grant']);
+  return access_grant_load_multiple($gids);
+}
+
+/**
  * Loads access grants from the database.
  *
  * Rather than accepting the deprecated $conditions parameter, as entity_load()
@@ -128,6 +167,128 @@ function access_grant_load($gid = NULL, $reset = FALSE) {
  */
 function access_grant_load_multiple($gids = FALSE, $reset = FALSE) {
   return entity_load('access_grant', $gids, array(), $reset);
+}
+
+/**
+ * Saves an access grant to the database.
+ *
+ * @param $grant
+ *   An access grant object with the following properties:
+ *   - gid: (optional) The unique ID for the grant being saved. If $grant->gid
+ *     is empty or omitted, a new grant will be inserted.
+ *   - uid: The ID of the user being granted access.
+ *   - rid: The ID of the role being granted to the user.
+ *   - scheme: The machine name of the scheme to which the grant belongs.
+ *   - original: (optional) The original grant object before any changes were
+ *     applied. When omitted, the unchanged grant object is loaded from the
+ *     database and stored in this property.
+ *   Since an access grant is an entity, any fields contained in the grant
+ *   object are saved alongside the grant object.
+ *
+ * @return
+ *   Status constant indicating whether the grant was inserted (SAVED_NEW) or
+ *   updated (SAVED_UPDATED). When inserting a new grant, $grant->gid will
+ *   contain the ID of the newly created grant.
+ */
+function access_grant_save($grant) {
+  $transaction = db_transaction();
+  try {
+    // Load the stored entity, if any.
+    if (!empty($grant->gid) && !isset($grant->original)) {
+      $grant->original = entity_load_unchanged('access_grant', $grant->gid);
+    }
+
+    field_attach_presave('access_grant', $grant);
+    module_invoke_all('access_grant_presave', $grant);
+    module_invoke_all('entity_presave', $grant, 'access_grant');
+
+    if (empty($grant->gid)) {
+      $op = 'insert';
+      $status = drupal_write_record('access_grant', $grant);
+      field_attach_insert('access_grant', $grant);
+    }
+    else {
+      $op = 'update';
+      $status = drupal_write_record('access_grant', $grant, 'gid');
+      field_attach_update('access_grant', $grant);
+    }
+
+    module_invoke_all('access_grant_' . $op, $grant);
+    module_invoke_all('entity_' . $op, $grant, 'access_grant');
+    unset($grant->original);
+
+    return $status;
+  }
+  catch (Exception $e) {
+    $transaction->rollback();
+    watchdog_exception('access', $e);
+    throw $e;
+  }
+}
+
+/**
+ * Deletes an access grant from the database.
+ *
+ * @param $gid
+ *   The grant ID.
+ *
+ * @return
+ *   Status constant indicating deletion.
+ */
+function access_grant_delete($gid) {
+  $transaction = db_transaction();
+  try {
+    if ($grant = access_grant_load($gid)) {
+      db_delete('access_grant')
+        ->condition('gid', $gid)
+        ->execute();
+
+      field_attach_delete('access_grant', $grant);
+      module_invoke_all('access_grant_delete', $grant);
+      module_invoke_all('entity_delete', $grant, 'access_grant');
+    }
+    return SAVED_DELETED;
+  }
+  catch (Exception $e) {
+    $transaction->rollback();
+    watchdog_exception('access', $e);
+    throw $e;
+  }
+}
+
+/**
+ * Implements hook_access_grant_insert().
+ */
+function access_access_grant_insert($grant) {
+  // If the user was not previously a member of the role, we need to add them to
+  // it at the system level in order for the access grant to have any effect.
+  $account = user_load($grant->uid);
+  if ($account !== FALSE && !isset($account->roles[$grant->rid])) {
+    if ($role = user_role_load($grant->rid)) {
+      $roles = $account->roles + array($role->rid => $role->name);
+      $account->original = clone $account;
+      user_save($account, array('roles' => $roles));
+    }
+  }
+}
+
+/**
+ * Implements hook_access_grant_delete().
+ */
+function access_access_grant_delete($grant) {
+  // If the deleted grant was the last one giving the user access to the role,
+  // we need to remove them from it at the system level to clean up.
+  $existing = access_grant_load_by_condition(array('uid' => $grant->uid, 'rid' => $grant->rid));
+  if (empty($existing)) {
+    $account = user_load($grant->uid);
+    if ($account !== FALSE && isset($account->roles[$grant->rid])) {
+      if ($role = user_role_load($grant->rid)) {
+        $roles = array_diff($account->roles, array($role->rid => $role->name));
+        $account->original = clone $account;
+        user_save($account, array('roles' => $roles));
+      }
+    }
+  }
 }
 
 /**
@@ -706,6 +867,13 @@ function access_menu() {
     'page arguments' => array(3),
     'access arguments' => array('administer access grants'),
     'type' => MENU_LOCAL_TASK,
+    'file' => 'access_grants.admin.inc',
+  );
+  $items['admin/access/grant/%access_grant/delete'] = array(
+    'title' => 'Delete',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('access_grant_delete_confirm', 3),
+    'access arguments' => array('administer access grants'),
     'file' => 'access_grants.admin.inc',
   );
 
