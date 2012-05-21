@@ -8,7 +8,87 @@
  * Menu page callback; the access grants overview page.
  */
 function access_overview_grants() {
-  return '@todo grant overview page';
+  $form['admin'] = access_admin_grants();
+
+  return $form;
+}
+
+/**
+ * Form constructor for the grant admin form.
+ */
+function access_admin_grants() {
+  // Build the sortable table header.
+  $header = array(
+    'username' => array(
+      'data' => t('Username'),
+      'field' => 'u.name',
+    ),
+    'role' => array(
+      'data' => t('Role'),
+      'field' => 'r.name',
+    ),
+    'realms' => t('Realms'),
+    'scheme' => array(
+      'data' => t('Scheme'),
+      'field' => 's.name',
+    ),
+    'operations' => array(
+      'data' => t('Operations'),
+      'colspan' => '3',
+    ),
+  );
+
+  $query = db_select('access_grant', 'g')
+    ->extend('PagerDefault')
+    ->extend('TableSort');
+  $query->join('users', 'u', 'g.uid = u.uid');
+  $query->join('role', 'r', 'g.rid = r.rid');
+  $query->join('access_scheme', 's', 'g.scheme = s.scheme');
+  $query->addField('g', 'gid', 'gid');
+  $query->addField('r', 'name', 'role');
+  $query->addField('s', 'name', 'scheme');
+  $result = $query
+    ->fields('u', array('uid', 'name', 'status', 'created', 'access'))
+    ->limit(50)
+    ->orderByHeader($header)
+    ->execute()
+    ->fetchAllAssoc('gid');
+  $grants = access_grant_load_multiple(array_keys($result));
+
+  // Prepare the list of grants.
+  $destination = drupal_get_destination();
+  $options = array();
+  foreach ($result as $gid => $fields) {
+    // Get the realms list, truncated for length.
+    $realms = implode(', ', access_grant_get_realms($grants[$gid]));
+    if (drupal_strlen($realms) > 30) {
+      $realms = drupal_substr($realms, 0, 25) . '...';
+    }
+
+    // Add the main columns.
+    $options[$gid] = array(
+      'username' => theme('username', array('account' => $fields)),
+      'role' => check_plain($fields->role),
+      'realms' => $realms,
+      'scheme' => check_plain($fields->scheme),
+    );
+
+    // Add the operations links.
+    $url = 'admin/access/grant/' . $gid;
+    $options[$gid][] = array('data' => l(t('view'), $url));
+    $options[$gid][] = array('data' => l(t('edit'), $url . '/edit', array('query' => $destination)));
+    $options[$gid][] = array('data' => l(t('delete'), $url . '/delete', array('query' => $destination)));
+  }
+
+  // Format as a table with pager.
+  $form['grants'] = array(
+    '#theme' => 'table',
+    '#header' => $header,
+    '#rows' => $options,
+    '#empty' => t('No access grants available.'),
+  );
+  $form['pager'] = array('#markup' => theme('pager'));
+  return $form;
 }
 
 /**

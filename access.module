@@ -91,6 +91,32 @@ function access_field_extra_fields() {
 }
 
 /**
+ * Returns the list of realms on an access grant.
+ *
+ * @param $grant
+ *   An access grant object.
+ *
+ * @return
+ *   A list of assigned realms, where the keys are the values of the grant's
+ *   access realm field, and the values are the realm labels.
+ */
+function access_grant_get_realms($grant) {
+  $field_name = 'ack_' . $grant->scheme;
+  $assigned = isset($grant->$field_name) ? $grant->$field_name : array('und' => array());
+
+  // Get the list of all possible values for the field, with labels.
+  $field = field_info_field($field_name);
+  $labels = access_allowed_values($field);
+
+  $realms = array();
+  foreach ($assigned['und'] as $data) {
+    $key = $data['value'];
+    $realms[$key] = isset($labels[$key]) ? field_filter_xss($labels[$key]) : field_filter_xss($key);
+  }
+  return $realms;
+}
+
+/**
  * Loads an access grant from the database.
  *
  * @param $gid
@@ -821,7 +847,8 @@ function access_menu() {
   $items['admin/access'] = array(
     'title' => 'Access',
     'description' => 'Manage access grants.',
-    'page callback' => 'access_overview_grants',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('access_overview_grants'),
     'access arguments' => array('administer access grants'),
     // -2 places it between "People" and "Modules" on the default admin menu.
     'weight' => -2,
