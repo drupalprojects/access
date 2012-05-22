@@ -196,7 +196,7 @@ function access_grant_add($scheme) {
  */
 function access_grant_edit($grant) {
   $scheme = access_scheme_get_scheme($grant);
-  drupal_set_title(t('<em>Edit grant by @scheme</em> @grant', array('@scheme' => $scheme->name, '@grant' => access_grant_label($grant, $grant->scheme))), PASS_THROUGH);
+  drupal_set_title(t('<em>Edit @scheme for</em> @grant', array('@scheme' => $scheme->name, '@grant' => access_grant_label($grant))), PASS_THROUGH);
   return drupal_get_form('access_grant_form', $grant);
 }
 
@@ -304,7 +304,7 @@ function access_grant_form_validate($form, &$form_state) {
       if (!empty($existing)) {
         $scheme = access_scheme_load($grant->scheme);
         $existing = reset($existing);
-        form_set_error('role', t('User %user has already been granted the %role role within the %scheme access scheme. Duplicate access grants are not permitted. Please <a href="@url">edit the existing grant</a> instead.', array('%user' => $account->name, '%role' => $role->name, '%scheme' => $scheme->name, '@url' => url('admin/access/grant/' . $existing->gid . '/edit'))));
+        form_set_error('', t('%user has already been granted access as %role in @scheme. Duplicate access grants are not permitted. Please <a href="@url">edit the existing grant</a> instead.', array('%user' => $account->name, '%role' => $role->name, '@scheme' => $scheme->name, '@url' => url('admin/access/grant/' . $existing->gid . '/edit'))));
       }
     }
   }
@@ -337,11 +337,11 @@ function access_grant_form_submit($form, &$form_state) {
   );
   switch ($status) {
     case SAVED_NEW:
-      drupal_set_message(t('Granted %user access to the %role role within the %scheme access scheme.', $t_args));
+      drupal_set_message(t('Granted %user access as %role in %scheme.', $t_args));
       watchdog('access', 'Granted %role to %user in %scheme.', $t_args, WATCHDOG_NOTICE, l(t('edit'), 'admin/access/grant/' . $grant->gid . '/edit'));
       break;
     case SAVED_UPDATED:
-      drupal_set_message(t("Updated %user's access to the %role role within the %scheme access scheme.", $t_args));
+      drupal_set_message(t("Updated %user's access as %role in %scheme.", $t_args));
       watchdog('access', 'Updated %role realms for %user in %scheme.', $t_args, WATCHDOG_NOTICE, l(t('edit'), 'admin/access/grant/' . $grant->gid . '/edit'));
       break;
   }
@@ -382,8 +382,8 @@ function access_grant_delete_confirm($form, &$form_state, $grant) {
     '%scheme' => $scheme->name,
   );
 
-  $message = t("Are you sure you want to revoke %user's access to the %role role in the %scheme access scheme?", $t_args);
-  $caption = '<p>' . t('If this is the last access grant giving %user access to the %role role, then %user will be removed from the role entirely.', $t_args) . '</p>';
+  $message = t("Are you sure you want to revoke %user's access as %role in %scheme?", $t_args);
+  $caption = '<p>' . t('If this is the last grant giving %user access as %role, then %user will be removed from the role entirely.', $t_args) . '</p>';
   $caption .= '<p>' . t('This action cannot be undone.') . '</p>';
 
   return confirm_form($form, $message, 'admin/access/grant/' . $grant->gid, $caption, t('Delete'));
@@ -404,7 +404,7 @@ function access_grant_delete_confirm_submit($form, &$form_state) {
     '%role' => $role->name,
     '%scheme' => $scheme->name,
   );
-  drupal_set_message(t('%user has been removed from the %role role for the %scheme access scheme.', $t_args));
+  drupal_set_message(t('%user has been removed from the %role role in %scheme.', $t_args));
   watchdog('access', 'Revoked %role for %user in %scheme.', $t_args, WATCHDOG_NOTICE);
 
   $form_state['redirect'] = 'admin/access';
@@ -433,7 +433,7 @@ function access_grant_multiple_delete_confirm($form, &$form_state, $selected) {
       '#type' => 'hidden',
       '#value' => $grant->gid,
       '#prefix' => '<li>',
-      '#suffix' => t('%username: %role in %scheme', array('%username' => $usernames[$grant->uid], '%role' => $roles[$grant->rid], '%scheme' => $schemes[$grant->scheme])) . "</li>\n",
+      '#suffix' => t('@user as @role in @scheme', array('@user' => $usernames[$grant->uid], '@role' => $roles[$grant->rid], '@scheme' => $schemes[$grant->scheme])) . "</li>\n",
     );
   }
 
@@ -442,7 +442,7 @@ function access_grant_multiple_delete_confirm($form, &$form_state, $selected) {
     '#value' => 'delete',
   );
   $form['#submit'][] = 'access_grant_multiple_delete_confirm_submit';
-  $confirm_question = format_plural(count($grants), 'Are you sure you want to delete this item?', 'Are you sure you want to delete these items?');
+  $confirm_question = format_plural(count($grants), 'Are you sure you want to delete this access grant?', 'Are you sure you want to delete these access grants?');
   return confirm_form($form, $confirm_question, 'admin/access', t('This action cannot be undone.'), t('Delete'), t('Cancel'));
 }
 
