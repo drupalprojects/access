@@ -7,7 +7,11 @@
 /**
  * Menu page callback; the access grants overview page.
  */
-function access_overview_grants() {
+function access_overview_grants($form, $form_state) {
+  // Check for the delete confirmation form.
+  if (isset($form_state['values']['operation']) && $form_state['values']['operation'] == 'delete') {
+    return access_grant_multiple_delete_confirm($form, $form_state, array_filter($form_state['values']['grants']));
+  }
   $form['admin'] = access_admin_grants();
 
   return $form;
@@ -15,8 +19,20 @@ function access_overview_grants() {
 
 /**
  * Form constructor for the grant admin form.
+ *
+ * @see access_admin_grants_validate()
+ * @see access_admin_grants_submit()
  */
 function access_admin_grants() {
+  // Build the delete button.
+  $form['actions'] = array('#type' => 'actions', '#weight' => -10);
+  $form['actions']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Delete selected grants'),
+    '#validate' => array('access_admin_grants_validate'),
+    '#submit' => array('access_admin_grants_submit'),
+  );
+
   // Build the sortable table header.
   $header = array(
     'username' => array(
@@ -32,10 +48,7 @@ function access_admin_grants() {
       'data' => t('Scheme'),
       'field' => 's.name',
     ),
-    'operations' => array(
-      'data' => t('Operations'),
-      'colspan' => '3',
-    ),
+    'operations' => array('data' => t('Operations')),
   );
 
   $query = db_select('access_grant', 'g')
@@ -75,20 +88,66 @@ function access_admin_grants() {
 
     // Add the operations links.
     $url = 'admin/access/grant/' . $gid;
-    $options[$gid][] = array('data' => l(t('view'), $url));
-    $options[$gid][] = array('data' => l(t('edit'), $url . '/edit', array('query' => $destination)));
-    $options[$gid][] = array('data' => l(t('delete'), $url . '/delete', array('query' => $destination)));
+    $operations = array();
+    $operations['view'] = array(
+      'title' => t('view'),
+      'href' => $url,
+    );
+    $operations['edit'] = array(
+      'title' => t('edit'),
+      'href' => $url . '/edit',
+      'query' => $destination,
+    );
+    $operations['delete'] = array(
+      'title' => t('delete'),
+      'href' => $url . '/delete',
+      'query' => $destination,
+    );
+    $options[$gid]['operations'] = array(
+      'data' => array(
+        '#theme' => 'links',
+        '#links' => $operations,
+        '#attributes' => array('class' => array('links', 'inline')),
+      ),
+    );
   }
 
   // Format as a table with pager.
   $form['grants'] = array(
-    '#theme' => 'table',
+    '#type' => 'tableselect',
     '#header' => $header,
-    '#rows' => $options,
+    '#options' => $options,
     '#empty' => t('No access grants available.'),
   );
   $form['pager'] = array('#markup' => theme('pager'));
   return $form;
+}
+
+/**
+ * Form validation handler for access_admin_grants().
+ *
+ * @see access_admin_grants_submit()
+ */
+function access_admin_grants_validate($form, &$form_state) {
+  // Error if there are no items to select.
+  if (!is_array($form_state['values']['grants']) || !count(array_filter($form_state['values']['grants']))) {
+    form_set_error('', t('No items selected.'));
+  }
+}
+
+/**
+ * Form submission handler for access_admin_grants().
+ *
+ * @see access_admin_grants_validate()
+ */
+function access_admin_grants_submit($form, &$form_state) {
+  // Filter out unchecked grants.
+  $grants = array_filter($form_state['values']['grants']);
+
+  if ($form_state['values']['op'] == t('Delete selected grants')) {
+    $form_state['values']['operation'] = 'delete';
+    $form_state['rebuild'] = TRUE;
+  }
 }
 
 /**
@@ -350,6 +409,56 @@ function access_grant_delete_confirm_submit($form, &$form_state) {
 
   $form_state['redirect'] = 'admin/access';
   return;
+}
+
+/**
+ * Form constructor for the access grant multiple delete confirmation form.
+ *
+ * @see access_grant_multiple_delete_confirm_submit()
+ */
+function access_grant_multiple_delete_confirm($form, &$form_state, $selected) {
+  $gids = array_keys($selected);
+  $grants = access_grant_load_multiple($gids);
+  $roles = user_roles();
+  $schemes = access_scheme_get_names();
+  $usernames = db_query('SELECT g.uid, u.name FROM {access_grant} g INNER JOIN {users} u ON g.uid = u.uid WHERE g.gid IN (:gids)', array(':gids' => $gids))->fetchAllKeyed();
+
+  $form['grants'] = array(
+    '#prefix' => '<ul>',
+    '#suffix' => '</ul>',
+    '#tree' => TRUE,
+  );
+  foreach ($grants as $grant) {
+    $form['grants'][$grant->gid] = array(
+      '#type' => 'hidden',
+      '#value' => $grant->gid,
+      '#prefix' => '<li>',
+      '#suffix' => t('%username: %role in %scheme', array('%username' => $usernames[$grant->uid], '%role' => $roles[$grant->rid], '%scheme' => $schemes[$grant->scheme])) . "</li>\n",
+    );
+  }
+
+  $form['operation'] = array(
+    '#type' => 'hidden',
+    '#value' => 'delete',
+  );
+  $form['#submit'][] = 'access_grant_multiple_delete_confirm_submit';
+  $confirm_question = format_plural(count($grants), 'Are you sure you want to delete this item?', 'Are you sure you want to delete these items?');
+  return confirm_form($form, $confirm_question, 'admin/access', t('This action cannot be undone.'), t('Delete'), t('Cancel'));
+}
+
+/**
+ * Form submission handler for access_grant_multiple_delete_confirm().
+ */
+function access_grant_multiple_delete_confirm_submit($form, &$form_state) {
+  if ($form_state['values']['confirm']) {
+    foreach (array_keys($form_state['values']['grants']) as $gid) {
+      access_grant_delete($gid);
+    }
+    $count = count($form_state['values']['grants']);
+    watchdog('access', 'Deleted @count access grants.', array('@count' => $count));
+    drupal_set_message(format_plural($count, 'Deleted 1 access grant.', 'Deleted @count access grants.'));
+  }
+  $form_state['redirect'] = 'admin/access';
 }
 
 /**
