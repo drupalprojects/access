@@ -86,14 +86,16 @@ function access_grant_get_realms($grant) {
   $field_name = 'ack_' . $grant->scheme;
   $assigned = isset($grant->$field_name) ? $grant->$field_name : array('und' => array());
 
-  // Get the list of all possible values for the field, with labels.
+  // Get the list of allowed values for the field, with labels.
   $field = field_info_field($field_name);
-  $labels = access_allowed_values($field);
+  $allowed = access_allowed_values($field);
 
   $realms = array();
   foreach ($assigned['und'] as $data) {
     $key = $data['value'];
-    $realms[$key] = isset($labels[$key]) ? field_filter_xss($labels[$key]) : field_filter_xss($key);
+    if (isset($allowed[$key])) {
+      $realms[$key] = field_filter_xss($allowed[$key]);
+    }
   }
   return $realms;
 }
