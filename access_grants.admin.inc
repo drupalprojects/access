@@ -12,6 +12,8 @@ function access_overview_grants($form, $form_state) {
   if (isset($form_state['values']['operation']) && $form_state['values']['operation'] == 'delete') {
     return access_grant_multiple_delete_confirm($form, $form_state, array_filter($form_state['values']['grants']));
   }
+  $form['filter'] = access_admin_grants_filter_form();
+  $form['#submit'][] = 'access_admin_grants_filter_form_submit';
   $form['admin'] = access_admin_grants();
 
   return $form;
@@ -54,6 +56,8 @@ function access_admin_grants() {
   $query = db_select('access_grant', 'g')
     ->extend('PagerDefault')
     ->extend('TableSort');
+  access_admin_grants_build_filter_query($query);
+
   $query->join('users', 'u', 'g.uid = u.uid');
   $query->join('role', 'r', 'g.rid = r.rid');
   $query->join('access_scheme', 's', 'g.scheme = s.scheme');
@@ -147,6 +151,183 @@ function access_admin_grants_submit($form, &$form_state) {
   if ($form_state['values']['op'] == t('Delete selected grants')) {
     $form_state['values']['operation'] = 'delete';
     $form_state['rebuild'] = TRUE;
+  }
+}
+
+/**
+ * Form constructor for the access grant administration filter form.
+ */
+function access_admin_grants_filter_form() {
+  $session = isset($_SESSION['access_overview_grant_filter']) ? $_SESSION['access_overview_grant_filter'] : array();
+  $filters = access_admin_grants_filters();
+
+  $i = 0;
+  $form['filters'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Show only access grants where'),
+    '#theme' => 'exposed_filters__access_grant',
+  );
+  foreach ($session as $filter) {
+    list($type, $value) = $filter;
+    if (isset($filters[$type]['options'])) {
+      $value = $filters[$type]['options'][$value];
+    }
+    else {
+      $value = check_plain($value);
+    }
+    $t_args = array(
+      '%property' => $filters[$type]['title'],
+      '%value' => $value,
+    );
+    if ($i++) {
+      $form['filters']['current'][] = array('#markup' => t('and where %property is %value', $t_args));
+    }
+    else {
+      $form['filters']['current'][] = array('#markup' => t('where %property is %value', $t_args));
+    }
+    unset($filters[$type]);
+  }
+
+  $form['filters']['available'] = array(
+    '#type' => 'container',
+    '#attributes' => array('class' => array('clearfix')),
+    '#prefix' => ($i ? '<div class="additional-filters">' . t('and where') . '</div>' : ''),
+  );
+  $form['filters']['available']['filters'] = array(
+    '#type' => 'container',
+    '#attributes' => array('class' => array('filters')),
+  );
+  foreach ($filters as $key => $filter) {
+    if (isset($filter['options'])) {
+      $form['filters']['available']['filters'][$key] = array(
+        '#type' => 'select',
+        '#options' => $filter['options'],
+        '#title' => $filter['title'],
+        '#default_value' => '[any]',
+      );
+    }
+    else {
+      $form['filters']['available']['filters'][$key] = array(
+        '#type' => 'textfield',
+        '#size' => '32',
+        '#title' => $filter['title'],
+      );
+    }
+  }
+
+  $form['filters']['available']['actions'] = array(
+    '#type' => 'actions',
+    '#attributes' => array('class' => array('container-inline')),
+  );
+  $available = element_children($form['filters']['available']['filters']);
+  if (!empty($available)) {
+    $form['filters']['available']['actions']['submit'] = array(
+      '#type' => 'submit',
+      '#value' => count($session) ? t('Refine') : t('Filter'),
+    );
+  }
+  if (count($session)) {
+    $form['filters']['available']['actions']['undo'] = array(
+      '#type' => 'submit',
+      '#value' => t('Undo'),
+    );
+    $form['filters']['available']['actions']['reset'] = array(
+      '#type' => 'submit',
+      '#value' => t('Reset'),
+    );
+  }
+
+  drupal_add_js('misc/form.js');
+
+  return $form;
+}
+
+/**
+ * Form submission handler for access_admin_grants_filter_form().
+ */
+function access_admin_grants_filter_form_submit($form, &$form_state) {
+  $filters = access_admin_grants_filters();
+  switch ($form_state['values']['op']) {
+    case t('Filter'):
+    case t('Refine'):
+      // Apply every filter that has a choice selected other than 'any'.
+      foreach ($filters as $filter => $options) {
+        if (isset($form_state['values'][$filter])) {
+          if (!isset($filters[$filter]['options'])) {
+            // Filters lacking an 'options' key are text input.
+            $_SESSION['access_overview_grant_filter'][] = array($filter, $form_state['values'][$filter]);
+          }
+          elseif ($form_state['values'][$filter] != '[any]') {
+            // Flatten the options array to accommodate hierarchical/nested options.
+            $flat_options = form_options_flatten($filters[$filter]['options']);
+            // Only accept valid selections offered on the dropdown, block bad input.
+            if (isset($flat_options[$form_state['values'][$filter]])) {
+              $_SESSION['access_overview_grant_filter'][] = array($filter, $form_state['values'][$filter]);
+            }
+          }
+        }
+      }
+      break;
+    case t('Undo'):
+      array_pop($_SESSION['access_overview_grant_filter']);
+      break;
+    case t('Reset'):
+      $_SESSION['access_overview_grant_filter'] = array();
+      break;
+  }
+}
+
+/**
+ * Lists access grant administration filters that can be applied.
+ *
+ * @return
+ *   Returns a list of filter definitions for the grant administration form.
+ *   Each key is filter identifier for access_admin_grants_build_filter_query(),
+ *   and each value is an array with the following keys:
+ *   - 'title': The translated title of the filter, to be shown on the form.
+ *   - 'options': (optional) A list of options to populate the filter as a
+ *     select field. If omitted, the filter will be rendered as a text field.
+ */
+function access_admin_grants_filters() {
+  // By role.
+  $filters['rid'] = array(
+    'title' => t('role'),
+    'options' => array('[any]' => t('any')) + access_realm_roles(),
+  );
+
+  // By scheme.
+  $filters['scheme'] = array(
+    'title' => t('scheme'),
+    'options' => array('[any]' => t('any')) + access_scheme_get_names(),
+  );
+
+  // By username.
+  $filters['username'] = array(
+    'title' => t('username'),
+  );
+
+  return $filters;
+}
+
+/**
+ * Apply filters for the access grant administration page based on session.
+ *
+ * @param $query
+ *   A SelectQuery to which the filters should be applied.
+ */
+function access_admin_grants_build_filter_query(SelectQueryInterface $query) {
+  $filter_data = isset($_SESSION['access_overview_grant_filter']) ? $_SESSION['access_overview_grant_filter'] : array();
+  foreach ($filter_data as $index => $filter) {
+    list($key, $value) = $filter;
+    switch ($key) {
+      case 'rid':
+      case 'scheme':
+        $query->condition('g.' . $key, $value);
+        break;
+      case 'username':
+        $query->condition('u.name', $value);
+        break;
+    }
   }
 }
 
