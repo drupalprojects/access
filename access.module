@@ -73,34 +73,6 @@ function access_grant_label($grant) {
 }
 
 /**
- * Implements hook_field_extra_fields().
- */
-function access_field_extra_fields() {
-  $extra = array();
-  $fields = array(
-    'user' => array(
-      'label' => t('User'),
-      'description' => t('Access control kit user reference'),
-      'weight'=> -5,
-    ),
-    'role' => array(
-      'label' => t('Role'),
-      'description' => t('Access control kit role reference'),
-      'weight' => -4,
-    ),
-  );
-
-  foreach (access_scheme_get_names() as $scheme => $name) {
-    $extra['access_grant'][$scheme] = array(
-      'form' => $fields,
-      'display' => $fields,
-    );
-  }
-
-  return $extra;
-}
-
-/**
  * Returns the list of realms on an access grant.
  *
  * @param $grant
@@ -339,6 +311,115 @@ function access_grant_page_title($grant) {
  */
 function access_grant_add_page_title($scheme) {
   return t('Grant access in @scheme', array('@scheme' => $scheme->name));
+}
+
+/**
+ * Menu page callback; view a single access grant.
+ */
+function access_grant_page_view($grant) {
+  $grants = access_grant_view_multiple(array($grant->gid => $grant), 'full');
+  return $grants;
+}
+
+/**
+ * Constructs an array for drupal_render() from an array of access grants.
+ *
+ * @param $grants
+ *   An array of grants objects, as returned by access_grant_load_multiple().
+ * @param $view_mode
+ *   View mode, e.g. 'full'.
+ * @param $weight
+ *   An integer representing the weight of the first grant in the list.
+ *
+ * @return
+ *   An array in the format expected by drupal_render().
+ */
+function access_grant_view_multiple($grants, $view_mode = 'full', $weight = 0) {
+  field_attach_prepare_view('access_grant', $grants, $view_mode);
+  entity_prepare_view('access_grant', $grants);
+  $build = array();
+  foreach ($grants as $grant) {
+    $build['grants'][$grant->gid] = access_grant_view($grant, $view_mode);
+    $build['grants'][$grant->gid]['#weight'] = $weight;
+    $weight++;
+  }
+  $build['grants']['#sorted'] = TRUE;
+  return $build;
+}
+
+/**
+ * Generates an array for rendering the given access grant.
+ *
+ * @param $grant
+ *   An access grant object.
+ * @param $view_mode
+ *   View mode, e.g. 'full'.
+ *
+ * @return
+ *   An array in the format expected by drupal_render().
+ */
+function access_grant_view($grant, $view_mode = 'full') {
+  // Retrieve all fields and attach to $grant->content.
+  access_grant_build_content($grant, $view_mode);
+
+  $build = $grant->content;
+  // We don't need it twice.
+  unset($grant->content);
+
+  $build += array(
+    '#theme' => 'access_grant',
+    '#access_grant' => $grant,
+    '#view_mode' => $view_mode,
+  );
+
+  $type = 'access_grant';
+  drupal_alter(array('access_grant_view', 'entity_view'), $build, $type);
+
+  return $build;
+}
+
+/**
+ * Builds a structured array representing the access grant in $grant->content.
+ *
+ * @param $grant
+ *   An access grant object.
+ * @param $view_mode
+ *   View mode, e.g. 'full'.
+ */
+function access_grant_build_content($grant, $view_mode = 'full') {
+  $grant->content = array();
+
+  // Build fields content.
+  // An internal flag prevents this from happening twice, such as when called
+  // through access_grant_view_multiple().
+  field_attach_prepare_view('access_grant', array($grant->gid => $grant), $view_mode);
+  entity_prepare_view('access_grant', array($grant->gid => $grant));
+  $grant->content += field_attach_view('access_grant', $grant, $view_mode);
+
+  module_invoke_all('access_grant_view', $grant, $view_mode);
+  module_invoke_all('entity_view', $grant, 'access_grant', $view_mode);
+}
+
+/**
+ * Implements hook_access_grant_view().
+ */
+function access_access_grant_view($grant) {
+  // @todo Is there some way to toggle above/inline/hidden for the label?
+  $account = user_load($grant->uid);
+  $grant->content['user'] = array(
+    '#type' => 'item',
+    '#title' => t('User:'),
+    '#markup' => theme('username', array('account' => $account)),
+    '#weight' => -5,
+  );
+
+  $role = user_role_load($grant->rid);
+  $grant->content['role'] = array(
+    '#type' => 'item',
+    '#title' => t('Role:'),
+    '#markup' => check_plain($role->name),
+    '#weight' => -4,
+  );
 }
 
 /**
@@ -828,6 +909,51 @@ function access_field_formatter_view($entity_type, $entity, $field, $instance, $
 }
 
 /**
+ * Implements hook_field_extra_fields().
+ */
+function access_field_extra_fields() {
+  $extra = array();
+  $fields = array(
+    'user' => array(
+      'label' => t('User'),
+      'description' => t('Access control kit user reference'),
+      'weight'=> -5,
+    ),
+    'role' => array(
+      'label' => t('Role'),
+      'description' => t('Access control kit role reference'),
+      'weight' => -4,
+    ),
+  );
+
+  foreach (access_scheme_get_names() as $scheme => $name) {
+    $extra['access_grant'][$scheme] = array(
+      'form' => $fields,
+      'display' => $fields,
+    );
+  }
+
+  return $extra;
+}
+
+/**
+ * Implements hook_theme().
+ */
+function access_theme() {
+  return array(
+    'access_schemes_overview' => array(
+      'variables' => array('scheme' => NULL),
+      'file' => 'access_schemes.admin.inc',
+    ),
+    'access_grant' => array(
+      'render element' => 'elements',
+      'template' => 'access-grant',
+      'file' => 'access_grants.admin.inc',
+    ),
+  );
+}
+
+/**
  * Implements hook_permission().
  */
 function access_permission() {
@@ -888,10 +1014,9 @@ function access_menu() {
   $items['admin/access/grant/%access_grant'] = array(
     'title callback' => 'access_grant_page_title',
     'title arguments' => array(3),
-    'page callback' => 'access_grant_view',
+    'page callback' => 'access_grant_page_view',
     'page arguments' => array(3),
     'access arguments' => array('administer access grants'),
-    'file' => 'access_grants.admin.inc',
   );
   $items['admin/access/grant/%access_grant/view'] = array(
     'title' => 'View',
@@ -966,18 +1091,6 @@ function access_menu() {
   );
 
   return $items;
-}
-
-/**
- * Implements hook_theme().
- */
-function access_theme() {
-  return array(
-    'access_schemes_overview' => array(
-      'variables' => array('scheme' => NULL),
-      'file' => 'access_schemes.admin.inc',
-    ),
-  );
 }
 
 /**

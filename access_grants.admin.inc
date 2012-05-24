@@ -462,8 +462,30 @@ function access_grant_multiple_delete_confirm_submit($form, &$form_state) {
 }
 
 /**
- * Menu page callback; view a single access grant.
+ * Process variables for access-grant.tpl.php.
+ *
+ * The $variables array contains the following arguments:
+ * - $access_grant
+ *
+ * @see access-grant.tpl.php
  */
-function access_grant_view($grant) {
-  return '@todo grant view page';
+function template_preprocess_access_grant(&$variables) {
+  $grant = $variables['elements']['#access_grant'];
+  $variables['access_grant'] = $grant;
+
+  // Helpful $ack variable for templates.
+  foreach (element_children($variables['elements']) as $key) {
+    $variables['ack'][$key] = $variables['elements'][$key];
+  }
+  field_attach_preprocess('access_grant', $grant, $variables['elements'], $variables);
+
+  // Add helper variables for the access realm field, since the name is dynamic.
+  $variables['access_field'] = 'ack_' . $grant->scheme;
+  $variables['ack_realms'] = $variables[$variables['access_field']];
+
+  // Add a class to identify the scheme.
+  $variables['classes_array'][] = drupal_html_class('access-grant-' . $grant->scheme);
+
+  // Allow per scheme templates.
+  $variables['theme_hook_suggestions'][] = 'access_grant__' . $grant->scheme;
 }
