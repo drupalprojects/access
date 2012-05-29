@@ -939,6 +939,52 @@ function access_field_extra_fields() {
 }
 
 /**
+ * Interface for an object access handler.
+ */
+interface AccessControlKitInterface {
+  /**
+   * Returns the list of access realms that apply to the given object.
+   *
+   * @param mixed $object
+   *   A Drupal object, such as a node, term, or menu item.  The actual data
+   *   type depends on the object for which the class is providing ACK support.
+   *
+   * @return
+   *   An array of realms of which $object is a member according to the handler.
+   */
+  public function getRealms($object);
+}
+
+/**
+ * Base class for object access handlers.
+ */
+abstract class AccessControlKit implements AccessControlKitInterface {
+  /**
+   * The access handler configuration.
+   *
+   * @var array
+   */
+  protected $settings;
+
+  /**
+   * Constructs an AccessControlKit object.
+   *
+   * @param array $settings
+   *   The handler configuration array.
+   */
+  public function __construct(array $settings = array()) {
+    $this->settings = $settings;
+  }
+
+  /**
+   * Implements AccessControlKitInterface::getRealms().
+   */
+  public function getRealms($object) {
+    return array();
+  }
+}
+
+/**
  * Implements hook_theme().
  */
 function access_theme() {

@@ -4,3 +4,6 @@ core = 7.x
 package = Access control kit
 dependencies[] = field
 dependencies[] = options
+
+; Notify the registry of the AccessControlKit class and interface.
+files[] = access.module
