@@ -476,7 +476,13 @@ function access_scheme_get_schemes() {
  */
 function access_scheme_get_scheme($grant) {
   $scheme = is_object($grant) ? $grant->scheme : $grant;
-  return db_query('SELECT * FROM {access_scheme} WHERE scheme = :scheme', array(':scheme' => $scheme))->fetchObject();
+  // Fetch the base scheme properties from the database.
+  $fields = db_query('SELECT * FROM {access_scheme} WHERE scheme = :scheme', array(':scheme' => $scheme))->fetchObject();
+  // Fetch any attached access handlers.
+  if (!empty($fields)) {
+    access_handler_attach_handlers($fields);
+  }
+  return $fields;
 }
 
 /**
@@ -554,9 +560,17 @@ function access_scheme_save($info) {
  */
 function access_scheme_delete($scheme) {
   $info = access_scheme_get_scheme($scheme);
+
+  // Detach any access handlers for this scheme.
+  db_delete('access_handler')
+    ->condition('scheme', $scheme)
+    ->execute();
+
+  // Delete the access scheme definition.
   db_delete('access_scheme')
     ->condition('scheme', $scheme)
     ->execute();
+
   // Notify the Field API and other interested modules of the deletion.
   field_attach_delete_bundle('access_grant', $scheme);
   module_invoke_all('access_scheme_delete', $info);
@@ -936,6 +950,93 @@ function access_field_extra_fields() {
   }
 
   return $extra;
+}
+
+/**
+ * Attaches configured access handlers to a scheme.
+ *
+ * @param $scheme
+ *   An access scheme object. Any handlers attached to the scheme will be added
+ *   in $scheme->handlers as an array of AccessControlKit objects, indexed by
+ *   object type (e.g. the node handler will be in $scheme->handlers['node']).
+ */
+function access_handler_attach_handlers($scheme) {
+  // Remove any previously built handlers, if any.
+  $scheme->handlers = array();
+
+  // Fetch handler configs from the database.
+  $result = db_query('SELECT * FROM {access_handler} WHERE scheme = :scheme', array(':scheme' => $scheme->scheme));
+  foreach ($result as $row) {
+    // Initialize the handler using the class and settings from the database.
+    $class = $row->handler;
+    $settings = unserialize($row->settings);
+    $scheme->handlers[$row->object_type] = new $class($settings);
+  }
+}
+
+/**
+ * Saves an access handler attachment to the database.
+ *
+ * @param $scheme
+ *   The name of the access scheme to which to attach the handler.
+ * @param $object_type
+ *   The type of Drupal object that the handler will manage (e.g. node).
+ * @param $handler
+ *   The name of the access handler class to attach.
+ * @param $module
+ *   The module that provides the handler.
+ * @param $settings
+ *   (optional) An array of settings to control the handler's behavior.
+ *
+ * @return
+ *   Status flag indicating the outcome of the database operation.
+ */
+function access_handler_save($scheme, $object_type, $handler, $module, $settings = array()) {
+  // Sanitize the inputs.
+  $fields = array(
+    'scheme' => (string) $scheme,
+    'object_type' => (string) $object_type,
+    'handler' => (string) $handler,
+    'module' => (string) $module,
+    'settings' => is_array($settings) ? $settings : (array) $settings,
+  );
+  $fields['settings'] = serialize($fields['settings']);
+
+  // Check for an existing handler attachment.
+  $is_existing = (bool) db_query_range('SELECT 1 FROM {access_handler} WHERE scheme = :scheme AND object_type = :object_type', 0, 1, array(':scheme' => $fields['scheme'], ':object_type' => $fields['object_type']))->fetchField();
+  if ($is_existing) {
+    // Update/replace the existing handler attachment.
+    db_update('access_handler')
+      ->fields($fields)
+      ->condition('scheme', $fields['scheme'])
+      ->condition('object_type', $fields['object_type'])
+      ->execute();
+    $status = SAVED_UPDATED;
+  }
+  else {
+    // Attach the new handler.
+    db_insert('access_handler')
+      ->fields($fields)
+      ->execute();
+    $status = SAVED_NEW;
+  }
+
+  return $status;
+}
+
+/**
+ * Deletes an access handler attachment from the database.
+ *
+ * @param $scheme
+ *   The name of the access scheme to which the handler is attached.
+ * @param $object_type
+ *   The type of Drupal object that the handler manages (e.g. node).
+ */
+function access_handler_delete($scheme, $object_type) {
+  db_delete('access_handler')
+    ->condition('scheme', $scheme)
+    ->condition('object_type', $object_type)
+    ->execute();
 }
 
 /**

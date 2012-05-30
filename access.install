@@ -95,6 +95,58 @@ function access_schema() {
     'primary key' => array('scheme'),
   );
 
+  // The access handler table.
+  $schema['access_handler'] = array(
+    'description' => 'Attaches object access handlers to {access_scheme} schemes.',
+    'fields' => array(
+      'scheme' => array(
+        'description' => 'The {access_scheme}.scheme to which this handler is attached.',
+        'type' => 'varchar',
+        'length' => 28,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'object_type' => array(
+        'description' => 'The type of Drupal object (e.g. node, taxonomy_term, etc.) that this handler manages. Only one handler is permitted per object type per scheme.',
+        'type' => 'varchar',
+        'length' => 128,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'handler' => array(
+        'description' => 'The name of the access handler class.',
+        'type' => 'varchar',
+        'length' => 128,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'module' => array(
+        'description' => 'The module that implements the handler.',
+        'type' => 'varchar',
+        'length' => 128,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'settings' => array(
+        'description' => 'Serialized data containing the handler settings, as defined by the implementing module.',
+        'type' => 'blob',
+        'size' => 'big',
+        'not null' => TRUE,
+        'serialize' => TRUE,
+      ),
+    ),
+    'primary key' => array('scheme', 'object_type'),
+    'foreign keys' => array(
+      'handler_scheme' => array(
+        'table' => 'access_scheme',
+        'columns' => array('scheme' => 'scheme'),
+      ),
+    ),
+    'indexes' => array(
+      'scheme' => array(array('scheme', 4)),
+    ),
+  );
+
   return $schema;
 }
 
