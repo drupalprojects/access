@@ -96,6 +96,7 @@ function access_scheme_form($form, &$form_state, $scheme = NULL) {
       'exists' => 'access_scheme_load',
     ),
     '#description' => t('A unique machine-readable name for this access scheme. It must only contain lowercase letters, numbers, and underscores.'),
+    '#disabled' => !empty($scheme->scheme),
   );
 
   // The realm type can only be set when creating a new scheme.
