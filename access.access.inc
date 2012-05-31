@@ -46,7 +46,7 @@ function access_access_realm_info() {
 /**
  * Implements hook_access_realm_settings().
  */
-function access_access_realm_settings($realm_type, $values = array()) {
+function access_access_realm_settings($realm_type, $has_data, $values = array()) {
   $form = array();
   switch ($realm_type) {
     case 'list_integer':
@@ -61,6 +61,7 @@ function access_access_realm_settings($realm_type, $values = array()) {
         '#default_value' => $values['field'],
         '#options' => $options,
         '#required' => TRUE,
+        '#disabled' => $has_data,
       );
       break;
 
@@ -77,6 +78,7 @@ function access_access_realm_settings($realm_type, $values = array()) {
         '#default_value' => $values['vocabulary'],
         '#options' => $options,
         '#required' => TRUE,
+        '#disabled' => $has_data,
       );
       break;
   }

@@ -98,15 +98,56 @@ function access_scheme_form($form, &$form_state, $scheme = NULL) {
     '#description' => t('A unique machine-readable name for this access scheme. It must only contain lowercase letters, numbers, and underscores.'),
   );
 
-  $form['realm_type'] = array(
-    '#title' => t('Realm type'),
-    '#type' => 'select',
-    '#options' => access_realm_options(),
-    '#default_value' => $scheme->realm_type,
-    '#description' => t('@todo Realm type field description'),
-    '#required' => TRUE,
-    '#disabled' => !empty($scheme->realm_type),
-  );
+  // The realm type can only be set when creating a new scheme.
+  if (empty($scheme->realm_type)) {
+    $form['realm_type'] = array(
+      '#title' => t('Realm type'),
+      '#type' => 'select',
+      '#options' => access_realm_options(),
+      '#description' => t('The base object for dividing the site into access realms. For example, if the realm type is a list field, you will be able to grant users access to content based upon the values of that field.'),
+      '#required' => TRUE,
+      '#ajax' => array(
+        'callback' => 'access_scheme_realm_settings_js',
+        'wrapper' => 'realm-settings-wrapper',
+        'effect' => 'fade',
+      ),
+    );
+
+    $form['realm_settings'] = array(
+      '#prefix' => '<div id="realm-settings-wrapper">',
+      '#suffix' => '</div>',
+      '#type' => 'container',
+    );
+
+    // Dynamically add the settings, if any, for the selected realm type.
+    if (!empty($form_state['values']['realm_type']) && $form_state['values']['realm_type']) {
+      $realm_type = $form_state['values']['realm_type'];
+      $info = access_realm_info($realm_type);
+      $form['realm_settings']['arguments'] = module_invoke($info['module'], 'access_realm_settings', $realm_type, FALSE);
+      $form['realm_settings']['arguments']['#tree'] = TRUE;
+    }
+  }
+  else {
+    // For editing existing schemes, the realm type is unchangeable.
+    $form['realm_type'] = array('#type' => 'value', '#value' => $scheme->realm_type);
+
+    // Display a summary of the realm type.
+    $options = access_realm_options();
+    $form['realm_info'] = array(
+      '#type' => 'item',
+      '#title' => t('Realm type'),
+      '#markup' => check_plain($options[$scheme->realm_type]),
+    );
+    // Show the current realm field settings, if any, as a list.
+    $field = field_info_field('ack_' . $scheme->scheme);
+    if (!empty($field['settings']['arguments'])) {
+      $form['realm_info']['#description'] = '<ul>';
+      foreach ($field['settings']['arguments'] as $key => $value) {
+        $form['realm_info']['#description'] .= '<li>[' . check_plain($key) . '] ' . check_plain($value) . '</li>';
+      }
+      $form['realm_info']['#description'] .= '</ul>';
+    }
+  }
 
   $form['description'] = array(
     '#title' => t('Description'),
@@ -172,6 +213,9 @@ function access_scheme_form_submit($form, &$form_state) {
   $scheme->name = trim($form_state['values']['name']);
   $scheme->realm_type = $form_state['values']['realm_type'];
   $scheme->description = $form_state['values']['description'];
+  if (isset($form_state['values']['arguments'])) {
+    $scheme->realm_settings = $form_state['values']['arguments'];
+  }
 
   if ($op == t('Delete access scheme')) {
     $form_state['redirect'] = 'admin/structure/access/manage/' . str_replace('_', '-', $scheme->old_scheme) . '/delete';

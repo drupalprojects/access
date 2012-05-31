@@ -605,6 +605,11 @@ function access_access_scheme_insert($scheme) {
           'arguments' => isset($info['arguments']) ? $info['arguments'] : array(),
         ),
       );
+      // If the realm field is configurable, merge in any available field
+      // settings attached to the scheme.
+      if (!empty($field['settings']['arguments']) && isset($scheme->realm_settings)) {
+        $field['settings']['arguments'] = array_merge($field['settings']['arguments'], $scheme->realm_settings);
+      }
       $field = field_create_field($field);
     }
 
@@ -664,6 +669,15 @@ function access_scheme_update_grants($old, $new) {
  */
 function access_scheme_page_title($scheme) {
   return check_plain($scheme->name);
+}
+
+/**
+ * AJAX callback to get the settings form for a scheme's selected realm type.
+ *
+ * @see access_scheme_form()
+ */
+function access_scheme_realm_settings_js($form, $form_state) {
+  return $form['realm_settings'];
 }
 
 /**
@@ -878,7 +892,7 @@ function access_options_list($field, $instance, $entity_type, $entity) {
  */
 function access_field_settings_form($field, $instance, $has_data) {
   $info = access_realm_info_by_field($field);
-  $form['arguments'] = module_invoke($info['module'], 'access_realm_settings', $info['realm_type'], $field['settings']['arguments']);
+  $form['arguments'] = module_invoke($info['module'], 'access_realm_settings', $info['realm_type'], $has_data, $field['settings']['arguments']);
   $form['arguments']['#tree'] = TRUE;
   return $form;
 }

@@ -60,6 +60,8 @@ function hook_access_realm_info() {
  *
  * @param $realm_type
  *   The access realm type machine name, as defined in hook_access_realm_info().
+ * @param $has_data
+ *   A boolean indicating whether access grants already exist for the scheme.
  * @param $values
  *   The current values of the realm type arguments. When creating a new access
  *   scheme, these will be the defaults set in hook_access_realm_info(). When
@@ -71,7 +73,7 @@ function hook_access_realm_info() {
  *   field keys should correspond to the 'arguments' array keys set for the
  *   $realm_type in hook_access_realm_info().
  */
-function hook_access_realm_settings($realm_type, $values = array()) {
+function hook_access_realm_settings($realm_type, $has_data, $values = array()) {
   $form = array();
   switch ($realm_type) {
     case 'taxonomy_term':
@@ -86,6 +88,7 @@ function hook_access_realm_settings($realm_type, $values = array()) {
         '#default_value' => $values['vocabulary'],
         '#options' => $options,
         '#required' => TRUE,
+        '#disabled' => $has_data,
       );
       break;
   }
