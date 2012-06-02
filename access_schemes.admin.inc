@@ -12,7 +12,7 @@ function access_overview_schemes() {
   $field_ui = module_exists('field_ui');
   $header = array(t('Name'), array(
     'data' => t('Operations'),
-    'colspan' => $field_ui ? '4' : '2',
+    'colspan' => $field_ui ? '5' : '3',
   ));
   $rows = array();
 
@@ -22,6 +22,8 @@ function access_overview_schemes() {
 
     // The edit operation.
     $row[] = array('data' => l(t('edit'), $url));
+    // The manage access handlers operation.
+    $row[] = array('data' => l(t('manage access handlers'), $url . '/handlers'));
 
     // Field UI operations.
     if ($field_ui) {
@@ -160,7 +162,7 @@ function access_scheme_form($form, &$form_state, $scheme = NULL) {
   $form['actions'] = array('#type' => 'actions');
   $form['actions']['submit'] = array(
     '#type' => 'submit',
-    '#value' => t('Save access scheme'),
+    '#value' => empty($scheme->scheme) ? t('Save access scheme and add handlers') : t('Save access scheme'),
     '#weight' => 40,
   );
   if (!empty($scheme->scheme)) {
@@ -210,6 +212,7 @@ function access_scheme_form_submit($form, &$form_state) {
 
   $scheme = access_scheme_set_defaults();
   $scheme->scheme = trim($form_state['values']['scheme']);
+  // @todo Eliminate the "old_scheme" convention entirely? We already don't allow changing the machine name through the UI, and we don't have a good way of renaming the access field to match if the machine name did change.
   $scheme->old_scheme = isset($form_state['values']['old_scheme']) ? $form_state['values']['old_scheme'] : $scheme->scheme;
   $scheme->name = trim($form_state['values']['name']);
   $scheme->realm_type = $form_state['values']['realm_type'];
@@ -229,14 +232,13 @@ function access_scheme_form_submit($form, &$form_state) {
   $t_args = array('%name' => $scheme->name);
   if ($status == SAVED_UPDATED) {
     drupal_set_message(t('The access scheme %name has been updated.', $t_args));
+    $form_state['redirect'] = 'admin/structure/access';
   }
   elseif ($status == SAVED_NEW) {
     drupal_set_message(t('The access scheme %name has been added.', $t_args));
     watchdog('access', 'Added access scheme %name.', $t_args, WATCHDOG_NOTICE, l(t('view'), 'admin/structure/access'));
+    $form_state['redirect'] = 'admin/structure/access/manage/' . str_replace('_', '-', $scheme->scheme) . '/handlers';
   }
-
-  $form_state['redirect'] = 'admin/structure/access';
-  return;
 }
 
 /**
@@ -274,4 +276,114 @@ function access_scheme_delete_confirm_submit($form, &$form_state) {
 
   $form_state['redirect'] = 'admin/structure/access';
   return;
+}
+
+/**
+ * Form constructor for managing a scheme's attached access handlers.
+ */
+function access_scheme_handlers_form($form, &$form_state, $scheme) {
+  $form['#scheme'] = $scheme;
+
+  // Get information on all available access handlers.
+  $info = module_invoke_all('access_info');
+  if (empty($info)) {
+    return array('empty' => array('#markup' => t('No access handlers available. In order to control access to content, menu items, or other Drupal objects, you must first <a href="@link">enable one or more modules</a> that provide Access Control Kit handlers, such as the ACK node module.', array('@link' => url('admin/modules')))));
+  }
+
+  // Get the scheme's realm settings, for use below by handlers.
+  $field = field_info_field('ack_' . $scheme->scheme);
+  $realm_settings = isset($field['settings']['arguments']) ? $field['settings']['arguments'] : array();
+
+  // Display each supported object type as a vertical tab.
+  $form['objects'] = array('#type' => 'vertical_tabs');
+  foreach ($info as $object => $object_data) {
+    $form['objects'][$object] = array(
+      '#type' => 'fieldset',
+      '#title' => $object_data['label'],
+      '#tree' => TRUE,
+    );
+
+    // Construct an ID for the AJAX settings form (below) in a manner similar to
+    // drupal_html_id(), but without the uniqueness logic, so that it doesn't
+    // increment on a rebuild.
+    $id = 'handler-settings-wrapper-' . $object;
+    $id = strtr(drupal_strtolower($id), array(' ' => '-', '_' => '-', '[' => '-', ']' => ''));
+    $id = preg_replace('/[^A-Za-z0-9\-_]/', '', $id);
+    $id = preg_replace('/\-+/', '-', $id);
+
+    // Handler selector.
+    $form['objects'][$object]['handler'] = array(
+      '#type' => 'select',
+      '#title' => t('@object access realms are determined by', array('@object' => $object_data['label'])),
+      '#options' => array(),
+      '#default_value' => isset($scheme->handlers[$object]) ? get_class($scheme->handlers[$object]) : '',
+      '#empty_option' => t('- Not managed -'),
+      '#ajax' => array(
+        'callback' => 'access_handler_settings_js',
+        'wrapper' => $id,
+        'effect' => 'fade',
+      ),
+    );
+    // Only show handlers that match the scheme's realm type.
+    foreach ($object_data['handlers'] as $handler => $handler_data) {
+      if (in_array($scheme->realm_type, $handler_data['realm types'])) {
+        $form['objects'][$object]['handler']['#options'][$handler] = $handler_data['label'];
+      }
+    }
+
+    $form['objects'][$object]['settings'] = array(
+      '#prefix' => '<div id="' . $id . '">',
+      '#suffix' => '</div>',
+      '#type' => 'container',
+    );
+
+    // Dynamic settings form for the handler.
+    $selected_handler = NULL;
+    if (!empty($form_state['values'][$object]['handler'])) {
+      // The user has selected a new handler and we're rebuilding via AJAX.
+      // Check whether the new selection is the currently saved handler.
+      if (isset($scheme->handlers[$object]) && $form_state['values'][$object]['handler'] == get_class($scheme->handlers[$object])) {
+        // Use the already configured object.
+        $selected_handler = $scheme->handlers[$object];
+      }
+      else {
+        // Use an unconfigured instance of the selected handler class.
+        $class = $form_state['values'][$object]['handler'];
+        $selected_handler = new $class();
+      }
+    }
+    elseif (isset($scheme->handlers[$object])) {
+      // On initial build, show the currently active handler's settings.
+      $selected_handler = $scheme->handlers[$object];
+    }
+    // If we were able to determine a handler above, add its settings form.
+    if (isset($selected_handler)) {
+      $form['objects'][$object]['settings']['arguments'] = $selected_handler->settingsForm($scheme->realm_type, $realm_settings);
+    }
+  }
+
+  $form['actions'] = array('#type' => 'actions');
+  $form['actions']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Save'),
+    '#weight' => 40,
+  );
+  return $form;
+}
+
+/**
+ * Form submission handler for access_scheme_handlers_form().
+ */
+function access_scheme_handlers_form_submit($form, &$form_state) {
+  $scheme = $form['#scheme'];
+  $modules = module_implements('access_info');
+  foreach ($modules as $module) {
+    $info = module_invoke($module, 'access_info');
+    foreach ($info as $object => $object_data) {
+      if (!empty($form_state['values'][$object]['handler'])) {
+        $settings = empty($form_state['values'][$object]['settings']['arguments']) ? array() : $form_state['values'][$object]['settings']['arguments'];
+        access_handler_save($scheme->scheme, $object, $form_state['values'][$object]['handler'], $module, $settings);
+      }
+    }
+  }
 }

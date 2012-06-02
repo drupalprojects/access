@@ -28,4 +28,15 @@ class ACKNodeList extends AccessControlKit {
     }
     return $realms;
   }
+
+  /**
+   * Implements AccessControlKitInterface::settingsForm().
+   */
+  public function settingsForm($realm_type, array $realm_settings = array()) {
+    // Inherit the realm's list field as the handler's connection to the node.
+    if (isset($realm_settings['field'])) {
+      $form['field_name'] = array('#type' => 'value', '#value' => $realm_settings['field']);
+      return $form;
+    }
+  }
 }

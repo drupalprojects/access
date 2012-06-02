@@ -1054,6 +1054,20 @@ function access_handler_delete($scheme, $object_type) {
 }
 
 /**
+ * AJAX callback to get the settings form for a selected access handler.
+ *
+ * @see access_scheme_handlers_form()
+ */
+function access_handler_settings_js($form, $form_state) {
+  // This callback is triggered by a handler selector element in
+  // access_scheme_handlers_form(). Both the handler element and its associated
+  // settings element (which we're replacing) are in $form['objects'][$object],
+  // so the triggering handler element's first parent should be the $object key.
+  $object = $form_state['triggering_element']['#parents'][0];
+  return $form['objects'][$object]['settings'];
+}
+
+/**
  * Interface for an object access handler.
  */
 interface AccessControlKitInterface {
@@ -1068,6 +1082,26 @@ interface AccessControlKitInterface {
    *   An array of realms of which $object is a member according to the handler.
    */
   public function getRealms($object);
+
+  /**
+   * Returns form elements needed to configure the handler.
+   *
+   * @param $realm_type
+   *   The realm type of the access scheme to which the handler is attached.
+   * @param array $realm_settings
+   *   (optional) An array of configuration arguments for the realm type.
+   *
+   * @return
+   *   An array of form elements, or array() if the handler does not require
+   *   configuration. The array should not normally include a submit button, as
+   *   one will be provided automatically by the ACK UI. The submitted values of
+   *   the form will be saved as-is in the handler's settings array when
+   *   attaching the handler to an access scheme. Note that the returned
+   *   elements will be wrapped in an element with '#tree' => TRUE when this
+   *   method is called by the ACK UI, and thus the submitted values will retain
+   *   their structure in $this->settings.
+   */
+   public function settingsForm($realm_type, array $realm_settings = array());
 }
 
 /**
@@ -1095,6 +1129,13 @@ abstract class AccessControlKit implements AccessControlKitInterface {
    * Implements AccessControlKitInterface::getRealms().
    */
   public function getRealms($object) {
+    return array();
+  }
+
+  /**
+   * Implements AccessControlKitInterface::settingsForm().
+   */
+  public function settingsForm($realm_type, array $realm_settings = array()) {
     return array();
   }
 }
@@ -1235,6 +1276,14 @@ function access_menu() {
   $items['admin/structure/access/manage/%access_scheme/edit'] = array(
     'title' => 'Edit',
     'type' => MENU_DEFAULT_LOCAL_TASK,
+  );
+  $items['admin/structure/access/manage/%access_scheme/handlers'] = array(
+    'title' => 'Manage access handlers',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('access_scheme_handlers_form', 4),
+    'access arguments' => array('administer access schemes'),
+    'file' => 'access_schemes.admin.inc',
+    'type' => MENU_LOCAL_TASK,
   );
   $items['admin/structure/access/manage/%access_scheme/delete'] = array(
     'title' => 'Delete',

@@ -28,7 +28,7 @@ function ack_node_access_info() {
   // Handlers for list fields.
   if (module_exists('list')) {
     $info['node']['handlers']['ACKNodeList'] = array(
-      'label' => t('a list field'),
+      'label' => t('the list field'),
       'realm types' => array('list_integer', 'list_float', 'list_text'),
     );
   }
