@@ -1145,6 +1145,34 @@ abstract class AccessControlKit implements AccessControlKitInterface {
 }
 
 /**
+ * Returns a list of realms that apply to an object per scheme.
+ *
+ * @param $object_type
+ *   The type of access controlled object, such as 'node'.
+ * @param $object
+ *   The object for which to return realm memberships.
+ * @param $schemes
+ *   (optional) An array of access scheme objects. If given, returns only realm
+ *   memberships for these schemes. Otherwise, returns realms for all schemes.
+ *
+ * @return
+ *   An array indexed by scheme machine name where each value is an array of
+ *   realms of which the $object is a member according to that scheme. If the
+ *   $object is not a member of any realms for a scheme, that scheme's value
+ *   will be array().
+ */
+function access_object_realms($object_type, $object, $schemes = NULL) {
+  if (!isset($schemes)) {
+    $schemes = access_scheme_get_schemes();
+  }
+  $realms = array();
+  foreach ($schemes as $scheme) {
+    $realms[$scheme->scheme] = isset($scheme->handlers[$object_type]) ? $scheme->handlers[$object_type]->getRealms($object) : array();
+  }
+  return $realms;
+}
+
+/**
  * Implements hook_theme().
  */
 function access_theme() {
