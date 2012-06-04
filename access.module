@@ -462,7 +462,11 @@ function access_scheme_get_names() {
  *   An array of access scheme objects, keyed by machine name.
  */
 function access_scheme_get_schemes() {
-  return db_query('SELECT * FROM {access_scheme} ORDER BY scheme')->fetchAllAssoc('scheme');
+  $schemes = db_query('SELECT * FROM {access_scheme} ORDER BY scheme')->fetchAllAssoc('scheme');
+  foreach ($schemes as $scheme) {
+    access_handler_attach_handlers($scheme);
+  }
+  return $schemes;
 }
 
 /**
