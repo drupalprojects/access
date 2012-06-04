@@ -22,8 +22,10 @@ class ACKNodeTaxonomyTermReference extends AccessControlKit {
     $realms = array();
     if (isset($node->$field_name)) {
       $terms = $node->$field_name;
-      foreach ($terms['und'] as $term) {
-        $realms[] = $term['tid'];
+      if (!empty($terms['und'])) {
+        foreach ($terms['und'] as $term) {
+          $realms[] = $term['tid'];
+        }
       }
     }
     return $realms;

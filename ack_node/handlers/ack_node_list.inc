@@ -22,8 +22,10 @@ class ACKNodeList extends AccessControlKit {
     $realms = array();
     if (isset($node->$field_name)) {
       $list = $node->$field_name;
-      foreach ($list['und'] as $item) {
-        $realms[] = $item['value'];
+      if (!empty($list['und'])) {
+        foreach ($list['und'] as $item) {
+          $realms[] = $item['value'];
+        }
       }
     }
     return $realms;
