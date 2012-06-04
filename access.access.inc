@@ -12,7 +12,6 @@ function access_access_realm_info() {
     'label' => t('a boolean value'),
     'field_type' => 'access_boolean',
   );
-  // @todo Access handlers will relate this to node properties, list fields, etc.
 
   if (module_exists('list')) {
     foreach (array('integer', 'float', 'text') as $type) {
@@ -31,7 +30,6 @@ function access_access_realm_info() {
       'arguments' => array('vocabulary' => ''),
     );
     // @todo Support cascading hierarchical privileges as an option.
-    // @todo Support relationships based on fields and on taxonomy_index.
   }
 
   $info['user'] = array(
