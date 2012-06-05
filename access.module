@@ -1203,9 +1203,12 @@ function access_user_roles($account = NULL) {
   // On cache miss, load all grants for the user and sort by role and scheme.
   if (!isset($user_roles[$account->uid])) {
     $grants = access_grant_load_by_condition(array('uid' => $account->uid));
+    $allowed_roles = access_realm_roles();
     $roles = array();
     foreach ($grants as $grant) {
-      $roles[$grant->rid][$grant->scheme] = access_grant_get_realms($grant);
+      if (isset($allowed_roles[$grant->rid])) {
+        $roles[$grant->rid][$grant->scheme] = access_grant_get_realms($grant);
+      }
     }
     $user_roles[$account->uid] = $roles;
   }
