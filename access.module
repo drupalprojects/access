@@ -1173,6 +1173,47 @@ function access_object_realms($object_type, $object, $schemes = NULL) {
 }
 
 /**
+ * Returns a list of a user's ACK roles with scheme and realm assignments.
+ *
+ * @param $account
+ *   (optional) The account to check. Defaults to the currently logged in user.
+ *
+ * @return
+ *   A nested array indexed first by role ID, then by scheme machine name, where
+ *   where the values are an array containing the user's assigned realms for
+ *   that role in that scheme. Note that the list of roles is limited to those
+ *   returned by access_realm_roles(); non-ACK roles are excluded.
+ *
+ * @see access_realm_roles()
+ */
+function access_user_roles($account = NULL) {
+  global $user;
+  if (!isset($account)) {
+    $account = $user;
+  }
+
+  // Cache the user role list using the advanced drupal_static() pattern for
+  // best performance on repeated access checks.
+  static $drupal_static_fast;
+  if (!isset($drupal_static_fast)) {
+    $drupal_static_fast['user_roles'] = &drupal_static(__FUNCTION__);
+  }
+  $user_roles = &$drupal_static_fast['user_roles'];
+
+  // On cache miss, load all grants for the user and sort by role and scheme.
+  if (!isset($user_roles[$account->uid])) {
+    $grants = access_grant_load_by_condition(array('uid' => $account->uid));
+    $roles = array();
+    foreach ($grants as $grant) {
+      $roles[$grant->rid][$grant->scheme] = access_grant_get_realms($grant);
+    }
+    $user_roles[$account->uid] = $roles;
+  }
+
+  return $user_roles[$account->uid];
+}
+
+/**
  * Implements hook_theme().
  */
 function access_theme() {
