@@ -1217,6 +1217,81 @@ function access_user_roles($account = NULL) {
 }
 
 /**
+ * Determines whether a user has a given permission on a given object.
+ *
+ * @param $string
+ *   The permission, such as "edit any page", being checked for.
+ * @param $object_type
+ *   The type of access controlled object, such as "node".
+ * @param $object
+ *   The object that the user is trying to access.
+ * @param $account
+ *   (optional) The account to check. Defaults to the currently logged in user.
+ *
+ * @return
+ *   Boolean TRUE if the user has the requested permission on the object.
+ */
+function access_user_object_access($string, $object_type, $object, $account = NULL) {
+  global $user;
+  if (!isset($account)) {
+    $account = $user;
+  }
+
+  // Sanity check to make sure the user has the permission at all.
+  if (!user_access($string, $account)) {
+    return FALSE;
+  }
+  // User #1 has all privileges on all objects.
+  if ($account->uid == 1) {
+    return TRUE;
+  }
+
+  // Get the object's realm memberships via access scheme handlers.
+  $object_realms = access_object_realms($object_type, $object);
+  // Get the user's realm role assignments via access grants.
+  $user_roles = access_user_roles($account);
+  // Get the list of all roles available for use in realms. Any roles assigned
+  // to the user that are not in this list will be considered global.
+  $realm_roles = access_realm_roles();
+
+  // See which of the user's roles apply to the object globally or by realm.
+  $match = array();
+  foreach ($account->roles as $rid => $name) {
+    if (!isset($realm_roles[$rid])) {
+      // Non-realm roles apply globally.
+      $match[$rid] = TRUE;
+    }
+    elseif (isset($user_roles[$rid])) {
+      // Realm roles that were assigned to the user via an access grant only
+      // apply if the role's scheme and realm assignments match the object.
+      // Note that if a realm role was somehow associated with the user, but
+      // there are no access grants giving the user access to use that role in a
+      // realm (for example, if a role reserved for ACK was directly assigned to
+      // the user by another module), the "elseif" statement above will cause
+      // that role to be excluded from consideration. This enforces the concept
+      // that ACK roles should not be used outside of ACK.
+      foreach ($object_realms as $scheme => $realms) {
+        foreach ($realms as $realm) {
+          if (isset($user_roles[$rid][$scheme][$realm])) {
+            $match[$rid] = TRUE;
+            break 2;
+          }
+        }
+      }
+    }
+  }
+
+  // Check whether any applicable role provides the requested permission.
+  $role_permissions = user_role_permissions($match);
+  foreach ($role_permissions as $permissions) {
+    if (isset($permissions[$string])) {
+      return TRUE;
+    }
+  }
+  return FALSE;
+}
+
+/**
  * Implements hook_theme().
  */
 function access_theme() {
