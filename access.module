@@ -1206,7 +1206,11 @@ function access_user_roles($account = NULL) {
     $allowed_roles = access_realm_roles();
     $roles = array();
     foreach ($grants as $grant) {
-      if (isset($allowed_roles[$grant->rid])) {
+      // Only include roles that are in the current list of ACK-enabled roles
+      // (in case the module settings have changed), and that are currently
+      // associated with the user (in case another module revoked a role without
+      // ACK being notified to clean up grants).
+      if (isset($allowed_roles[$grant->rid]) && isset($account->roles[$grant->rid])) {
         $roles[$grant->rid][$grant->scheme] = access_grant_get_realms($grant);
       }
     }
@@ -1241,50 +1245,96 @@ function access_user_object_access($string, $object_type, $object, $account = NU
   if (!user_access($string, $account)) {
     return FALSE;
   }
-  // User #1 has all privileges on all objects.
+
+  // If the user has the permission globally, realm assignments don't matter.
+  if (access_user_permission_global($string, $account)) {
+    return TRUE;
+  }
+
+  // Get the list of realms in which the user has the requested permission.
+  $user_realms = access_user_permission_realms($string, $account);
+  // Get the object's realm memberships via access scheme handlers.
+  $object_realms = access_object_realms($object_type, $object);
+  // Check whether the object is a member of any realm in which the user has the
+  // requested permission.
+  foreach ($object_realms as $scheme => $realms) {
+    foreach ($realms as $realm) {
+      if (isset($user_realms[$scheme][$realm])) {
+        return TRUE;
+      }
+    }
+  }
+  return FALSE;
+}
+
+/**
+ * Determines in which realms a user has a given permission.
+ *
+ * @param $string
+ *   The permission, such as "edit any page", being checked for.
+ * @param $account
+ *   (optional) The account to check. Defaults to the currently logged in user.
+ *
+ * @return
+ *   An array indexed by access scheme. Each value is an array whose keys are
+ *   the realms in which the user has the permission, and whose values are the
+ *   realm labels.
+ */
+function access_user_permission_realms($string, $account = NULL) {
+  global $user;
+  if (!isset($account)) {
+    $account = $user;
+  }
+
+  // Get the user's realm role assignments via access grants.
+  $user_roles = access_user_roles($account);
+
+  // Check which (if any) of the realm roles provide the requested permission.
+  $role_permissions = user_role_permissions($user_roles);
+  $permission_realms = array();
+  foreach ($role_permissions as $rid => $permissions) {
+    // If the role provides the permission, add the role's realms to the list.
+    if (isset($permissions[$string])) {
+      foreach ($user_roles[$rid] as $scheme => $realms) {
+        if (!isset($permission_realms[$scheme])) {
+          $permission_realms[$scheme] = array();
+        }
+        $permission_realms[$scheme] += $realms;
+      }
+    }
+  }
+  return $permission_realms;
+}
+
+/**
+ * Determines whether a user has a given permission globally.
+ *
+ * @param $string
+ *   The permission, such as "edit any page", being checked for.
+ * @param $account
+ *   (optional) The account to check. Defaults to the currently logged in user.
+ *
+ * @return
+ *   Boolean TRUE if the user has permission globally (i.e. via a non-ACK role).
+ */
+function access_user_permission_global($string, $account = NULL) {
+  global $user;
+  if (!isset($account)) {
+    $account = $user;
+  }
+  // User #1 has all permissions globally.
   if ($account->uid == 1) {
     return TRUE;
   }
 
-  // Get the object's realm memberships via access scheme handlers.
-  $object_realms = access_object_realms($object_type, $object);
-  // Get the user's realm role assignments via access grants.
-  $user_roles = access_user_roles($account);
-  // Get the list of all roles available for use in realms. Any roles assigned
-  // to the user that are not in this list will be considered global.
+  // Get the list of roles enabled for use with ACK.
+  // Any role not in this list is considered global.
   $realm_roles = access_realm_roles();
 
-  // See which of the user's roles apply to the object globally or by realm.
-  $match = array();
-  foreach ($account->roles as $rid => $name) {
-    if (!isset($realm_roles[$rid])) {
-      // Non-realm roles apply globally.
-      $match[$rid] = TRUE;
-    }
-    elseif (isset($user_roles[$rid])) {
-      // Realm roles that were assigned to the user via an access grant only
-      // apply if the role's scheme and realm assignments match the object.
-      // Note that if a realm role was somehow associated with the user, but
-      // there are no access grants giving the user access to use that role in a
-      // realm (for example, if a role reserved for ACK was directly assigned to
-      // the user by another module), the "elseif" statement above will cause
-      // that role to be excluded from consideration. This enforces the concept
-      // that ACK roles should not be used outside of ACK.
-      foreach ($object_realms as $scheme => $realms) {
-        foreach ($realms as $realm) {
-          if (isset($user_roles[$rid][$scheme][$realm])) {
-            $match[$rid] = TRUE;
-            break 2;
-          }
-        }
-      }
-    }
-  }
-
-  // Check whether any applicable role provides the requested permission.
-  $role_permissions = user_role_permissions($match);
-  foreach ($role_permissions as $permissions) {
-    if (isset($permissions[$string])) {
+  // Check whether any of the global roles provides the requested permission.
+  $role_permissions = user_role_permissions($account->roles);
+  foreach ($role_permissions as $rid => $permissions) {
+    if (!isset($realm_roles[$rid]) && isset($permissions[$string])) {
       return TRUE;
     }
   }
