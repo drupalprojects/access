@@ -50,7 +50,9 @@ function access_access_realm_settings($realm_type, $has_data, $values = array())
     case 'list_integer':
     case 'list_float':
     case 'list_text':
-      $fields = field_read_fields(array('type' => $realm_type));
+      // Only support single-value list fields for now. This may change in the
+      // future, if we can figure out a sane way to handle it on object forms.
+      $fields = field_read_fields(array('type' => $realm_type, 'cardinality' => 1));
       $options = drupal_map_assoc(array_keys($fields));
       $form['field'] = array(
         '#type' => 'select',

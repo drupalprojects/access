@@ -37,7 +37,9 @@ class ACKNodeTaxonomyTermReference extends AccessControlKit {
   public function settingsForm($realm_type, array $realm_settings = array()) {
     $options = array();
     if (isset($realm_settings['vocabulary'])) {
-      $fields = field_read_fields(array('type' => 'taxonomy_term_reference'));
+      // Only support single-value term fields for now. This may change in the
+      // future, if we can figure out a sane way to handle it on object forms.
+      $fields = field_read_fields(array('type' => 'taxonomy_term_reference', 'cardinality' => 1));
       foreach ($fields as $field_name => $field) {
         if (!empty($field['settings']['allowed_values']) && $field['settings']['allowed_values'][0]['vocabulary'] == $realm_settings['vocabulary']) {
           $options[$field_name] = check_plain($field_name);
