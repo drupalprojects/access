@@ -1106,6 +1106,32 @@ interface AccessControlKitInterface {
    *   their structure in $this->settings.
    */
    public function settingsForm($realm_type, array $realm_settings = array());
+
+   /**
+    * Alters the form for an object to reflect realm create/delete permissions.
+    *
+    * It is up to the handler module to invoke this method as needed within a
+    * hook_form_alter(), hook_form_BASE_FORM_ID_alter(), or
+    * hook_form_FORM_ID_alter() implementation to properly enforce realm
+    * permissions on the handled object type.
+    *
+    * @param &$form
+    *   Nested array of form elements that comprise the form.
+    * @param &$form_state
+    *   A keyed array containing the current state of the form.
+    * @param $form_id
+    *   String representing the name of the form itself. Typically this is the
+    *   name of the function that generated the form.
+    * @param $create
+    *   (optional) An array of realms in which the user has "create" access for
+    *   the handled object type. An empty array() indicates that the user has no
+    *   such access in any realm. Defaults to NULL, indicating global access,
+    *   which should require no filtering.
+    * @param $delete
+    *   (optional) As $create (above), an array of realms in which the user has
+    *   "delete" access for the handled object type. Defaults to NULL.
+    */
+    public function formAlter(&$form, &$form_state, $form_id, $create = NULL, $delete = NULL);
 }
 
 /**
@@ -1141,6 +1167,116 @@ abstract class AccessControlKit implements AccessControlKitInterface {
    */
   public function settingsForm($realm_type, array $realm_settings = array()) {
     return array();
+  }
+
+  /**
+   * Implements AccessControlKitInterface::formAlter().
+   */
+  public function formAlter(&$form, &$form_state, $form_id, $create = NULL, $delete = NULL) {
+    // No filtering needed in the abstract class.  Subclasses can make use of
+    // $this->elementFilter() to limit access-related form fields as needed.
+  }
+
+  /**
+   * Filters a form element's available options according to which options the
+   * user is permitted to set or unset.
+   *
+   * For use in subclass implementations of AccessControlKit::formAlter() to
+   * limit a realm-related field on an object's add/edit form according to the
+   * user's realm-level create/delete permissions.
+   *
+   * @param &$element
+   *   A form element of '#type' => 'radios' or 'select', with '#options'
+   *   populated, passed by reference.  If the $is_new parameter is FALSE, the
+   *   '#default_value' is assumed to be the current value of the field.  The
+   *   $element is also assumed to be used for controlling realm membership, and
+   *   thus must not have '#multiple' set to TRUE.
+   * @param $is_new
+   *   Boolean indicating whether the access-controlled object is being created
+   *   (TRUE) or edited (FALSE).  When TRUE, the $delete parameter is ignored.
+   * @param $create
+   *   An array indicating which of the $element['#options'] the user is allowed
+   *   to set.  Defaults to NULL, indicating that the user may set any option.
+   *   An empty array() indicates that the user may not set any value in this
+   *   field other than the one already set.
+   * @param $delete
+   *   An array of the $element['#options'] that the user is allowed to unset.
+   *   Defaults to NULL, indicating that the user may unset any option.  An
+   *   empty array() indicates that the user may not unset any existing value.
+   *
+   * @return
+   *   The $element's '#options' array will be filtered according to the $create
+   *   and $delete parameters to only show values that the user is permitted to
+   *   save on the object.  If only one valid option remains after filtering,
+   *   the element will be changed to '#type' => 'value' to save the user from
+   *   having to select it manually.
+   *
+   *   If $is_new == TRUE and the element is required, but no options remain
+   *   after filtering, returns FALSE.  This indicates that the user does not
+   *   have sufficient access to complete the form; handlers are expected to
+   *   respond to this condition appropriately, perhaps by denying access to the
+   *   form.  Otherwise, returns TRUE.
+   */
+  protected function elementFilter(&$element, $is_new = FALSE, $create = NULL, $delete = NULL) {
+    // Check for a valid existing value.
+    $value = isset($element['#default_value']) ? $element['#default_value'] : NULL;
+    $value = is_array($value) ? reset($value) : $value;
+    $existing = !$is_new && !empty($value) && isset($element['#options'][$value]);
+
+    // If there is an existing value that the user does not have access to
+    // remove, then the user cannot change the current value.
+    if ($existing && isset($delete) && !isset($delete[$value])) {
+      $element['#type'] = 'value';
+      $element['#value'] = $value;
+      return TRUE;
+    }
+
+    // If the user lacks global create permission, we need to filter the list.
+    if (isset($create)) {
+      $options = array();
+
+      // If there is an N/A option available, preserve it.
+      if ($none = isset($element['#options']['_none'])) {
+        $options['_none'] = $element['#options']['_none'];
+      }
+
+      // If there is an existing value, preserve it regardless of permissions
+      // (i.e. user may be able to edit but not create objects in this realm).
+      if ($existing) {
+        $options[$value] = $element['#options'][$value];
+      }
+
+      // Preserve any options that the user is allowed to add to the object.
+      foreach ($element['#options'] as $key => $label) {
+        if (isset($create[$key])) {
+          $options[$key] = $label;
+        }
+      }
+
+      $element['#options'] = $options;
+      // Alter the element based on how many options remain.
+      $count = count($options);
+      $required = !empty($element['#required']);
+      if ($count == 0 && $is_new && $required) {
+        // No options remain, but the field is required, so return FALSE to let
+        // formAlter() know that it should deny access to the form.
+        return FALSE;
+      }
+      elseif ($count == 1) {
+        // Only one option remains, so we can just set it for the user.
+        $element['#type'] = 'value';
+        $element['#value'] = key($options);
+      }
+      elseif ($count == 2 && $none && $required) {
+        // Two options remain, but one of them is N/A and the field is required,
+        // so we can again just set it for the user to save them from clicking.
+        unset($options['_none']);
+        $element['#type'] = 'value';
+        $element['#value'] = key($options);
+      }
+    }
+
+    return TRUE;
   }
 }
 

@@ -97,5 +97,61 @@ function ack_node_node_access($node, $op, $account) {
  * Implements hook_form_BASE_FORM_ID_alter().
  */
 function ack_node_form_node_form_alter(&$form, &$form_state, $form_id) {
-  // @todo Alter the node form on create and edit to limit ACK fields/properties.
+  global $user;
+  $node = $form['#node'];
+  $create = NULL;
+  $delete = NULL;
+
+  // Setting a value in a field used by a realm handler is essentially creating
+  // a node in that realm.  Thus, we need to limit such form fields' options to
+  // only those realms where the user has "create" permission, unless the user
+  // has global create access, in which case they can create in any realm.
+  if (!access_user_permission_global("create $node->type content")) {
+    $create = access_user_permission_realms("create $node->type content");
+  }
+  if (isset($node->nid)) {
+    // Unsetting a realm value on an existing node is essentially deleting the
+    // node from the realm, so we need to know where the user has "delete".
+    if (!access_user_permission_global("delete any $node->type content") && !(access_user_permission_global("delete own $node->type content") && ($user->uid == $node->uid))) {
+      $delete = access_user_permission_realms("delete any $node->type content");
+      if ($user->uid == $node->uid) {
+        // Merge in the "delete own" realms.  Can't use array_merge_recursive(),
+        // because it would destroy numeric keys, so do it with a loop.
+        foreach (access_user_permission_realms("delete own $node->type content") as $scheme => $assigned) {
+          foreach ($assigned as $key => $value) {
+            $delete[$scheme][$key] = $value;
+          }
+        }
+      }
+    }
+  }
+
+  if (isset($create) || isset($delete)) {
+    // Give each access scheme with a node handler the chance to alter the form.
+    foreach (access_scheme_get_schemes() as $scheme) {
+      if (isset($scheme->handlers['node'])) {
+        if (isset($create)) {
+          // The user doesn't have global create access, so if there isn't an
+          // entry for a scheme, they have no access by that scheme, indicated
+          // by an empty array.
+          $scheme_create = isset($create[$scheme->scheme]) ? $create[$scheme->scheme] : array();
+        }
+        else {
+          // The user does have global create, which we indicate with NULL.
+          $scheme_create = NULL;
+        }
+
+        if (isset($delete)) {
+          // As above, an empty array indicates no delete access in the scheme.
+          $scheme_delete = isset($delete[$scheme->scheme]) ? $delete[$scheme->scheme] : array();
+        }
+        else {
+          // NULL indicates global delete access.
+          $scheme_delete = NULL;
+        }
+
+        $scheme->handlers['node']->formAlter($form, $form_state, $form_id, $scheme_create, $scheme_delete);
+      }
+    }
+  }
 }

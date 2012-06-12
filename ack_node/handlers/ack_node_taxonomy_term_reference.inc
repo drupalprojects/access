@@ -55,4 +55,26 @@ class ACKNodeTaxonomyTermReference extends AccessControlKit {
     );
     return $form;
   }
+
+  /**
+   * Implements AccessControlKitInterface::formAlter().
+   */
+  public function formAlter(&$form, &$form_state, $form_id, $create = NULL, $delete = NULL) {
+    if (empty($this->settings['field_name'])) {
+      return;
+    }
+    $field_name = $this->settings['field_name'];
+    $node = $form['#node'];
+    $is_new = empty($node->nid);
+
+    // If the handler field exists on the node, we need to filter it to match
+    // the user's create/delete access.
+    if (isset($form[$field_name])) {
+      $language = $form[$field_name]['#language'];
+      $element = &$form[$field_name][$language];
+      if (!($this->elementFilter($element, $is_new, $create, $delete))) {
+        // @todo User does not have access to create the node.
+      }
+    }
+  }
 }
