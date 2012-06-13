@@ -1,0 +1,9 @@
+name = ACK menu
+description = "Controls access to menu items."
+core = 7.x
+package = Access control kit
+dependencies[] = access
+dependencies[] = menu
+
+; Handlers
+files[] = handlers/ack_menu_map.inc

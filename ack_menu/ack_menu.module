@@ -1,0 +1,47 @@
+<?php
+/**
+ * @file
+ * The ACK menu module.
+ */
+
+/**
+ * Implements hook_permission().
+ */
+function ack_menu_permission() {
+  return array(
+    'manage access realm menu tree' => array(
+      'title' => t('Manage the menu tree for an access realm'),
+      'description' => t('Create and edit links within a realm-associated menu tree.'),
+    ),
+    'administer access realm menu map' => array(
+      'title' => t('Administer the menu link-to-realm map'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_access_info().
+ */
+function ack_menu_access_info() {
+  // Declare support for controlling access to menu links.
+  $info['menu_links'] = array(
+    'label' => t('Menu links'),
+    'handlers' => array(),
+    'permissions' => array('manage access realm menu tree' => TRUE),
+  );
+
+  // Handler to map menu links to realms.
+  $info['menu_links']['handlers']['ACKMenuMap'] = array(
+    'label' => t('mapping links to realms'),
+    'realm types' => array('boolean', 'list_integer', 'list_float', 'list_text', 'taxonomy_term', 'user'),
+  );
+
+  return $info;
+}
+
+/**
+ * Implements hook_form_BASE_FORM_ID_alter().
+ */
+function ack_menu_form_node_form_alter(&$form, &$form_state, $form_id) {
+  // @todo Filter the menu parent selector.
+}
