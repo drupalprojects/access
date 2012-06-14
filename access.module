@@ -988,7 +988,7 @@ function access_handler_attach_handlers($scheme) {
     // Initialize the handler using the class and settings from the database.
     $class = $row->handler;
     $settings = unserialize($row->settings);
-    $scheme->handlers[$row->object_type] = new $class($settings);
+    $scheme->handlers[$row->object_type] = new $class($scheme->scheme, $settings);
   }
 }
 
@@ -1139,6 +1139,13 @@ interface AccessControlKitInterface {
  */
 abstract class AccessControlKit implements AccessControlKitInterface {
   /**
+   * The name of the access scheme to which the handler is attached.
+   *
+   * @var string
+   */
+  protected $scheme;
+
+  /**
    * The access handler configuration.
    *
    * @var array
@@ -1148,10 +1155,13 @@ abstract class AccessControlKit implements AccessControlKitInterface {
   /**
    * Constructs an AccessControlKit object.
    *
+   * @param $scheme
+   *   The name of the access scheme to which the handler is attached.
    * @param array $settings
    *   The handler configuration array.
    */
-  public function __construct(array $settings = array()) {
+  public function __construct($scheme = '', array $settings = array()) {
+    $this->scheme = $scheme;
     $this->settings = $settings;
   }
 

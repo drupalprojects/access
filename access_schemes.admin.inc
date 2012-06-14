@@ -349,7 +349,7 @@ function access_scheme_handlers_form($form, &$form_state, $scheme) {
       else {
         // Use an unconfigured instance of the selected handler class.
         $class = $form_state['values'][$object]['handler'];
-        $selected_handler = new $class();
+        $selected_handler = new $class($scheme->scheme);
       }
     }
     elseif (isset($scheme->handlers[$object])) {
