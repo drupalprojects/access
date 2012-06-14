@@ -24,19 +24,69 @@ function ack_menu_permission() {
  */
 function ack_menu_access_info() {
   // Declare support for controlling access to menu links.
-  $info['menu_links'] = array(
-    'label' => t('Menu links'),
+  $info['menu_link'] = array(
+    'label' => t('Menu link'),
     'handlers' => array(),
     'permissions' => array('manage access realm menu tree' => TRUE),
   );
 
-  // Handler to map menu links to realms.
-  $info['menu_links']['handlers']['ACKMenuMap'] = array(
+  // Handler to map menu links to realms; should work for all realm types.
+  $info['menu_link']['handlers']['ACKMenuMap'] = array(
     'label' => t('mapping links to realms'),
-    'realm types' => array('boolean', 'list_integer', 'list_float', 'list_text', 'taxonomy_term', 'user'),
+    'realm types' => array_keys(access_realm_info()),
   );
 
   return $info;
+}
+
+/**
+ * Implements hook_menu_alter().
+ */
+function ack_menu_menu_alter(&$items) {
+  // Override access to the menu link admin pages.
+  foreach (array('edit', 'reset', 'delete') as $op) {
+    $items['admin/structure/menu/item/%menu_link/' . $op]['access callback'] = 'ack_menu_link_access';
+    $items['admin/structure/menu/item/%menu_link/' . $op]['access arguments'] = array(4, $op);
+  }
+}
+
+/**
+ * Checks menu link access; used as the menu access callback for link admin.
+ *
+ * @param $menu_link
+ *   A menu link object on which to perform the access check.
+ * @param $op
+ *   The operation to be performed.  Possible values:
+ *   - "edit"
+ *   - "reset"
+ *   - "delete"
+ * @param $account
+ *   (optional) The user object on which to perform the access check operation.
+ *   Defaults to the currently logged-in user.
+ *
+ * @return
+ *   Boolean indicating whether the operation is allowed.
+ */
+function ack_menu_link_access($menu_link, $op, $account = NULL) {
+  global $user;
+  if (!isset($account)) {
+    $account = $user;
+  }
+
+  // The 'administer menu' permission is global.
+  if (user_access('administer menu', $account)) {
+    return TRUE;
+  }
+
+  // Check realm permissions.
+  switch ($op) {
+    case 'edit':
+    case 'reset':
+    case 'delete':
+      return access_user_object_access('manage access realm menu tree', 'menu_link', $menu_link, $account);
+  }
+
+  return FALSE;
 }
 
 /**

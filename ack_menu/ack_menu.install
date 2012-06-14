@@ -1,0 +1,38 @@
+<?php
+/**
+ * @file
+ * Install, update, and uninstall functions for the ACK menu module.
+ */
+
+/**
+ * Implements hook_schema().
+ */
+function ack_menu_schema() {
+  $schema['ack_menu_map'] = array(
+    'description' => 'Maps menu links to access realms.',
+    'fields' => array(
+      'mlid' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => 'The {menu_links}.mlid that identifies the link.',
+      ),
+      'map' => array(
+        'description' => 'Serialized data containing an array of schemes and realms to which the menu link belongs.',
+        'type' => 'blob',
+        'size' => 'big',
+        'not null' => TRUE,
+        'serialize' => TRUE,
+      ),
+    ),
+    'foreign keys' => array(
+      'menu_link' => array(
+        'table' => 'menu_links',
+        'columns' => array('mlid' => 'mlid'),
+      ),
+    ),
+    'primary key' => array('mlid'),
+  );
+  return $schema;
+}
