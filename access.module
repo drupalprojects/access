@@ -82,7 +82,7 @@ function access_grant_label($grant) {
  *   A list of assigned realms, where the keys are the values of the grant's
  *   access realm field, and the values are the realm labels.
  */
-function access_grant_get_realms($grant) {
+function access_grant_realms($grant) {
   $field_name = access_scheme_fieldname($grant->scheme);
   $assigned = isset($grant->$field_name) ? $grant->$field_name : array('und' => array());
 
@@ -1385,7 +1385,7 @@ function access_user_roles($account = NULL) {
       // associated with the user (in case another module revoked a role without
       // ACK being notified to clean up grants).
       if (isset($allowed_roles[$grant->rid]) && isset($account->roles[$grant->rid])) {
-        $roles[$grant->rid][$grant->scheme] = access_grant_get_realms($grant);
+        $roles[$grant->rid][$grant->scheme] = access_grant_realms($grant);
       }
     }
     $user_roles[$account->uid] = $roles;

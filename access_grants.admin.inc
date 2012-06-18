@@ -77,7 +77,7 @@ function access_admin_grants() {
   $options = array();
   foreach ($result as $gid => $fields) {
     // Get the realms list, truncated for length.
-    $realms = implode(', ', access_grant_get_realms($grants[$gid]));
+    $realms = implode(', ', access_grant_realms($grants[$gid]));
     if (drupal_strlen($realms) > 30) {
       $realms = drupal_substr($realms, 0, 25) . '...';
     }
