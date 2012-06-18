@@ -83,7 +83,7 @@ function access_grant_label($grant) {
  *   access realm field, and the values are the realm labels.
  */
 function access_grant_get_realms($grant) {
-  $field_name = 'ack_' . $grant->scheme;
+  $field_name = access_scheme_fieldname($grant->scheme);
   $assigned = isset($grant->$field_name) ? $grant->$field_name : array('und' => array());
 
   // Get the list of allowed values for the field, with labels.
@@ -137,7 +137,7 @@ function access_grant_load_by_condition($conditions = array()) {
   if (isset($conditions['scheme'])) {
     $query->entityCondition('bundle', $conditions['scheme']);
     if (isset($conditions['realms'])) {
-      $field_name = 'ack_' . $conditions['scheme'];
+      $field_name = access_scheme_fieldname($conditions['scheme']);
       $query->fieldCondition($field_name, 'value', $conditions['realms']);
     }
   }
@@ -586,9 +586,7 @@ function access_scheme_delete($scheme) {
 function access_access_scheme_insert($scheme) {
   // Create the realm field for the scheme.
   if ($info = access_realm_info($scheme->realm_type)) {
-    // Schemes and realm fields have a one-to-one relationship, so naming the
-    // field after the scheme should guarantee uniqueness.
-    $field_name = 'ack_' . $scheme->scheme;
+    $field_name = access_scheme_fieldname($scheme);
 
     // Make sure the field type is supported.
     $field_types = access_field_info();
@@ -666,6 +664,22 @@ function access_scheme_update_grants($old, $new) {
     ->fields(array('scheme' => $new))
     ->condition('scheme', $old)
     ->execute();
+}
+
+/**
+ * Returns the expected name of the access field for given scheme.
+ *
+ * @param $scheme
+ *   An access scheme object, or the machine-readable name of an access scheme.
+ *
+ * @return
+ *   The expected name of the access field.  Note that neither the scheme nor
+ *   the field need to exist for this function to succeed.
+ */
+function access_scheme_fieldname($scheme) {
+  // Schemes and realm fields have a one-to-one relationship, so naming the
+  // field after the scheme should guarantee uniqueness.
+  return is_object($scheme) ? 'ack_' . $scheme->scheme : 'ack_' . $scheme;
 }
 
 /**

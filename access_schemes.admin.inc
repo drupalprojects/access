@@ -142,7 +142,7 @@ function access_scheme_form($form, &$form_state, $scheme = NULL) {
       '#markup' => check_plain($options[$scheme->realm_type]),
     );
     // Show the current realm field settings, if any, as a list.
-    $field = field_info_field('ack_' . $scheme->scheme);
+    $field = field_info_field(access_scheme_fieldname($scheme));
     if (!empty($field['settings']['arguments'])) {
       $form['realm_info']['#description'] = '<ul>';
       foreach ($field['settings']['arguments'] as $key => $value) {
@@ -291,7 +291,7 @@ function access_scheme_handlers_form($form, &$form_state, $scheme) {
   }
 
   // Get the scheme's realm settings, for use below by handlers.
-  $field = field_info_field('ack_' . $scheme->scheme);
+  $field = field_info_field(access_scheme_fieldname($scheme));
   $realm_settings = isset($field['settings']['arguments']) ? $field['settings']['arguments'] : array();
 
   // Display each supported object type as a vertical tab.

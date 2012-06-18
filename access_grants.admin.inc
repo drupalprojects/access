@@ -661,7 +661,7 @@ function template_preprocess_access_grant(&$variables) {
   field_attach_preprocess('access_grant', $grant, $variables['elements'], $variables);
 
   // Add helper variables for the access realm field, since the name is dynamic.
-  $variables['access_field'] = 'ack_' . $grant->scheme;
+  $variables['access_field'] = access_scheme_fieldname($grant->scheme);
   $variables['ack_realms'] = $variables[$variables['access_field']];
 
   // Add a class to identify the scheme.
