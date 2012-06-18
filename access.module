@@ -86,9 +86,8 @@ function access_grant_get_realms($grant) {
   $field_name = access_scheme_fieldname($grant->scheme);
   $assigned = isset($grant->$field_name) ? $grant->$field_name : array('und' => array());
 
-  // Get the list of allowed values for the field, with labels.
-  $field = field_info_field($field_name);
-  $allowed = access_allowed_values($field);
+  // Get the list of allowed realms for the scheme.
+  $allowed = access_scheme_realms($grant->scheme);
 
   $realms = array();
   foreach ($assigned['und'] as $data) {
@@ -687,6 +686,21 @@ function access_scheme_fieldname($scheme) {
  */
 function access_scheme_page_title($scheme) {
   return check_plain($scheme->name);
+}
+
+/**
+ * Returns a list of all realms in an access scheme.
+ *
+ * @param $scheme
+ *   An access scheme object, or the machine-readable name of an access scheme.
+ *
+ * @return
+ *   An array of realms.  The keys are the raw stored values (number or text)
+ *   that identify the realm and the values are the realm display labels.
+ */
+function access_scheme_realms($scheme) {
+  $field = field_info_field(access_scheme_fieldname($scheme));
+  return empty($field) ? array() : access_allowed_values($field);
 }
 
 /**
