@@ -69,7 +69,7 @@ function access_grant_label($grant) {
   $rolename = empty($role) ? $grant->rid : $role->name;
   $schemename = empty($scheme) ? $grant->scheme : $scheme->name;
 
-  return t('Grant @user access as @role in @scheme', array('@user' => $username, '@role' => $rolename, '@scheme' => $schemename));
+  return t('Grant access to @user as @role in @scheme', array('@user' => $username, '@role' => $rolename, '@scheme' => $schemename));
 }
 
 /**
