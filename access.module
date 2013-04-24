@@ -105,15 +105,14 @@ function access_grant_realms($grant) {
  * @param $gid
  *   The grant ID.
  * @param $reset
- *   Whether to reset the internal cache.
+ *   (optional) Whether to reset the internal cache.  Defaults to FALSE.
  *
  * @return
  *   An access grant object, or FALSE if the grant is not found.
  */
-function access_grant_load($gid = NULL, $reset = FALSE) {
-  $gids = isset($gid) ? array($gid) : array();
-  $grant = access_grant_load_multiple($gids, $reset);
-  return $grant ? reset($grant) : FALSE;
+function access_grant_load($gid, $reset = FALSE) {
+  $grants = access_grant_load_multiple(array($gid), $reset);
+  return reset($grants);
 }
 
 /**
