@@ -386,4 +386,5 @@ function access_scheme_handlers_form_submit($form, &$form_state) {
       }
     }
   }
+  drupal_set_message(t('The access handler settings have been saved.'));
 }
