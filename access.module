@@ -62,14 +62,12 @@ function access_grant_label($grant) {
   // Load the primary descriptors of the grant.
   $account = user_load($grant->uid);
   $role = user_role_load($grant->rid);
-  $scheme = access_scheme_load($grant->scheme);
 
   // Sanitize the descriptors.
   $username = empty($account) ? $grant->uid : format_username($account);
   $rolename = empty($role) ? $grant->rid : $role->name;
-  $schemename = empty($scheme) ? $grant->scheme : $scheme->name;
 
-  return t('Grant access to @user as @role in @scheme', array('@user' => $username, '@role' => $rolename, '@scheme' => $schemename));
+  return t("@user's access as @role", array('@user' => $username, '@role' => $rolename));
 }
 
 /**
@@ -261,41 +259,6 @@ function access_grant_delete($gid) {
     $transaction->rollback();
     watchdog_exception('access', $e);
     throw $e;
-  }
-}
-
-/**
- * Implements hook_access_grant_insert().
- */
-function access_access_grant_insert($grant) {
-  // If the user was not previously a member of the role, we need to add them to
-  // it at the system level in order for the access grant to have any effect.
-  $account = user_load($grant->uid);
-  if ($account !== FALSE && !isset($account->roles[$grant->rid])) {
-    if ($role = user_role_load($grant->rid)) {
-      $roles = $account->roles + array($role->rid => $role->name);
-      $account->original = clone $account;
-      user_save($account, array('roles' => $roles));
-    }
-  }
-}
-
-/**
- * Implements hook_access_grant_delete().
- */
-function access_access_grant_delete($grant) {
-  // If the deleted grant was the last one giving the user access to the role,
-  // we need to remove them from it at the system level to clean up.
-  $existing = access_grant_load_by_condition(array('uid' => $grant->uid, 'rid' => $grant->rid));
-  if (empty($existing)) {
-    $account = user_load($grant->uid);
-    if ($account !== FALSE && isset($account->roles[$grant->rid])) {
-      if ($role = user_role_load($grant->rid)) {
-        $roles = array_diff($account->roles, array($role->rid => $role->name));
-        $account->original = clone $account;
-        user_save($account, array('roles' => $roles));
-      }
-    }
   }
 }
 
@@ -1677,6 +1640,13 @@ function access_menu() {
   );
 
   return $items;
+}
+
+/**
+ * AJAX callback for the access grant form.
+ */
+function access_grant_form_ajax($form, $form_state) {
+  return $form['role'];
 }
 
 /**

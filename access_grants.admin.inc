@@ -389,6 +389,7 @@ function access_grant_edit($grant) {
  *
  * @see access_grant_form_validate()
  * @see access_grant_form_submit()
+ * @see access_grant_form_delete_submit()
  */
 function access_grant_form($form, &$form_state, $grant) {
   // During initial form build, add the grant entity to the form state for use
@@ -400,6 +401,8 @@ function access_grant_form($form, &$form_state, $grant) {
   else {
     $grant = $form_state['grant'];
   }
+  $is_new = empty($grant->gid);
+  $admin = user_access('administer users');
 
   // Basic grant information.  Not user-configurable.
   foreach (array('gid', 'uid', 'rid', 'scheme') as $key) {
@@ -408,52 +411,123 @@ function access_grant_form($form, &$form_state, $grant) {
       '#value' => isset($grant->$key) ? $grant->$key : NULL,
     );
   }
-  $is_new = empty($grant->gid);
 
   // The ACK user reference field.
-  $account = empty($grant->uid) ? FALSE : user_load($grant->uid);
   $form['user'] = array(
-    '#type' => 'textfield',
-    '#title' => t('User'),
-    '#maxlength' => 60,
+    '#type' => 'container',
     '#weight' => -5,
-    '#required' => $is_new,
-    '#disabled' => !$is_new,
+    '#prefix' => '<div id="access-grant-form-user">',
+    '#suffix' => '</div>',
   );
-  if ($is_new) {
-    $form['user']['#autocomplete_path'] = 'user/autocomplete';
+  if (!$is_new) {
+    $account = user_load($grant->uid);
+    $form['user']['user'] = array(
+      '#type' => 'value',
+      '#value' => $account->name,
+    );
+    $form['user']['user_display'] = array(
+      '#type' => 'item',
+      '#title' => t('User'),
+      '#markup' => format_username($account),
+    );
   }
-  if (!empty($account)) {
-    $form['user']['#default_value'] = check_plain($account->name);
+  else {
+    if (!empty($form_state['values']['user'])) {
+      $account = user_load_by_name($form_state['values']['user']);
+    }
+    else {
+      $account = FALSE;
+    }
+    $form['user']['user'] = array(
+      '#type' => 'textfield',
+      '#title' => t('User'),
+      '#maxlength' => 60,
+      '#required' => TRUE,
+      '#autocomplete_path' => 'user/autocomplete',
+      '#ajax' => array(
+        'callback' => 'access_grant_form_ajax',
+        'wrapper' => 'access-grant-form-role',
+        'effect' => 'fade',
+      ),
+    );
+    if ($account) {
+      $form['user']['user']['#default_value'] = $account->name;
+    }
   }
 
   // The ACK role reference field.
-  $role = empty($grant->rid) ? FALSE : user_role_load($grant->rid);
   $form['role'] = array(
-    '#type' => 'select',
-    '#title' => t('Role'),
+    '#type' => 'container',
     '#weight' => -4,
-    '#options' => access_realm_roles(),
-    '#required' => $is_new,
-    '#disabled' => !$is_new,
+    '#prefix' => '<div id="access-grant-form-role">',
+    '#suffix' => '</div>',
   );
-  if (!empty($role)) {
-    $form['role']['#default_value'] = $role->rid;
+  if (!$is_new) {
+    $role = user_role_load($grant->rid);
+    $form['role']['role'] = array(
+      '#type' => 'value',
+      '#value' => $role->rid,
+    );
+    $form['role']['role_display'] = array(
+      '#type' => 'item',
+      '#title' => t('Role'),
+      '#markup' => check_plain($role->name),
+    );
+  }
+  else {
+    $role = FALSE;
+    $role_options = access_realm_roles();
+    if ($account) {
+      foreach (array_keys($role_options) as $option) {
+        // Duplicate grants (same user, role, and scheme) are not permitted.
+        $duplicate = access_grant_load_by_condition(array('uid' => $account->uid, 'rid' => $option, 'scheme' => $grant->scheme));
+        // Non-admins cannot add users to new roles.
+        $disallowed = !$admin && empty($account->roles[$option]);
+        // Filter the role options.
+        if ($duplicate || $disallowed) {
+          unset($role_options[$option]);
+        }
+      }
+    }
+    $form['role']['role'] = array(
+      '#type' => 'select',
+      '#title' => t('Role'),
+      '#options' => $role_options,
+      '#required' => TRUE,
+    );
+    if ($admin) {
+      $form['role']['role']['#description'] = t('The user will be added to this role, if not already a member.');
+    }
+    if (empty($role_options)) {
+      if ($account) {
+        $form['role']['role']['#description'] = t('No roles are available for new access grants for this user. Try editing the user\'s <a href="@url">existing grants</a> instead.', array('@url' => url('admin/access')));
+      }
+      else {
+        $form['role']['role']['#description'] = t('No roles are available for new access grants.');
+      }
+    }
   }
 
   $form['actions'] = array('#type' => 'actions');
   $form['actions']['submit'] = array(
     '#type' => 'submit',
     '#value' => t('Save'),
-    '#weight' => 5,
   );
-  if (!empty($grant->gid)) {
+  if (!$is_new) {
     $form['actions']['delete'] = array(
       '#type' => 'submit',
       '#value' => t('Delete'),
-      '#weight' => 10,
+      '#submit' => array('access_grant_form_delete_submit'),
     );
   }
+  $cancel = $is_new ? 'admin/access' : 'admin/access/grant/' . $grant->gid;
+  if (isset($_GET['destination'])) {
+    $cancel = drupal_get_destination();
+    $cancel = $cancel['destination'];
+  }
+  $form['actions']['cancel'] = array(
+    '#markup' => l(t('Cancel'), $cancel),
+  );
 
   field_attach_form('access_grant', $grant, $form, $form_state);
   return $form;
@@ -462,30 +536,40 @@ function access_grant_form($form, &$form_state, $grant) {
 /**
  * Form validation handler for access_grant_form().
  *
+ * @see access_grant_form()
  * @see access_grant_form_submit()
  */
 function access_grant_form_validate($form, &$form_state) {
   $grant = (object) $form_state['values'];
 
-  // On new grants, we must validate that the user reference is valid, and that
-  // the uid-rid-scheme combination is unique. This is not needed for editing
-  // an existing grant, because the user and role fields cannot be changed.
+  // Validate properties of new grants.  Not needed on existing grants, since
+  // their properties are not modifiable by the form.
   if (empty($grant->gid)) {
-    $account = empty($grant->user) ? FALSE : user_load_by_name($grant->user);
-    $role = empty($grant->role) ? FALSE : user_role_load($grant->role);
-
+    $account = user_load_by_name($grant->user);
+    $role = user_role_load($grant->role);
     // Validate the user reference.
     if (empty($account)) {
       form_set_error('user', t('The username %name does not exist.', array('%name' => $grant->user)));
     }
 
-    // Validate the uniqueness of the user-role-scheme combination.
-    if (isset($account->uid) && isset($role->rid)) {
+    // Validate the role reference.
+    if (empty($role)) {
+      form_set_error('role', t('A role with ID %rid does not exist.', array('%rid' => $grant->role)));
+    }
+
+    // If the above tests passed, validate that the user-role-scheme combination
+    // is unique.  Duplicate grants are not permitted.
+    if (!form_get_errors()) {
       $existing = access_grant_load_by_condition(array('uid' => $account->uid, 'rid' => $role->rid, 'scheme' => $grant->scheme));
       if (!empty($existing)) {
         $scheme = access_scheme_load($grant->scheme);
         $existing = reset($existing);
         form_set_error('', t('%user has already been granted access as %role in @scheme. Duplicate access grants are not permitted. Please <a href="@url">edit the existing grant</a> instead.', array('%user' => $account->name, '%role' => $role->name, '@scheme' => $scheme->name, '@url' => url('admin/access/grant/' . $existing->gid . '/edit'))));
+      }
+      // If the selected user is not yet a member of the selected role, check
+      // whether the user submitting the form has authority to grant new roles.
+      elseif (empty($account->roles[$role->rid]) && !user_access('administer users')) {
+        form_set_error('role', t('%user is not a member of the %role role.  You must have administrative access to user accounts in order to add a user to a new role.', array('%user' => $account->name, '%role' => $role->name)));
       }
     }
   }
@@ -496,42 +580,50 @@ function access_grant_form_validate($form, &$form_state) {
 /**
  * Form submission handler for access_grant_form().
  *
+ * @see access_grant_form()
  * @see access_grant_form_validate()
  */
 function access_grant_form_submit($form, &$form_state) {
-  // Check for the Delete button.
-  if ($form_state['triggering_element']['#value'] == t('Delete')) {
-    $form_state['redirect'] = 'admin/access/grant/' . $form_state['values']['gid'] . '/delete';
-    return;
-  }
-
   $grant = access_grant_form_submit_build_grant($form, $form_state);
-  $status = access_grant_save($grant);
-
   $account = user_load($grant->uid);
   $role = user_role_load($grant->rid);
   $scheme = access_scheme_load($grant->scheme);
+
+  // Add the user to the role, if not already a member.
+  if (empty($account->roles[$role->rid])) {
+    $roles = $account->roles + array($role->rid => $role->name);
+    $account->original = clone $account;
+    user_save($account, array('roles' => $roles));
+  }
+
+  // Save the grant and update form state.
+  $status = access_grant_save($grant);
+  $form_state['values']['gid'] = $grant->gid;
+  $form_state['grant'] = $grant;
+
+  // Report the change.
   $t_args = array(
-    '%user' => $account->name,
+    '%user' => format_username($account),
     '%role' => $role->name,
     '%scheme' => $scheme->name,
   );
   switch ($status) {
     case SAVED_NEW:
-      drupal_set_message(t('Granted %user access as %role in %scheme.', $t_args));
-      watchdog('access', 'Granted %role to %user in %scheme.', $t_args, WATCHDOG_NOTICE, l(t('edit'), 'admin/access/grant/' . $grant->gid . '/edit'));
+      $message = "Added %scheme for %user's access as %role.";
       break;
+
     case SAVED_UPDATED:
-      drupal_set_message(t("Updated %user's access as %role in %scheme.", $t_args));
-      watchdog('access', 'Updated %role realms for %user in %scheme.', $t_args, WATCHDOG_NOTICE, l(t('edit'), 'admin/access/grant/' . $grant->gid . '/edit'));
+      $message = "Updated %scheme for %user's access as %role.";
       break;
   }
-
-  $form_state['values']['gid'] = $grant->gid;
+  drupal_set_message(t($message, $t_args));
+  watchdog('access', $message, $t_args, WATCHDOG_NOTICE, l(t('edit'), 'admin/access/grant/' . $grant->gid . '/edit'));
 }
 
 /**
  * Updates the form state's grant entity by processing the submission values.
+ *
+ * @see access_grant_form_submit()
  */
 function access_grant_form_submit_build_grant($form, &$form_state) {
   $grant = $form_state['grant'];
@@ -547,6 +639,24 @@ function access_grant_form_submit_build_grant($form, &$form_state) {
 }
 
 /**
+ * Form submission handler for access_grant_form().
+ *
+ * Handles the "Delete" button on the grant form.
+ *
+ * @see access_grant_form()
+ * @see access_grant_form_validate()
+ */
+function access_grant_form_delete_submit($form, &$form_state) {
+  $destination = array();
+  if (isset($_GET['destination'])) {
+    $destination = drupal_get_destination();
+    unset($_GET['destination']);
+  }
+  $grant = $form_state['grant'];
+  $form_state['redirect'] = 'admin/access/grant/' . $grant->gid . '/delete';
+}
+
+/**
  * Form constructor for the access grant delete confirmation form.
  *
  * @see access_grant_delete_confirm_submit()
@@ -557,15 +667,26 @@ function access_grant_delete_confirm($form, &$form_state, $grant) {
   $account = user_load($grant->uid);
   $role = user_role_load($grant->rid);
   $scheme = access_scheme_load($grant->scheme);
+
   $t_args = array(
-    '%user' => $account->name,
+    '%user' => format_username($account),
     '%role' => $role->name,
     '%scheme' => $scheme->name,
   );
+  $message = t("Are you sure you want to revoke all %scheme for %user's access as %role?", $t_args);
+  $caption = '<p>' . t('This action cannot be undone.') . '</p>';
 
-  $message = t("Are you sure you want to revoke %user's access as %role in %scheme?", $t_args);
-  $caption = '<p>' . t('If this is the last grant giving %user access as %role, then %user will be removed from the role entirely.', $t_args) . '</p>';
-  $caption .= '<p>' . t('This action cannot be undone.') . '</p>';
+  // If this is the user's last grant for this role, allow administrators to
+  // also revoke the role itself at the same time.
+  $existing = access_grant_load_by_condition(array('uid' => $grant->uid, 'rid' => $grant->rid));
+  if (count($existing) == 1) {
+    $form['revoke_role'] = array(
+      '#type' => 'checkbox',
+      '#title' => t("Also revoke %user's membership in the %role role?", $t_args),
+      '#description' => t("This is %user's last remaining access grant for the %role role. By checking this box, %user will be removed from the %role role entirely.", $t_args),
+      '#access' => user_access('administer users'),
+    );
+  }
 
   return confirm_form($form, $message, 'admin/access/grant/' . $grant->gid, $caption, t('Delete'));
 }
@@ -575,18 +696,29 @@ function access_grant_delete_confirm($form, &$form_state, $grant) {
  */
 function access_grant_delete_confirm_submit($form, &$form_state) {
   $grant = $form_state['grant'];
-  access_grant_delete($grant->gid);
-
   $account = user_load($grant->uid);
   $role = user_role_load($grant->rid);
   $scheme = access_scheme_load($grant->scheme);
+
+  // Delete the grant.
+  access_grant_delete($grant->gid);
+
+  // Report the change.
   $t_args = array(
-    '%user' => $account->name,
+    '%user' => format_username($account),
     '%role' => $role->name,
     '%scheme' => $scheme->name,
   );
-  drupal_set_message(t('%user has been removed from the %role role in %scheme.', $t_args));
-  watchdog('access', 'Revoked %role for %user in %scheme.', $t_args, WATCHDOG_NOTICE);
+  $message = "Deleted %scheme for %user's access as %role.";
+  drupal_set_message(t($message, $t_args));
+  watchdog('access', $message, $t_args, WATCHDOG_NOTICE);
+
+  // Revoke the role entirely, if that option was selected.
+  if (!empty($form_state['values']['revoke_role'])) {
+    $roles = array_diff($account->roles, array($role->rid => $role->name));
+    $account->original = clone $account;
+    user_save($account, array('roles' => $roles));
+  }
 
   $form_state['redirect'] = 'admin/access';
   return;
