@@ -292,7 +292,7 @@ function access_admin_grants_filters() {
   // By role.
   $filters['rid'] = array(
     'title' => t('role'),
-    'options' => array('[any]' => t('any')) + access_realm_roles(),
+    'options' => array('[any]' => t('any')) + options_array_flatten(access_scheme_roles()),
   );
 
   // By scheme.
@@ -476,7 +476,7 @@ function access_grant_form($form, &$form_state, $grant) {
   }
   else {
     $role = FALSE;
-    $role_options = access_realm_roles();
+    $role_options = access_scheme_roles($grant->scheme);
     if ($account) {
       foreach (array_keys($role_options) as $option) {
         // Duplicate grants (same user, role, and scheme) are not permitted.

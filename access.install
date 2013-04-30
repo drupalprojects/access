@@ -194,3 +194,41 @@ function access_field_schema($field) {
     ),
   );
 }
+
+/**
+ * Implements hook_uninstall().
+ */
+function access_uninstall() {
+  $schemes = access_scheme_get_names();
+  foreach (array_keys($schemes) as $scheme) {
+    variable_del('access_scheme_roles_' . $scheme);
+  }
+}
+
+/**
+ * Make the list of available roles a scheme-level setting.
+ */
+function access_update_7100() {
+  // The old realm roles setting used to just store rid => rid or rid => 0.
+  // Convert this to rid => role_name, filtering out any rid => 0 values.
+  $realm_roles = variable_get('access_realm_roles', array());
+  if (!empty($realm_roles)) {
+    $realm_roles = array_filter($realm_roles);
+    $user_roles = user_roles();
+    foreach (array_keys($realm_roles) as $rid) {
+      if (empty($user_roles[$rid])) {
+        unset($realm_roles[$rid]);
+      }
+      else {
+        $realm_roles[$rid] = $user_roles[$rid];
+      }
+    }
+  }
+  // Store the set of enabled roles for each defined scheme for backwards
+  // compatibility, then purge the old variable.
+  $schemes = access_scheme_get_names();
+  foreach (array_keys($schemes) as $scheme) {
+    variable_set('access_scheme_roles_' . $scheme, $realm_roles);
+  }
+  variable_del('access_realm_roles');
+}

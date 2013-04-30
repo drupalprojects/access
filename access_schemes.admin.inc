@@ -75,7 +75,7 @@ function theme_access_schemes_overview($variables) {
  * @see access_scheme_form_submit()
  */
 function access_scheme_form($form, &$form_state, $scheme = NULL) {
-  if (!isset($scheme->scheme)) {
+  if (!isset($scheme) || !isset($scheme->scheme)) {
     $scheme = access_scheme_set_defaults();
   }
   $form['#scheme'] = $scheme;
@@ -85,7 +85,7 @@ function access_scheme_form($form, &$form_state, $scheme = NULL) {
     '#title' => t('Name'),
     '#type' => 'textfield',
     '#default_value' => $scheme->name,
-    '#description' => t('The human-readable name of this access scheme. It is recommended that this name begin with a capital letter and contain only letters, numbers, and spaces. This name must be unique.'),
+    '#description' => t('The human-readable name of this access scheme. It is recommended that this name be plural, begin with a capital letter, and contain only letters, numbers, and spaces. This name must be unique.'),
     '#required' => TRUE,
     '#size' => 28,
   );
@@ -159,6 +159,30 @@ function access_scheme_form($form, &$form_state, $scheme = NULL) {
     '#description' => t('A brief description of this access scheme.'),
   );
 
+  $form['additional_settings'] = array(
+    '#type' => 'vertical_tabs',
+    '#attached' => array(
+      'js' => array(drupal_get_path('module', 'access') . '/access_schemes.js'),
+    ),
+  );
+
+  // Roles used for access grants in this scheme.
+  $roles = user_roles(TRUE);
+  unset($roles[DRUPAL_AUTHENTICATED_RID]);
+  $form['roles'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Roles'),
+    '#collapsible' => TRUE,
+    '#group' => 'additional_settings',
+  );
+  $form['roles']['role_options'] = array(
+    '#type' => 'checkboxes',
+    '#title' => t('User roles available for use within this access scheme'),
+    '#options' => $roles,
+    '#default_value' => array_keys(access_scheme_roles($scheme)),
+    '#description' => t('Users with the <em>Administer access grants</em> permission will be able to grant access to users with these roles within one or more access realms.'),
+  );
+
   $form['actions'] = array('#type' => 'actions');
   $form['actions']['submit'] = array(
     '#type' => 'submit',
@@ -226,7 +250,17 @@ function access_scheme_form_submit($form, &$form_state) {
     return;
   }
 
+  // Save the scheme.
   $status = access_scheme_save($scheme);
+
+  // Save the role options.
+  $roles = user_roles(TRUE);
+  unset($roles[DRUPAL_AUTHENTICATED_RID]);
+  $role_options = array_filter($form_state['values']['role_options']);
+  $roles = array_intersect_key($roles, $role_options);
+  variable_set('access_scheme_roles_' . $scheme->scheme, $roles);
+
+  // Rebuild the menu so that the "add access grant" page is up to date.
   menu_rebuild();
 
   $t_args = array('%name' => $scheme->name);
