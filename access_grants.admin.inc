@@ -750,7 +750,7 @@ function access_grant_multiple_delete_confirm($form, &$form_state, $selected) {
       '#type' => 'hidden',
       '#value' => $grant->gid,
       '#prefix' => '<li>',
-      '#suffix' => t('@user as @role in @scheme', array('@user' => $usernames[$grant->uid], '@role' => $roles[$grant->rid], '@scheme' => $schemes[$grant->scheme])) . "</li>\n",
+      '#suffix' => t("@scheme for @user's access as @role", array('@user' => $usernames[$grant->uid], '@role' => $roles[$grant->rid], '@scheme' => $schemes[$grant->scheme])) . "</li>\n",
     );
   }
 
