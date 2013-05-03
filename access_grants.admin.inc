@@ -86,6 +86,8 @@ function access_admin_grants() {
     $options[$gid] = array(
       'username' => theme('username', array('account' => $fields)),
       'role' => check_plain($fields->role),
+      // We don't need to check_plain($realms) because access_grant_realms()
+      // already sanitized the realm labels.
       'realms' => $realms,
       'scheme' => check_plain($fields->scheme),
     );
