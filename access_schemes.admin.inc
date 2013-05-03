@@ -252,19 +252,26 @@ function access_scheme_form($form, &$form_state, $scheme = NULL) {
           if (is_object($handler_values[$object_type])) {
             $handler = $handler_values[$object_type];
           }
-          // If all we have is the name, but it's the same as the saved handler,
-          // then use the saved handler object.
-          elseif (isset($scheme->handlers) && isset($scheme->handlers[$object_type]) && $handler_values[$object_type]['handler'] == get_class($scheme->handlers[$object_type])) {
-            $handler = $scheme->handlers[$object_type];
+          // Otherwise, see if we have a class name from the select element.
+          elseif (is_array($handler_values[$object_type]) && !empty($handler_values[$object_type]['handler'])) {
+            // If the class is the same as the saved handler, get that handler.
+            if (isset($scheme->handlers) && isset($scheme->handlers[$object_type]) && $handler_values[$object_type]['handler'] == get_class($scheme->handlers[$object_type])) {
+              $handler = $scheme->handlers[$object_type];
+            }
+            // Otherwise, we have to use an unconfigured instance of the class.
+            else {
+              $class = $handler_values[$object_type]['handler'];
+              $handler = new $class($scheme->scheme);
+            }
           }
-          // Otherwise, we have to use an unconfigured instance of the handler.
           else {
-            $class = $handler_values[$object_type]['handler'];
-            $handler = new $class($scheme->scheme);
+            $handler = FALSE;
           }
 
           // Add the handler's settings form.
-          $fieldset['settings'] = $handler->settingsForm($scheme->realm_type, $realm_values);
+          if ($handler) {
+            $fieldset['settings'] = $handler->settingsForm($scheme->realm_type, $realm_values);
+          }
         }
 
         $form['handlers']['handlers'][$object_type] = $fieldset;
