@@ -466,54 +466,47 @@ function access_scheme_load($scheme) {
 /**
  * Saves an access scheme to the database.
  *
- * @param $info
+ * @param $scheme
  *   The access scheme to save, as an object.
  *
  * @return
  *   Status flag indicating the outcome of the database operation.
  */
-function access_scheme_save($info) {
-  // Check whether this is a new scheme or an update of an existing one.
-  $existing_scheme = !empty($info->old_scheme) ? $info->old_scheme : $info->scheme;
-  $is_existing = (bool) db_query_range('SELECT 1 FROM {access_scheme} WHERE scheme = :scheme', 0, 1, array(':scheme' => $existing_scheme))->fetchField();
-
-  // Set the field values for the insert/update query.
-  $scheme = access_scheme_set_defaults($info);
-  $fields = array(
-    'scheme' => (string) $scheme->scheme,
-    'name' => (string) $scheme->name,
-    'realm_type' => (string) $scheme->realm_type,
-    'description' => (string) $scheme->description,
-  );
-
-  if ($is_existing) {
-    db_update('access_scheme')
-      ->fields($fields)
-      ->condition('scheme', $existing_scheme)
-      ->execute();
-    $status = SAVED_UPDATED;
-
-    // If the machine name was changed, we need to notify the Field API.
-    if (!empty($scheme->old_scheme) && $scheme->old_scheme != $scheme->scheme) {
-      field_attach_rename_bundle('access_grant', $scheme->old_scheme, $scheme->scheme);
-    }
-
-    // Allow other modules to react to the change.
-    module_invoke_all('access_scheme_update', $scheme);
-  }
-  else {
-    db_insert('access_scheme')
-      ->fields($fields)
-      ->execute();
-    $status = SAVED_NEW;
-
-    // Notify the Field API of the new bundle.
-    field_attach_create_bundle('access_grant', $scheme->scheme);
-
-    // Allow other modules to react to the new scheme definition.
-    module_invoke_all('access_scheme_insert', $scheme);
+function access_scheme_save($scheme) {
+  // Sanitize the values.
+  $scheme = access_scheme_set_defaults($scheme);
+  $fields = array();
+  foreach (array('scheme', 'name', 'realm_type', 'description') as $key) {
+    $scheme->$key = (string) $scheme->$key;
+    $fields[$key] = $scheme->$key;
   }
 
+  // Look for an existing scheme.
+  if (!isset($scheme->original)) {
+    $scheme->original = access_scheme_get_scheme($scheme->scheme);
+  }
+
+  // The machine name and realm type are not editable after creation.
+  if (!empty($scheme->original)) {
+    $scheme->scheme = $fields['scheme'] = $scheme->original->scheme;
+    $scheme->realm_type = $fields['realm_type'] = $scheme->original->realm_type;
+  }
+
+  // Save the scheme.
+  $status = db_merge('access_scheme')
+    ->key(array('scheme' => $fields['scheme']))
+    ->fields($fields)
+    ->execute();
+  switch ($status) {
+    case SAVED_NEW:
+      field_attach_create_bundle('access_grant', $scheme->scheme);
+      module_invoke_all('access_scheme_insert', $scheme);
+      break;
+
+    case SAVED_UPDATED:
+      module_invoke_all('access_scheme_update', $scheme);
+      break;
+  }
   return $status;
 }
 
@@ -596,35 +589,13 @@ function access_access_scheme_insert($scheme) {
  * Implements hook_access_scheme_update().
  */
 function access_access_scheme_update($scheme) {
-  // If the machine name was changed, we need to update the scheme's grants.
-  if (!empty($scheme->old_scheme) && $scheme->old_scheme != $scheme->scheme) {
-    $count = access_scheme_update_grants($scheme->old_scheme, $scheme->scheme);
-
-    if ($count) {
-      drupal_set_message(format_plural($count,
-        'Changed the scheme of 1 access grant from %old to %new.',
-        'Changed the scheme of @count access grants from %old to %new.',
-        array('%old' => $scheme->old_scheme, '%new' => $scheme->scheme)));
-    }
+  // If the realm field is configurable, merge in any available field settings
+  // attached to the scheme.
+  $field = field_info_field(access_scheme_fieldname($scheme));
+  if (!empty($field['settings']['arguments']) && isset($scheme->realm_settings)) {
+    $field['settings']['arguments'] = array_merge($field['settings']['arguments'], $scheme->realm_settings);
+    field_update_field($field);
   }
-}
-
-/**
- * Updates all access grants of one scheme to be of another scheme.
- *
- * @param $old
- *   The scheme of the access grants to be changed.
- * @param $new
- *   The new scheme for the grants.
- *
- * @return
- *   The number of access grants whose scheme field was modified.
- */
-function access_scheme_update_grants($old, $new) {
-  return db_update('access_grant')
-    ->fields(array('scheme' => $new))
-    ->condition('scheme', $old)
-    ->execute();
 }
 
 /**
@@ -703,15 +674,6 @@ function access_scheme_roles($scheme = NULL) {
     return reset($list);
   }
   return $list;
-}
-
-/**
- * AJAX callback to get the settings form for a scheme's selected realm type.
- *
- * @see access_scheme_form()
- */
-function access_scheme_realm_settings_js($form, $form_state) {
-  return $form['realm_settings'];
 }
 
 /**
@@ -1073,17 +1035,35 @@ function access_handler_delete($scheme, $object_type) {
 }
 
 /**
- * AJAX callback to get the settings form for a selected access handler.
+ * AJAX callback for access handler settings forms.
  *
- * @see access_scheme_handlers_form()
+ * @see access_scheme_form()
  */
-function access_handler_settings_js($form, $form_state) {
-  // This callback is triggered by a handler selector element in
-  // access_scheme_handlers_form(). Both the handler element and its associated
-  // settings element (which we're replacing) are in $form['objects'][$object],
-  // so the triggering handler element's first parent should be the $object key.
-  $object = $form_state['triggering_element']['#parents'][0];
-  return $form['objects'][$object]['settings'];
+function access_handler_form_ajax($form, $form_state) {
+  return $form['handlers']['handlers'];
+}
+
+/**
+ * Returns a list of access handlers and the modules that provide them.
+ *
+ * @return
+ *   A nested array indexed first by object type, then by handler name, where
+ *   each value is the name of the module that provides that handler.
+ */
+function access_handler_modules() {
+  $modules = module_implements('access_info');
+  $list = array();
+  foreach ($modules as $module) {
+    $info = module_invoke($module, 'access_info');
+    foreach ($info as $object_type => $object_info) {
+      if (isset($object_info['handlers'])) {
+        foreach (array_keys($object_info['handlers']) as $handler) {
+          $list[$object_type][$handler] = $module;
+        }
+      }
+    }
+  }
+  return $list;
 }
 
 /**
@@ -1633,14 +1613,6 @@ function access_menu() {
   $items['admin/structure/access/manage/%access_scheme/edit'] = array(
     'title' => 'Edit',
     'type' => MENU_DEFAULT_LOCAL_TASK,
-  );
-  $items['admin/structure/access/manage/%access_scheme/handlers'] = array(
-    'title' => 'Manage access handlers',
-    'page callback' => 'drupal_get_form',
-    'page arguments' => array('access_scheme_handlers_form', 4),
-    'access arguments' => array('administer access schemes'),
-    'file' => 'access_schemes.admin.inc',
-    'type' => MENU_LOCAL_TASK,
   );
   $items['admin/structure/access/manage/%access_scheme/delete'] = array(
     'title' => 'Delete',
