@@ -177,17 +177,19 @@ function access_admin_grants_filter_form() {
     else {
       $value = check_plain($value);
     }
-    $t_args = array(
-      '%property' => $filters[$type]['title'],
-      '%value' => $value,
-    );
-    if ($i++) {
-      $form['filters']['current'][] = array('#markup' => t('and where %property is %value', $t_args));
+    if (!empty($value)) {
+      $t_args = array(
+        '%property' => $filters[$type]['title'],
+        '%value' => $value,
+      );
+      if ($i++) {
+        $form['filters']['current'][] = array('#markup' => t('and where %property is %value', $t_args));
+      }
+      else {
+        $form['filters']['current'][] = array('#markup' => t('where %property is %value', $t_args));
+      }
+      unset($filters[$type]);
     }
-    else {
-      $form['filters']['current'][] = array('#markup' => t('where %property is %value', $t_args));
-    }
-    unset($filters[$type]);
   }
 
   $form['filters']['available'] = array(
@@ -254,7 +256,7 @@ function access_admin_grants_filter_form_submit($form, &$form_state) {
     case t('Refine'):
       // Apply every filter that has a choice selected other than 'any'.
       foreach ($filters as $filter => $options) {
-        if (isset($form_state['values'][$filter])) {
+        if (!empty($form_state['values'][$filter])) {
           if (!isset($filters[$filter]['options'])) {
             // Filters lacking an 'options' key are text input.
             $_SESSION['access_overview_grant_filter'][] = array($filter, $form_state['values'][$filter]);
