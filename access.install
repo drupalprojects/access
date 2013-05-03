@@ -232,3 +232,18 @@ function access_update_7100() {
   }
   variable_del('access_realm_roles');
 }
+
+/**
+ * Switch access fields to buttons widget.
+ */
+function access_update_7101() {
+  $schemes = access_scheme_get_names();
+  foreach (array_keys($schemes) as $scheme) {
+    $field_name = access_scheme_fieldname($scheme);
+    $instance = field_info_instance('access_grant', $field_name, $scheme);
+    if (!empty($instance) && $instance['widget']['type'] == 'options_select') {
+      $instance['widget']['type'] = 'options_buttons';
+      field_update_instance($instance);
+    }
+  }
+}
