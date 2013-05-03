@@ -211,7 +211,7 @@ function access_admin_grants_filter_form() {
     else {
       $form['filters']['available']['filters'][$key] = array(
         '#type' => 'textfield',
-        '#size' => '32',
+        '#size' => '31',
         '#title' => $filter['title'],
       );
     }
