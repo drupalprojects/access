@@ -275,7 +275,7 @@ function access_grant_page_title($grant) {
  * Menu title callback for adding a grant within a scheme.
  */
 function access_grant_add_page_title($scheme) {
-  return t('Grant access in @scheme', array('@scheme' => $scheme->name));
+  return t('Grant access to @scheme', array('@scheme' => $scheme->name));
 }
 
 /**
