@@ -122,11 +122,13 @@ function access_grant_load($gid, $reset = FALSE) {
  *   - 'uid': a user ID.
  *   - 'rid': a role ID.
  *   - 'realms': an array of realm values.  Only used if 'scheme' is provided.
+ * @param $reset
+ *   (optional) Whether to reset the internal cache.  Defaults to FALSE.
  *
  * @return
  *   An array of access grant objects matching the given parameters.
  */
-function access_grant_load_by_condition($conditions = array()) {
+function access_grant_load_by_condition($conditions = array(), $reset = FALSE) {
   $query = new EntityFieldQuery();
   $query->entityCondition('entity_type', 'access_grant');
 
@@ -149,7 +151,7 @@ function access_grant_load_by_condition($conditions = array()) {
     return array();
   }
   $gids = array_keys($result['access_grant']);
-  return access_grant_load_multiple($gids);
+  return access_grant_load_multiple($gids, $reset);
 }
 
 /**
