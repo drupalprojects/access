@@ -797,8 +797,9 @@ function template_preprocess_access_grant(&$variables) {
   field_attach_preprocess('access_grant', $grant, $variables['elements'], $variables);
 
   // Add helper variables for the access realm field, since the name is dynamic.
-  $variables['access_field'] = access_scheme_fieldname($grant->scheme);
-  $variables['ack_realms'] = $variables[$variables['access_field']];
+  $fieldname = access_scheme_fieldname($grant->scheme);
+  $variables['access_field'] = $fieldname;
+  $variables['ack_realms'] = empty($variables[$fieldname]) ? array() : $variables[$fieldname];
 
   // Add a class to identify the scheme.
   $variables['classes_array'][] = drupal_html_class('access-grant-' . $grant->scheme);
