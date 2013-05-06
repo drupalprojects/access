@@ -15,21 +15,39 @@ function access_access_realm_info() {
 
   if (module_exists('list')) {
     foreach (array('integer', 'float', 'text') as $type) {
-      $info['list_' . $type] = array(
-        'label' => t("a list (" . $type . ") field's allowed values"),
-        'field_type' => 'access_' . $type,
-        'arguments' => array('field' => ''),
-      );
+      // See if a field exists of this type.
+      $exists = db_select('field_config', 'f')
+        ->condition('f.type', 'list_' . $type)
+        ->condition('f.deleted', 0)
+        ->fields('f', array('id'))
+        ->range(0, 1)
+        ->execute()
+        ->fetchField();
+      if ($exists) {
+        $info['list_' . $type] = array(
+          'label' => t("a list (" . $type . ") field's allowed values"),
+          'field_type' => 'access_' . $type,
+          'arguments' => array('field' => ''),
+        );
+      }
     }
   }
 
   if (module_exists('taxonomy')) {
-    $info['taxonomy_term'] = array(
-      'label' => t('a taxonomy term'),
-      'field_type' => 'access_integer',
-      'arguments' => array('vocabulary' => ''),
-    );
-    // @todo Support cascading hierarchical privileges as an option.
+    // See if any vocabularies exist.
+    $exists = db_select('taxonomy_vocabulary', 't')
+      ->fields('t', array('vid'))
+      ->range(0, 1)
+      ->execute()
+      ->fetchField();
+    if ($exists) {
+      $info['taxonomy_term'] = array(
+        'label' => t('a taxonomy term'),
+        'field_type' => 'access_integer',
+        'arguments' => array('vocabulary' => ''),
+      );
+      // @todo Support cascading hierarchical privileges as an option.
+    }
   }
 
   $info['user'] = array(
