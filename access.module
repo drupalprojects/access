@@ -418,17 +418,34 @@ function access_scheme_get_names() {
 }
 
 /**
- * Returns a list of all defined access schemes.
+ * Returns an array of access schemes.
+ *
+ * @param $schemes
+ *   (optional) An access scheme machine name string, or an array of such names.
  *
  * @return
- *   An array of access scheme objects, keyed by machine name.
+ *   An array of access scheme objects matching the given machine name(s), keyed
+ *   by machine name.  If $schemes is not given, returns all defined schemes.
  */
-function access_scheme_get_schemes() {
-  $schemes = db_query('SELECT * FROM {access_scheme} ORDER BY scheme')->fetchAllAssoc('scheme');
-  foreach ($schemes as $scheme) {
-    access_handler_attach_handlers($scheme);
+function access_scheme_get_schemes($schemes = NULL) {
+  $query = db_select('access_scheme', 'a')
+    ->fields('a')
+    ->orderBy('a.scheme');
+
+  if (isset($schemes)) {
+    if (is_array($schemes)) {
+      $query->condition('a.scheme', $schemes, 'IN');
+    }
+    else {
+      $query->condition('a.scheme', $schemes);
+    }
   }
-  return $schemes;
+
+  $result = $query->execute()->fetchAllAssoc('scheme');
+  foreach ($result as $record) {
+    access_handler_attach_handlers($record);
+  }
+  return $result;
 }
 
 /**
@@ -442,13 +459,8 @@ function access_scheme_get_schemes() {
  */
 function access_scheme_get_scheme($grant) {
   $scheme = is_object($grant) ? $grant->scheme : $grant;
-  // Fetch the base scheme properties from the database.
-  $fields = db_query('SELECT * FROM {access_scheme} WHERE scheme = :scheme', array(':scheme' => $scheme))->fetchObject();
-  // Fetch any attached access handlers.
-  if (!empty($fields)) {
-    access_handler_attach_handlers($fields);
-  }
-  return $fields;
+  $result = access_scheme_get_schemes($scheme);
+  return reset($result);
 }
 
 /**
