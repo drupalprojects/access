@@ -362,12 +362,20 @@ function access_scheme_form_submit($form, &$form_state) {
   // Save the role options.
   variable_set('access_scheme_roles_' . $scheme->scheme, $scheme->role_options);
 
-  // Save the handlers.
+  // Update handlers.
   if (isset($scheme->handlers)) {
     $modules = access_handler_modules();
     foreach ($scheme->handlers as $object_type => $handler_values) {
       $handler = $handler_values['handler'];
-      if (!empty($handler)) {
+      // Check whether a handler was chosen for this object type.
+      if (empty($handler)) {
+        // If there was a handler chosen before, we need to delete it.
+        if (!empty($scheme->original) && !empty($scheme->original->handlers) && !empty($scheme->original->handlers[$object_type])) {
+          access_handler_delete($scheme->scheme, $object_type);
+        }
+      }
+      else {
+        // Save the handler.
         $module = $modules[$object_type][$handler];
         $settings = isset($handler_values['settings']) ? $handler_values['settings'] : array();
         access_handler_save($scheme->scheme, $object_type, $handler, $module, $settings);
