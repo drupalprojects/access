@@ -488,8 +488,9 @@ function access_scheme_load($scheme) {
 function access_scheme_save($scheme) {
   // Sanitize the values.
   $scheme = access_scheme_set_defaults($scheme);
+  $scheme->scheme = (string) $scheme->scheme;
   $fields = array();
-  foreach (array('scheme', 'name', 'realm_type', 'description') as $key) {
+  foreach (array('name', 'realm_type', 'description') as $key) {
     $scheme->$key = (string) $scheme->$key;
     $fields[$key] = $scheme->$key;
   }
@@ -501,13 +502,13 @@ function access_scheme_save($scheme) {
 
   // The machine name and realm type are not editable after creation.
   if (!empty($scheme->original)) {
-    $scheme->scheme = $fields['scheme'] = $scheme->original->scheme;
+    $scheme->scheme = $scheme->original->scheme;
     $scheme->realm_type = $fields['realm_type'] = $scheme->original->realm_type;
   }
 
   // Save the scheme.
   $status = db_merge('access_scheme')
-    ->key(array('scheme' => $fields['scheme']))
+    ->key(array('scheme' => $scheme->scheme))
     ->fields($fields)
     ->execute();
   switch ($status) {
