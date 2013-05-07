@@ -366,6 +366,13 @@ function access_grant_build_content($grant, $view_mode = 'full') {
 }
 
 /**
+ * AJAX callback for the access grant form.
+ */
+function access_grant_form_ajax($form, $form_state) {
+  return $form['role'];
+}
+
+/**
  * Implements hook_access_grant_view().
  */
 function access_access_grant_view($grant) {
@@ -1627,13 +1634,6 @@ function access_menu() {
   );
 
   return $items;
-}
-
-/**
- * AJAX callback for the access grant form.
- */
-function access_grant_form_ajax($form, $form_state) {
-  return $form['role'];
 }
 
 /**
