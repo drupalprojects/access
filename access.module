@@ -1004,34 +1004,22 @@ function access_handler_attach_handlers($scheme) {
  */
 function access_handler_save($scheme, $object_type, $handler, $module, $settings = array()) {
   // Sanitize the inputs.
-  $fields = array(
+  $key = array(
     'scheme' => (string) $scheme,
     'object_type' => (string) $object_type,
+  );
+  $fields = array(
     'handler' => (string) $handler,
     'module' => (string) $module,
-    'settings' => is_array($settings) ? $settings : (array) $settings,
+    'settings' => is_array($settings) ? $settings : array($settings),
   );
   $fields['settings'] = serialize($fields['settings']);
 
-  // Check for an existing handler attachment.
-  $is_existing = (bool) db_query_range('SELECT 1 FROM {access_handler} WHERE scheme = :scheme AND object_type = :object_type', 0, 1, array(':scheme' => $fields['scheme'], ':object_type' => $fields['object_type']))->fetchField();
-  if ($is_existing) {
-    // Update/replace the existing handler attachment.
-    db_update('access_handler')
-      ->fields($fields)
-      ->condition('scheme', $fields['scheme'])
-      ->condition('object_type', $fields['object_type'])
-      ->execute();
-    $status = SAVED_UPDATED;
-  }
-  else {
-    // Attach the new handler.
-    db_insert('access_handler')
-      ->fields($fields)
-      ->execute();
-    $status = SAVED_NEW;
-  }
-
+  // Add/update the attachment.
+  $status = db_merge('access_handler')
+    ->key($key)
+    ->fields($fields)
+    ->execute();
   return $status;
 }
 
