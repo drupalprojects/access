@@ -649,7 +649,7 @@ function access_scheme_page_title($scheme) {
  */
 function access_scheme_realms($scheme) {
   $field = field_info_field(access_scheme_fieldname($scheme));
-  return empty($field) ? array() : access_allowed_values($field);
+  return empty($field) ? array() : access_field_allowed_values($field);
 }
 
 /**
@@ -814,7 +814,7 @@ function access_field_info() {
  * @see list_field_validate()
  */
 function access_field_validate($entity_type, $entity, $field, $instance, $langcode, $items, &$errors) {
-  $allowed_values = access_allowed_values($field);
+  $allowed_values = access_field_allowed_values($field);
   foreach ($items as $delta => $item) {
     if (!empty($item['value'])) {
       if (empty($allowed_values) || !isset($allowed_values[$item['value']])) {
@@ -851,7 +851,7 @@ function access_field_is_empty($item, $field) {
  *
  * @see hook_access_realms()
  */
-function access_allowed_values($field) {
+function access_field_allowed_values($field) {
   $info = access_realm_info_by_field($field);
   if ($info) {
     return module_invoke($info['module'], 'access_realms', $info['realm_type'], $field['settings']['arguments']);
@@ -879,7 +879,7 @@ function access_field_widget_info_alter(&$info) {
  * Implements hook_options_list().
  */
 function access_options_list($field, $instance, $entity_type, $entity) {
-  return access_allowed_values($field);
+  return access_field_allowed_values($field);
 }
 
 /**
@@ -918,7 +918,7 @@ function access_field_formatter_view($entity_type, $entity, $field, $instance, $
 
   switch ($display['type']) {
     case 'access_default':
-      $allowed_values = access_allowed_values($field);
+      $allowed_values = access_field_allowed_values($field);
       foreach ($items as $delta => $item) {
         if (isset($allowed_values[$item['value']])) {
           $output = field_filter_xss($allowed_values[$item['value']]);
