@@ -1115,12 +1115,17 @@ interface AccessControlKitInterface {
    public function settingsForm($realm_type, array $realm_settings = array());
 
    /**
-    * Alters the form for an object to reflect realm create/delete permissions.
+    * Alters the form for a new object to reflect realm permissions.
     *
-    * It is up to the handler module to invoke this method as needed within a
-    * hook_form_alter(), hook_form_BASE_FORM_ID_alter(), or
-    * hook_form_FORM_ID_alter() implementation to properly enforce realm
-    * permissions on the handled object type.
+    * It is up to the handler module to invoke this method as needed from
+    * hook_form_alter() to enforce realm permissions on new objects.
+    * Implementations of this method should modify the form in such a way as to
+    * prevent the user from creating the object in a realm to which they do not
+    * have access.
+    *
+    * For example, if creating a node where access is granted via a list field,
+    * the list field options should be modified to only show the realms where
+    * the user has access to create the node.
     *
     * @param &$form
     *   Nested array of form elements that comprise the form.
@@ -1129,16 +1134,39 @@ interface AccessControlKitInterface {
     * @param $form_id
     *   String representing the name of the form itself. Typically this is the
     *   name of the function that generated the form.
-    * @param $create
-    *   (optional) An array of realms in which the user has "create" access for
-    *   the handled object type. An empty array() indicates that the user has no
-    *   such access in any realm. Defaults to NULL, indicating global access,
-    *   which should require no filtering.
-    * @param $delete
-    *   (optional) As $create (above), an array of realms in which the user has
-    *   "delete" access for the handled object type. Defaults to NULL.
+    * @param $realms
+    *   An array of realms in which the user has "create" access for the object,
+    *   as realm_value => realm_label.
     */
-    public function formAlter(&$form, &$form_state, $form_id, $create = NULL, $delete = NULL);
+    public function formAlterNew(&$form, &$form_state, $form_id, $realms = array());
+
+   /**
+    * Alters the form for an existing object to reflect realm permissions.
+    *
+    * It is up to the handler module to invoke this method as needed from
+    * hook_form_alter() to enforce realm permissions on existing objects.
+    * Implementations of this method should modify the form in such a way as to
+    * prevent the user from changing the object's assigned realms, and to
+    * prevent deleting the object unless the user has delete permission for one
+    * of the object's assigned realms.
+    *
+    * For example, if editing a node where access is granted via a list field,
+    * the list field should be locked (i.e., #access => FALSE), and the delete
+    * button should be removed unless the user has the "delete" permission for
+    * one of the realm values currently assigned to the field.
+    *
+    * @param &$form
+    *   Nested array of form elements that comprise the form.
+    * @param &$form_state
+    *   A keyed array containing the current state of the form.
+    * @param $form_id
+    *   String representing the name of the form itself. Typically this is the
+    *   name of the function that generated the form.
+    * @param $realms
+    *   An array of realms in which the user has "delete" access for the object,
+    *   as realm_value => realm_label.
+    */
+    public function formAlterExisting(&$form, &$form_state, $form_id, $realms = array());
 }
 
 /**
@@ -1187,113 +1215,133 @@ abstract class AccessControlKit implements AccessControlKitInterface {
   }
 
   /**
-   * Implements AccessControlKitInterface::formAlter().
+   * Implements AccessControlKitInterface::formAlterNew().
    */
-  public function formAlter(&$form, &$form_state, $form_id, $create = NULL, $delete = NULL) {
+  public function formAlterNew(&$form, &$form_state, $form_id, $realms = array()) {
     // No filtering needed in the abstract class.  Subclasses can make use of
-    // $this->elementFilter() to limit access-related form fields as needed.
+    // the convenience function $this->filterElementOptions() to filter the
+    // #options attribute of access-related form elements by $realms.
   }
 
   /**
-   * Filters a form element's available options according to which options the
-   * user is permitted to set or unset.
+   * Implements AccessControlKitInterface::formAlterExisting().
+   */
+  public function formAlterExisting(&$form, &$form_state, $form_id, $realms = array()) {
+    // No filtering needed in the abstract class.  Subclasses should lock any
+    // access-related form fields.  Access to "Delete" buttons, etc., should
+    // also be blocked if the current value of an access-related element is not
+    // present in $realms.
+  }
+
+  /**
+   * Filters a form element's #options to only include accessible realms.
    *
-   * For use in subclass implementations of AccessControlKit::formAlter() to
-   * limit a realm-related field on an object's add/edit form according to the
-   * user's realm-level create/delete permissions.
+   * The element's '#options' array will be filtered according to the realms
+   * parameter to only show values that the user can access.  If only one option
+   * remains, the element will be set to that option and disabled.
    *
    * @param &$element
-   *   A form element of '#type' => 'radios' or 'select', with '#options'
-   *   populated, passed by reference.  If the $is_new parameter is FALSE, the
-   *   '#default_value' is assumed to be the current value of the field.  The
-   *   $element is also assumed to be used for controlling realm membership, and
-   *   thus must not have '#multiple' set to TRUE.
-   * @param $is_new
-   *   Boolean indicating whether the access-controlled object is being created
-   *   (TRUE) or edited (FALSE).  When TRUE, the $delete parameter is ignored.
-   * @param $create
-   *   An array indicating which of the $element['#options'] the user is allowed
-   *   to set.  Defaults to NULL, indicating that the user may set any option.
-   *   An empty array() indicates that the user may not set any value in this
-   *   field other than the one already set.
-   * @param $delete
-   *   An array of the $element['#options'] that the user is allowed to unset.
-   *   Defaults to NULL, indicating that the user may unset any option.  An
-   *   empty array() indicates that the user may not unset any existing value.
+   *   A form element with an '#options' attribute (such as #type => 'select',
+   *   'radio', or 'checkboxes'), passed by reference.
+   * @param $realms
+   *   An associative array indicating which options the user is allowed to set,
+   *   as realm_value => realm_label.
+   * @param $empty_value
+   *   (optional) The #options key that denotes that no selection has been made.
+   */
+  protected function filterElementOptions(&$element, $realms, $empty_value = NULL) {
+    $options = array();
+    // Preserve the empty option, if one was specified.
+    if (isset($empty_value) && isset($element['#options'][$empty_value])) {
+      $options[$empty_value] = $element['#options'][$empty_value];
+    }
+    // Include only those options that correspond to allowed realms.
+    $options += array_intersect_key($element['#options'], $realms);
+
+    // If the element is required, and only one option remains besides the empty
+    // value, then remove the empty value as an option.
+    if (!empty($element['#required']) && count($options) == 2 && isset($empty_value) && isset($options[$empty_value])) {
+      unset($options[$empty_value]);
+    }
+
+    $element['#options'] = $options;
+    if (count($element['#options']) == 1) {
+      $element['#disabled'] = TRUE;
+      $element['#default_value'] = key($element['#options']);
+    }
+  }
+
+  /**
+   * Returns the handler settings.
+   *
+   * @param $name
+   *   (optional) The name of a setting.  If omitted, returns all settings.
+   * @param $empty_value
+   *   (optional) If $name does not exist in the handler settings, this will be
+   *   returned instead.  Defaults to NULL.  Ignored if $name is omitted.
    *
    * @return
-   *   The $element's '#options' array will be filtered according to the $create
-   *   and $delete parameters to only show values that the user is permitted to
-   *   save on the object.  If only one valid option remains after filtering,
-   *   the element will be changed to '#type' => 'value' to save the user from
-   *   having to select it manually.
-   *
-   *   If $is_new == TRUE and the element is required, but no options remain
-   *   after filtering, returns FALSE.  This indicates that the user does not
-   *   have sufficient access to complete the form; handlers are expected to
-   *   respond to this condition appropriately, perhaps by denying access to the
-   *   form.  Otherwise, returns TRUE.
+   *   The value of the requested handler setting, or all handler settings in an
+   *   array as name => value.
    */
-  protected function elementFilter(&$element, $is_new = FALSE, $create = NULL, $delete = NULL) {
-    // Check for a valid existing value.
-    $value = isset($element['#default_value']) ? $element['#default_value'] : NULL;
-    $value = is_array($value) ? reset($value) : $value;
-    $existing = !$is_new && !empty($value) && isset($element['#options'][$value]);
-
-    // If there is an existing value that the user does not have access to
-    // remove, then the user cannot change the current value.
-    if ($existing && isset($delete) && !isset($delete[$value])) {
-      $element['#type'] = 'value';
-      $element['#value'] = $value;
-      return TRUE;
+  protected function getSetting($name = NULL, $empty_value = NULL) {
+    $settings = empty($this->settings) ? array() : $this->settings;
+    if (isset($name)) {
+      return isset($settings[$name]) ? $settings[$name] : $empty_value;
     }
+    return $settings;
+  }
 
-    // If the user lacks global create permission, we need to filter the list.
-    if (isset($create)) {
-      $options = array();
+  /**
+   * Returns the settings for the scheme to which the handler is attached.
+   *
+   * @param $name
+   *   (optional) The name of a setting.  If omitted, returns all settings.
+   * @param $empty_value
+   *   (optional) If $name does not exist in the scheme settings, this will be
+   *   returned instead.  Defaults to NULL.  Ignored if $name is omitted.
+   *
+   * @return
+   *   The value of the requested scheme setting, or all scheme settings in an
+   *   array as name => value.
+   */
+  protected function getSchemeSetting($name = NULL, $empty_value = NULL) {
+    $ack_fieldname = access_scheme_fieldname($this->scheme);
+    $ack_field = field_info_field($ack_fieldname);
+    $settings = empty($ack_field['settings']['arguments']) ? array() : $ack_field['settings']['arguments'];
+    if (isset($name)) {
+      return isset($settings[$name]) ? $settings[$name] : $empty_value;
+    }
+    return $settings;
+  }
 
-      // If there is an N/A option available, preserve it.
-      if ($none = isset($element['#options']['_none'])) {
-        $options['_none'] = $element['#options']['_none'];
-      }
-
-      // If there is an existing value, preserve it regardless of permissions
-      // (i.e. user may be able to edit but not create objects in this realm).
-      if ($existing) {
-        $options[$value] = $element['#options'][$value];
-      }
-
-      // Preserve any options that the user is allowed to add to the object.
-      foreach ($element['#options'] as $key => $label) {
-        if (isset($create[$key])) {
-          $options[$key] = $label;
-        }
-      }
-
-      $element['#options'] = $options;
-      // Alter the element based on how many options remain.
-      $count = count($options);
-      $required = !empty($element['#required']);
-      if ($count == 0 && $is_new && $required) {
-        // No options remain, but the field is required, so return FALSE to let
-        // formAlter() know that it should deny access to the form.
-        return FALSE;
-      }
-      elseif ($count == 1) {
-        // Only one option remains, so we can just set it for the user.
-        $element['#type'] = 'value';
-        $element['#value'] = key($options);
-      }
-      elseif ($count == 2 && $none && $required) {
-        // Two options remain, but one of them is N/A and the field is required,
-        // so we can again just set it for the user to save them from clicking.
-        unset($options['_none']);
-        $element['#type'] = 'value';
-        $element['#value'] = key($options);
+  /**
+   * Wrapper for field_get_items() to get raw field values as an array.
+   *
+   * @param $key
+   *   The name of the key in each item that contains the value; e.g., 'tid'.
+   * @param $entity_type
+   *   The type of $entity; e.g., 'node' or 'user'.
+   * @param $entity
+   *   The entity containing the data to be displayed.
+   * @param $field_name
+   *   The field to be displayed.
+   * @param $langcode
+   *   (optional) The language code $entity->{$field_name} has to be displayed
+   *   in.  Defaults to the current language.
+   *
+   * @return
+   *   A flat array of the field's current values.  Note that delta keys, etc.
+   *   are not preserved.
+   */
+  protected function getFieldValues($key, $entity_type, $entity, $field_name, $langcode = NULL) {
+    $values = array();
+    if ($items = field_get_items($entity_type, $entity, $field_name, $langcode)) {
+      foreach ($items as $item) {
+        $values[] = $item[$key];
       }
     }
-
-    return TRUE;
+    return $values;
   }
 }
 
@@ -1374,45 +1422,51 @@ function access_user_roles($account = NULL) {
 }
 
 /**
- * Determines whether a user has a given permission on a given object.
+ * Determines whether a user has a permission on an object via an access grant.
  *
  * @param $string
- *   The permission, such as "edit any page", being checked for.
+ *   The permission, such as "edit any page".
  * @param $object_type
  *   The type of access controlled object, such as "node".
  * @param $object
- *   The object that the user is trying to access.
+ *   The object that the user is trying to access. May be an object or an array,
+ *   depending on the $object_type.
+ * @param $scheme
+ *   (optional) The machine name of the access scheme in which to check access.
+ *   If omitted, access is checked in all available access schemes.
  * @param $account
  *   (optional) The account to check. Defaults to the currently logged in user.
  *
  * @return
- *   Boolean TRUE if the user has the requested permission on the object.
+ *   Boolean TRUE if the user has the requested permission on the object via an
+ *   access grant in the $scheme, or in any scheme if $scheme was omitted.
  */
-function access_user_object_access($string, $object_type, $object, $account = NULL) {
+function access_user_object_access($string, $object_type, $object, $scheme = NULL, $account = NULL) {
   global $user;
   if (!isset($account)) {
     $account = $user;
   }
 
-  // Sanity check to make sure the user has the permission at all.
+  // Sanity check to make sure that the user has the permission at all.
   if (!user_access($string, $account)) {
     return FALSE;
   }
 
-  // If the user has the permission globally, realm assignments don't matter.
-  if (access_user_permission_global($string, $account)) {
-    return TRUE;
+  // Get the object's realm memberships.
+  if (isset($scheme)) {
+    $schemes = array($scheme => access_scheme_get_scheme($scheme));
   }
+  else {
+    $schemes = access_scheme_get_schemes();
+  }
+  $object_realms = access_object_realms($object_type, $object, $schemes);
 
-  // Get the list of realms in which the user has the requested permission.
-  $user_realms = access_user_permission_realms($string, $account);
-  // Get the object's realm memberships via access scheme handlers.
-  $object_realms = access_object_realms($object_type, $object);
-  // Check whether the object is a member of any realm in which the user has the
-  // requested permission.
-  foreach ($object_realms as $scheme => $realms) {
-    foreach ($realms as $realm) {
-      if (isset($user_realms[$scheme][$realm])) {
+  // Check the user's access in each scheme.
+  foreach ($schemes as $scheme_info) {
+    $user_realms = access_user_permission_realms($string, $scheme_info->scheme, $account);
+    foreach ($object_realms[$scheme_info->scheme] as $realm) {
+      if (isset($user_realms[$realm])) {
+        // If we get a match, there's no need to keep checking other schemes.
         return TRUE;
       }
     }
@@ -1421,77 +1475,57 @@ function access_user_object_access($string, $object_type, $object, $account = NU
 }
 
 /**
- * Determines in which realms a user has a given permission.
+ * Finds the realms where a user has a given permission via an access grant.
  *
  * @param $string
- *   The permission, such as "edit any page", being checked for.
+ *   The permission, such as "edit any page".
+ * @param $scheme
+ *   (optional) The machine name of the access scheme in which to check access.
+ *   If omitted, access is checked in all available access schemes.
  * @param $account
  *   (optional) The account to check. Defaults to the currently logged in user.
  *
  * @return
- *   An array indexed by access scheme. Each value is an array whose keys are
- *   the realms in which the user has the permission, and whose values are the
- *   realm labels.
+ *   An array whose keys are the realm values for which the user has been
+ *   granted the permission, and whose values are the corresponding realm
+ *   labels.  An empty array() indicates that the user does not have the
+ *   permission in any realm in the scheme.  If the $scheme paramater was
+ *   omitted, this will be a nested array indexed by scheme machine name.
  */
-function access_user_permission_realms($string, $account = NULL) {
+function access_user_permission_realms($string, $scheme = NULL, $account = NULL) {
   global $user;
   if (!isset($account)) {
     $account = $user;
+  }
+
+  if (isset($scheme)) {
+    $schemes = array($scheme);
+  }
+  else {
+    $schemes = array_keys(access_scheme_get_names());
   }
 
   // Get the user's realm role assignments via access grants.
-  $user_roles = access_user_roles($account);
+  $roles = access_user_roles($account);
+  // Filter out any roles that do not include the permission we're looking for.
+  foreach (user_role_permissions($roles) as $rid => $permissions) {
+    if (empty($permissions[$string])) {
+      unset($roles[$rid]);
+    }
+  }
 
-  // Check which (if any) of the realm roles provide the requested permission.
-  $role_permissions = user_role_permissions($user_roles);
-  $permission_realms = array();
-  foreach ($role_permissions as $rid => $permissions) {
-    // If the role provides the permission, add the role's realms to the list.
-    if (isset($permissions[$string])) {
-      foreach ($user_roles[$rid] as $scheme => $realms) {
-        if (!isset($permission_realms[$scheme])) {
-          $permission_realms[$scheme] = array();
-        }
-        $permission_realms[$scheme] += $realms;
+  // Find the accessible realms for each scheme.
+  $realms = array();
+  foreach ($schemes as $machine_name) {
+    $scheme_realms = array();
+    foreach ($roles as $access) {
+      if (!empty($access[$machine_name])) {
+        $scheme_realms += $access[$machine_name];
       }
     }
+    $realms[$machine_name] = $scheme_realms;
   }
-  return $permission_realms;
-}
-
-/**
- * Determines whether a user has a given permission globally.
- *
- * @param $string
- *   The permission, such as "edit any page", being checked for.
- * @param $account
- *   (optional) The account to check. Defaults to the currently logged in user.
- *
- * @return
- *   Boolean TRUE if the user has permission globally (i.e. via a non-ACK role).
- */
-function access_user_permission_global($string, $account = NULL) {
-  global $user;
-  if (!isset($account)) {
-    $account = $user;
-  }
-  // User #1 has all permissions globally.
-  if ($account->uid == 1) {
-    return TRUE;
-  }
-
-  // Get the list of roles enabled for use with ACK.
-  // Any role not in this list is considered global.
-  $realm_roles = options_array_flatten(access_scheme_roles());
-
-  // Check whether any of the global roles provides the requested permission.
-  $role_permissions = user_role_permissions($account->roles);
-  foreach ($role_permissions as $rid => $permissions) {
-    if (!isset($realm_roles[$rid]) && isset($permissions[$string])) {
-      return TRUE;
-    }
-  }
-  return FALSE;
+  return isset($scheme) ? reset($realms) : $realms;
 }
 
 /**
