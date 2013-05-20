@@ -1,0 +1,13 @@
+<?php
+/**
+ * @file
+ * Install, update, and uninstall functions for the ACK node module.
+ */
+
+/**
+ * API change for ACK permissions.
+ */
+function ack_node_update_7100() {
+  drupal_flush_all_caches();
+  return t('<strong>Important note for users of ack_node 7.x-1.x-dev releases from before May 20, 2013</strong>: The method of assigning scope-limited permissions to roles has changed. ACK now provides its own permissions for working with nodes, rather than overriding the core create/edit/delete permissions. Please update your permissions configuration accordingly. More information is available in the <a href="@url">ack_node README</a> file.', array('@url' => url(drupal_get_path('module', 'ack_node') . '/README.txt')));
+}
