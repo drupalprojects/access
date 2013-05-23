@@ -7,3 +7,8 @@ dependencies[] = options
 
 ; Notify the registry of the AccessControlKit class and interface.
 files[] = access.module
+
+; Handlers
+files[] = handlers/ack_entity_field.inc
+files[] = handlers/ack_entity_list.inc
+files[] = handlers/ack_entity_taxonomy_term_reference.inc

@@ -989,7 +989,7 @@ function access_handler_attach_handlers($scheme) {
     // Initialize the handler using the class and settings from the database.
     $class = $row->handler;
     $settings = unserialize($row->settings);
-    $scheme->handlers[$row->object_type] = new $class($scheme->scheme, $settings);
+    $scheme->handlers[$row->object_type] = new $class($scheme->scheme, $row->object_type, $settings);
   }
 }
 
@@ -1056,26 +1056,109 @@ function access_handler_form_ajax($form, $form_state) {
 }
 
 /**
- * Returns a list of access handlers and the modules that provide them.
+ * Returns information on all available object access handlers.
  *
  * @return
- *   A nested array indexed first by object type, then by handler name, where
- *   each value is the name of the module that provides that handler.
+ *   An array indexed by handler name where each value is an associative array
+ *   with the following keys:
+ *   - label: The human-readable name of this handler.
+ *   - realm types: An array listing the realm types that this handler supports,
+ *     as defined in hook_access_realm_info().
+ *   - object types: An array listing the object types that this handler
+ *     supports, as defined in hook_access_info(). A value of 'fieldable entity'
+ *     indicates that the handler supports all object types that are fieldable
+ *     entities, as defined by hook_entity_info().
+ *   - class: The name of the handler class.
+ *   - module: The module that provides the handler class.
+ *
+ * @see hook_access_handler_info()
+ * @see hook_access_handler_info_alter()
  */
-function access_handler_modules() {
-  $modules = module_implements('access_info');
-  $list = array();
-  foreach ($modules as $module) {
-    $info = module_invoke($module, 'access_info');
-    foreach ($info as $object_type => $object_info) {
-      if (isset($object_info['handlers'])) {
-        foreach (array_keys($object_info['handlers']) as $handler) {
-          $list[$object_type][$handler] = $module;
+function access_handler_info() {
+  $info = &drupal_static(__FUNCTION__, array());
+  if (empty($info)) {
+    if ($cache = cache_get('access_handler_info')) {
+      $info = $cache->data;
+    }
+    else {
+      foreach (module_implements('access_handler_info') as $module) {
+        if ($module_info = module_invoke($module, 'access_handler_info')) {
+          foreach ($module_info as $handler_name => $handler_info) {
+            // Merge in default values.
+            $module_info[$handler_name] += array(
+              'label' => '',
+              'realm types' => array(),
+              'object types' => array(),
+            );
+            // Set inferred values.
+            $module_info[$handler_name]['class'] = $handler_name;
+            $module_info[$handler_name]['module'] = $module;
+          }
+          $info += $module_info;
         }
       }
+      drupal_alter('access_handler_info', $info);
+      cache_set('access_handler_info', $info);
     }
   }
-  return $list;
+  return $info;
+}
+
+/**
+ * Returns information on all available access-controlled object types.
+ *
+ * @return
+ *   An array indexed by object type (e.g., "node", "menu_link") where each
+ *   value is an associative array with the following keys:
+ *   - label: The human-readable name of this object type (e.g., "Content",
+ *     "Menu link").
+ *   - type: The machine name of this object type (e.g., "node", "menu_link").
+ *   - module: The module that provides ACK-compatibility for the object type.
+ *   - fieldable: Boolean indicating whether or not this object type is a
+ *     fieldable entity, as defined by hook_entity_info().
+ *   - handlers: An array listing the access handlers that support this object
+ *     type, as defined in hook_access_handler_info().
+ *
+ * @see hook_access_info()
+ * @see hook_access_info_alter()
+ */
+function access_info() {
+  $info = &drupal_static(__FUNCTION__, array());
+  if (empty($info)) {
+    if ($cache = cache_get('access_info')) {
+      $info = $cache->data;
+    }
+    else {
+      $handlers = access_handler_info();
+      foreach (module_implements('access_info') as $module) {
+        if ($module_info = module_invoke($module, 'access_info')) {
+          foreach ($module_info as $object_type => $object_info) {
+            $info[$object_type]['label'] = $object_info['label'];
+            $info[$object_type]['type'] = $object_type;
+            $info[$object_type]['module'] = $module;
+
+            // Check whether the object is a fieldable entity.
+            $entity_info = entity_get_info($object_type);
+            $info[$object_type]['fieldable'] = empty($entity_info) ? FALSE : $entity_info['fieldable'];
+
+            // Find handlers that support this object type.
+            $info[$object_type]['handlers'] = array();
+            foreach ($handlers as $handler_name => $handler_info) {
+              // If the object is a fieldable entity and the handler supports all
+              // fieldable entities, or if the handler explicitly supports this
+              // object type, add the handler to the list.
+              if (($info[$object_type]['fieldable'] && in_array('fieldable entity', $handler_info['object types'])) || in_array($object_type, $handler_info['object types'])) {
+                $info[$object_type]['handlers'][] = $handler_name;
+              }
+            }
+          }
+        }
+      }
+      drupal_alter('access_info', $info);
+      cache_set('access_info', $info);
+    }
+  }
+  return $info;
 }
 
 /**
@@ -1134,11 +1217,13 @@ interface AccessControlKitInterface {
     * @param $form_id
     *   String representing the name of the form itself. Typically this is the
     *   name of the function that generated the form.
+    * @param $object
+    *   The object represented by this form.
     * @param $realms
     *   An array of realms in which the user has "create" access for the object,
     *   as realm_value => realm_label.
     */
-    public function formAlterNew(&$form, &$form_state, $form_id, $realms = array());
+    public function formAlterNew(&$form, &$form_state, $form_id, $object, $realms = array());
 
    /**
     * Alters the form for an existing object to reflect realm permissions.
@@ -1162,11 +1247,13 @@ interface AccessControlKitInterface {
     * @param $form_id
     *   String representing the name of the form itself. Typically this is the
     *   name of the function that generated the form.
+    * @param $object
+    *   The object represented by this form.
     * @param $realms
     *   An array of realms in which the user has "delete" access for the object,
     *   as realm_value => realm_label.
     */
-    public function formAlterExisting(&$form, &$form_state, $form_id, $realms = array());
+    public function formAlterExisting(&$form, &$form_state, $form_id, $object, $realms = array());
 }
 
 /**
@@ -1181,6 +1268,13 @@ abstract class AccessControlKit implements AccessControlKitInterface {
   protected $scheme;
 
   /**
+   * The type of object that this handler controls.
+   *
+   * @var string
+   */
+  protected $object_type;
+
+  /**
    * The access handler configuration.
    *
    * @var array
@@ -1192,11 +1286,14 @@ abstract class AccessControlKit implements AccessControlKitInterface {
    *
    * @param $scheme
    *   The name of the access scheme to which the handler is attached.
+   * @param $object_type
+   *   The type of object that this handler controls.
    * @param array $settings
    *   The handler configuration array.
    */
-  public function __construct($scheme = '', array $settings = array()) {
+  public function __construct($scheme = '', $object_type = '', array $settings = array()) {
     $this->scheme = $scheme;
+    $this->object_type = $object_type;
     $this->settings = $settings;
   }
 
@@ -1217,7 +1314,7 @@ abstract class AccessControlKit implements AccessControlKitInterface {
   /**
    * Implements AccessControlKitInterface::formAlterNew().
    */
-  public function formAlterNew(&$form, &$form_state, $form_id, $realms = array()) {
+  public function formAlterNew(&$form, &$form_state, $form_id, $object, $realms = array()) {
     // No filtering needed in the abstract class.  Subclasses can make use of
     // the convenience function $this->filterElementOptions() to filter the
     // #options attribute of access-related form elements by $realms.
@@ -1226,7 +1323,7 @@ abstract class AccessControlKit implements AccessControlKitInterface {
   /**
    * Implements AccessControlKitInterface::formAlterExisting().
    */
-  public function formAlterExisting(&$form, &$form_state, $form_id, $realms = array()) {
+  public function formAlterExisting(&$form, &$form_state, $form_id, $object, $realms = array()) {
     // No filtering needed in the abstract class.  Subclasses should lock any
     // access-related form fields.  Access to "Delete" buttons, etc., should
     // also be blocked if the current value of an access-related element is not
@@ -1272,27 +1369,6 @@ abstract class AccessControlKit implements AccessControlKitInterface {
   }
 
   /**
-   * Returns the handler settings.
-   *
-   * @param $name
-   *   (optional) The name of a setting.  If omitted, returns all settings.
-   * @param $empty_value
-   *   (optional) If $name does not exist in the handler settings, this will be
-   *   returned instead.  Defaults to NULL.  Ignored if $name is omitted.
-   *
-   * @return
-   *   The value of the requested handler setting, or all handler settings in an
-   *   array as name => value.
-   */
-  protected function getSetting($name = NULL, $empty_value = NULL) {
-    $settings = empty($this->settings) ? array() : $this->settings;
-    if (isset($name)) {
-      return isset($settings[$name]) ? $settings[$name] : $empty_value;
-    }
-    return $settings;
-  }
-
-  /**
    * Returns the settings for the scheme to which the handler is attached.
    *
    * @param $name
@@ -1313,35 +1389,6 @@ abstract class AccessControlKit implements AccessControlKitInterface {
       return isset($settings[$name]) ? $settings[$name] : $empty_value;
     }
     return $settings;
-  }
-
-  /**
-   * Wrapper for field_get_items() to get raw field values as an array.
-   *
-   * @param $key
-   *   The name of the key in each item that contains the value; e.g., 'tid'.
-   * @param $entity_type
-   *   The type of $entity; e.g., 'node' or 'user'.
-   * @param $entity
-   *   The entity containing the data to be displayed.
-   * @param $field_name
-   *   The field to be displayed.
-   * @param $langcode
-   *   (optional) The language code $entity->{$field_name} has to be displayed
-   *   in.  Defaults to the current language.
-   *
-   * @return
-   *   A flat array of the field's current values.  Note that delta keys, etc.
-   *   are not preserved.
-   */
-  protected function getFieldValues($key, $entity_type, $entity, $field_name, $langcode = NULL) {
-    $values = array();
-    if ($items = field_get_items($entity_type, $entity, $field_name, $langcode)) {
-      foreach ($items as $item) {
-        $values[] = $item[$key];
-      }
-    }
-    return $values;
   }
 }
 
@@ -1675,7 +1722,7 @@ function access_menu() {
  */
 function access_hook_info() {
   $group = array('group' => 'access');
-  $list = array('access_realm_info', 'access_realms', 'access_realm_settings');
+  $list = array('access_grant_presave', 'access_grant_insert', 'access_grant_update', 'access_grant_delete', 'access_grant_view', 'access_scheme_insert', 'access_scheme_update', 'access_scheme_delete', 'access_realm_info', 'access_realms', 'access_realm_settings', 'access_handler_info', 'access_info');
   $hooks = array();
   foreach ($list as $hook) {
     $hooks[$hook] = $group;

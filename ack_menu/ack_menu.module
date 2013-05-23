@@ -5,6 +5,28 @@
  */
 
 /**
+ * Implements hook_access_info().
+ */
+function ack_menu_access_info() {
+  // Declare support for controlling access to menu links.
+  $info['menu_link'] = array('label' => t('Menu link'));
+  return $info;
+}
+
+/**
+ * Implements hook_access_handler_info().
+ */
+function ack_menu_access_handler_info() {
+  // Handler to map menu links to realms; should work for all realm types.
+  $info['ACKMenuMap'] = array(
+    'label' => t('mapping links to realms'),
+    'realm types' => array_keys(access_realm_info()),
+    'object types' => array('menu_link'),
+  );
+  return $info;
+}
+
+/**
  * Implements hook_permission().
  */
 function ack_menu_permission() {
@@ -17,26 +39,6 @@ function ack_menu_permission() {
       'title' => t('Administer the menu link-to-realm map'),
     ),
   );
-}
-
-/**
- * Implements hook_access_info().
- */
-function ack_menu_access_info() {
-  // Declare support for controlling access to menu links.
-  $info['menu_link'] = array(
-    'label' => t('Menu link'),
-    'handlers' => array(),
-    'permissions' => array('manage access realm menu tree' => TRUE),
-  );
-
-  // Handler to map menu links to realms; should work for all realm types.
-  $info['menu_link']['handlers']['ACKMenuMap'] = array(
-    'label' => t('mapping links to realms'),
-    'realm types' => array_keys(access_realm_info()),
-  );
-
-  return $info;
 }
 
 /**

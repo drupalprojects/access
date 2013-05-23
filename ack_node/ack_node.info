@@ -6,7 +6,5 @@ dependencies[] = access
 
 ; Handlers
 files[] = handlers/ack_node_author.inc
-files[] = handlers/ack_node_list.inc
 files[] = handlers/ack_node_sticky.inc
 files[] = handlers/ack_node_taxonomy_index.inc
-files[] = handlers/ack_node_taxonomy_term_reference.inc

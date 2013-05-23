@@ -183,13 +183,14 @@ function access_scheme_form($form, &$form_state, $scheme = NULL) {
       '#collapsed' => TRUE,
       '#group' => 'additional_settings',
     );
-    $access_info = module_invoke_all('access_info');
+    $access_info = access_info();
     if (empty($access_info)) {
       $form['handlers']['empty'] = array(
-        '#markup' => t('No access handlers available. In order to control access to content, menu items, or other Drupal objects, you must first <a href="@link">enable one or more modules</a> that provide Access Control Kit handlers, such as the ACK node module.', array('@link' => url('admin/modules'))),
+        '#markup' => t('No access-controllable objects available. In order to control access to content, menu items, or other Drupal objects, you must first <a href="@link">enable one or more modules</a> that provide Access Control Kit compatibility for those objects, such as the ACK node module.', array('@link' => url('admin/modules'))),
       );
     }
     else {
+      $handler_info = access_handler_info();
       $form['handlers']['handlers'] = array(
         '#type' => 'container',
         '#tree' => TRUE,
@@ -239,10 +240,10 @@ function access_scheme_form($form, &$form_state, $scheme = NULL) {
             'effect' => 'fade',
           ),
         );
-        // Only show handlers that match the scheme's realm type.
-        foreach ($object_info['handlers'] as $handler_name => $handler_info) {
-          if (in_array($scheme->realm_type, $handler_info['realm types'])) {
-            $fieldset['handler']['#options'][$handler_name] = $handler_info['label'];
+        // Only show handlers that support this realm type and object type.
+        foreach ($object_info['handlers'] as $handler_name) {
+          if (isset($handler_info[$handler_name]) && in_array($scheme->realm_type, $handler_info[$handler_name]['realm types'])) {
+            $fieldset['handler']['#options'][$handler_name] = $handler_info[$handler_name]['label'];
           }
         }
 
@@ -364,7 +365,7 @@ function access_scheme_form_submit($form, &$form_state) {
 
   // Update handlers.
   if (isset($scheme->handlers)) {
-    $modules = access_handler_modules();
+    $handler_info = access_handler_info();
     foreach ($scheme->handlers as $object_type => $handler_values) {
       $handler = $handler_values['handler'];
       // Check whether a handler was chosen for this object type.
@@ -376,7 +377,7 @@ function access_scheme_form_submit($form, &$form_state) {
       }
       else {
         // Save the handler.
-        $module = $modules[$object_type][$handler];
+        $module = $handler_info[$handler]['module'];
         $settings = isset($handler_values['settings']) ? $handler_values['settings'] : array();
         access_handler_save($scheme->scheme, $object_type, $handler, $module, $settings);
       }

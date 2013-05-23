@@ -136,3 +136,28 @@ function access_access_realms($realm_type, $arguments = array()) {
   }
   return $values;
 }
+
+/**
+ * Implements hook_access_handler_info().
+ */
+function access_access_handler_info() {
+  // Handlers for list fields.
+  if (module_exists('list')) {
+    $info['ACKEntityList'] = array(
+      'label' => t('the list field'),
+      'realm types' => array('list_integer', 'list_float', 'list_text'),
+      'object types' => array('fieldable entity'),
+    );
+  }
+
+  // Handler for taxonomy term reference fields.
+  if (module_exists('taxonomy')) {
+    $info['ACKEntityTaxonomyTermReference'] = array(
+      'label' => t('a term reference field'),
+      'realm types' => array('taxonomy_term'),
+      'object types' => array('fieldable entity'),
+    );
+  }
+
+  return $info;
+}

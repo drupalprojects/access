@@ -9,38 +9,32 @@
  */
 function ack_node_access_info() {
   // Declare support for controlling access to nodes.
-  $info['node'] = array(
-    'label' => t('Content'),
-    'handlers' => array(),
-  );
+  $info['node'] = array('label' => t('Content'));
+  return $info;
+}
 
+/**
+ * Implements hook_access_handler_info().
+ */
+function ack_node_access_handler_info() {
   // Handlers for node properties.
-  $info['node']['handlers']['ACKNodeAuthor'] = array(
+  $info['ACKNodeAuthor'] = array(
     'label' => t('is author'),
     'realm types' => array('user'),
+    'object types' => array('node'),
   );
-  $info['node']['handlers']['ACKNodeSticky'] = array(
+  $info['ACKNodeSticky'] = array(
     'label' => t('is sticky'),
     'realm types' => array('boolean'),
+    'object types' => array('node'),
   );
 
-  // Handlers for list fields.
-  if (module_exists('list')) {
-    $info['node']['handlers']['ACKNodeList'] = array(
-      'label' => t('the list field'),
-      'realm types' => array('list_integer', 'list_float', 'list_text'),
-    );
-  }
-
-  // Handlers for taxonomy.
+  // Handler for the taxonomy index.
   if (module_exists('taxonomy')) {
-    $info['node']['handlers']['ACKNodeTaxonomyIndex'] = array(
+    $info['ACKNodeTaxonomyIndex'] = array(
       'label' => t('term association'),
       'realm types' => array('taxonomy_term'),
-    );
-    $info['node']['handlers']['ACKNodeTaxonomyTermReference'] = array(
-      'label' => t('a term reference field'),
-      'realm types' => array('taxonomy_term'),
+      'object types' => array('node'),
     );
   }
 
@@ -147,7 +141,7 @@ function ack_node_form_node_form_alter(&$form, &$form_state, $form_id) {
     foreach ($schemes as $machine_name) {
       $realms = access_user_permission_realms('create ' . $node->type . ' content in ack ' . $machine_name, $machine_name);
       $scheme = access_scheme_get_scheme($machine_name);
-      $scheme->handlers['node']->formAlterNew($form, $form_state, $form_id, $realms);
+      $scheme->handlers['node']->formAlterNew($form, $form_state, $form_id, $node, $realms);
     }
   }
   // If we are editing an existing node, check the delete permissions.
@@ -165,7 +159,7 @@ function ack_node_form_node_form_alter(&$form, &$form_state, $form_id) {
         $realms += access_user_permission_realms('delete own ' . $node->type . ' content in ack ' . $machine_name, $machine_name);
       }
       $scheme = access_scheme_get_scheme($machine_name);
-      $scheme->handlers['node']->formAlterExisting($form, $form_state, $form_id, $realms);
+      $scheme->handlers['node']->formAlterExisting($form, $form_state, $form_id, $node, $realms);
     }
   }
 }
