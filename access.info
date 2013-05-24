@@ -5,7 +5,10 @@ package = Access control kit
 dependencies[] = field
 dependencies[] = options
 
-; Notify the registry of the AccessControlKit class and interface.
+; The access grant entity controller class.
+files[] = access_grant_entity_controller.inc
+
+; The AccessControlKit class and interface.
 files[] = ack.inc
 
 ; Handlers
