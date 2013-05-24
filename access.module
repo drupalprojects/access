@@ -211,13 +211,6 @@ function access_grant_delete($gid) {
 }
 
 /**
- * Menu title callback for an access grant.
- */
-function access_grant_page_title($grant) {
-  return access_grant_label($grant);
-}
-
-/**
  * Menu title callback for adding a grant within a scheme.
  */
 function access_grant_add_page_title($scheme) {
@@ -1361,7 +1354,7 @@ function access_menu() {
     'file' => 'access_grants.admin.inc',
   );
   $items['admin/access/grant/%access_grant'] = array(
-    'title callback' => 'access_grant_page_title',
+    'title callback' => 'access_grant_label',
     'title arguments' => array(3),
     'page callback' => 'access_grant_page_view',
     'page arguments' => array(3),
