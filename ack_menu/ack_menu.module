@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @file
  * The ACK menu module.
@@ -19,7 +20,7 @@ function ack_menu_access_info() {
 function ack_menu_access_handler_info() {
   // Handler to map menu links to realms; should work for all realm types.
   $info['ACKMenuMap'] = array(
-    'label' => t('mapping links to realms'),
+    'label' => t('Map menu links to realms'),
     'realm types' => array_keys(access_realm_info()),
     'object types' => array('menu_link'),
   );
@@ -30,13 +31,15 @@ function ack_menu_access_handler_info() {
  * Implements hook_permission().
  */
 function ack_menu_permission() {
+  $scheme_names = access_object_schemes('menu_link', TRUE);
+  $t_args = array('%schemes' => implode(', ', $scheme_names));
   return array(
-    'manage access realm menu tree' => array(
-      'title' => t('Manage the menu tree for an access realm'),
-      'description' => t('Create and edit links within a realm-associated menu tree.'),
+    'ack manage menu links' => array(
+      'title' => t('Manage the menu links in assigned realms'),
+      'description' => t('This permission only applies to the following access schemes: %schemes.', $t_args),
     ),
-    'administer access realm menu map' => array(
-      'title' => t('Administer the menu link-to-realm map'),
+    'administer ack_menu' => array(
+      'title' => t('Map menu links to access realms'),
     ),
   );
 }
@@ -75,7 +78,7 @@ function ack_menu_link_access($menu_link, $op, $account = NULL) {
     $account = $user;
   }
 
-  // The 'administer menu' permission is global.
+  // The global 'administer menu' permission trumps any ACK permissions.
   if (user_access('administer menu', $account)) {
     return TRUE;
   }
@@ -85,7 +88,7 @@ function ack_menu_link_access($menu_link, $op, $account = NULL) {
     case 'edit':
     case 'reset':
     case 'delete':
-      return access_user_object_access('manage access realm menu tree', 'menu_link', $menu_link, $account);
+      return access_user_object_access('ack manage menu links', 'menu_link', $menu_link, $account);
   }
 
   return FALSE;
@@ -97,3 +100,6 @@ function ack_menu_link_access($menu_link, $op, $account = NULL) {
 function ack_menu_form_node_form_alter(&$form, &$form_state, $form_id) {
   // @todo Filter the menu parent selector.
 }
+
+// @todo Still need to build the admin UI for mapping menu links.
+// @todo Need to provide management UI for accessible links, so they can be managed without access to the admin screens.

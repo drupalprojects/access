@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @file
  * The ACK node module.
@@ -19,12 +20,12 @@ function ack_node_access_info() {
 function ack_node_access_handler_info() {
   // Handlers for node properties.
   $info['ACKNodeAuthor'] = array(
-    'label' => t('is author'),
+    'label' => t('Author'),
     'realm types' => array('user'),
     'object types' => array('node'),
   );
   $info['ACKNodeSticky'] = array(
-    'label' => t('is sticky'),
+    'label' => t('Sticky'),
     'realm types' => array('boolean'),
     'object types' => array('node'),
   );
@@ -32,7 +33,7 @@ function ack_node_access_handler_info() {
   // Handler for the taxonomy index.
   if (module_exists('taxonomy')) {
     $info['ACKNodeTaxonomyIndex'] = array(
-      'label' => t('term association'),
+      'label' => t('Term association'),
       'realm types' => array('taxonomy_term'),
       'object types' => array('node'),
     );
@@ -42,50 +43,38 @@ function ack_node_access_handler_info() {
 }
 
 /**
- * Returns a list of access schemes that use a node handler.
- *
- * @return
- *   An array of scheme names, keyed by machine name.
- */
-function ack_node_schemes() {
-  $list = array();
-  foreach (access_scheme_get_schemes() as $scheme) {
-    if (!empty($scheme->handlers['node'])) {
-      $list[$scheme->scheme] = $scheme->name;
-    }
-  }
-  return $list;
-}
-
-/**
  * Implements hook_permission().
  */
 function ack_node_permission() {
-  // Create scheme-level create/edit/delete permissions for each content type.
+  // Create ACK-enabled create/edit/delete permissions for each content type.
   $perms = array();
-  $schemes = ack_node_schemes();
+  $scheme_names = access_object_schemes('node', TRUE);
+  $t_args = array('%schemes' => implode(', ', $scheme_names));
   foreach (node_permissions_get_configured_types() as $type) {
     $type_info = node_type_get_type($type);
-    foreach ($schemes as $scheme => $scheme_name) {
-      $t_args = array('%type_name' => $type_info->name, '%scheme_name' => $scheme_name);
-      $perms += array(
-        "create $type content in ack $scheme" => array(
-          'title' => t('%type_name: Create new content in assigned %scheme_name', $t_args),
-        ),
-        "edit own $type content in ack $scheme" => array(
-          'title' => t('%type_name: Edit own content in assigned %scheme_name', $t_args),
-        ),
-        "edit any $type content in ack $scheme" => array(
-          'title' => t('%type_name: Edit any content in assigned %scheme_name', $t_args),
-        ),
-        "delete own $type content in ack $scheme" => array(
-          'title' => t('%type_name: Delete own content in assigned %scheme_name', $t_args),
-        ),
-        "delete any $type content in ack $scheme" => array(
-          'title' => t('%type_name: Delete any content in assigned %scheme_name', $t_args),
-        ),
-      );
-    }
+    $t_args['%type'] = $type_info->name;
+    $perms += array(
+      "ack create $type content" => array(
+        'title' => t('%type: Create new content in assigned access realms', $t_args),
+        'description' => t('This permission only applies to the following access schemes: %schemes.', $t_args),
+      ),
+      "ack edit own $type content" => array(
+        'title' => t('%type: Edit own content in assigned access realms', $t_args),
+        'description' => t('This permission only applies to the following access schemes: %schemes.', $t_args),
+      ),
+      "ack edit any $type content" => array(
+        'title' => t('%type: Edit any content in assigned access realms', $t_args),
+        'description' => t('This permission only applies to the following access schemes: %schemes.', $t_args),
+      ),
+      "ack delete own $type content" => array(
+        'title' => t('%type: Delete own content in assigned access realms', $t_args),
+        'description' => t('This permission only applies to the following access schemes: %schemes.', $t_args),
+      ),
+      "ack delete any $type content" => array(
+        'title' => t('%type: Delete any content in assigned access realms', $t_args),
+        'description' => t('This permission only applies to the following access schemes: %schemes.', $t_args),
+      ),
+    );
   }
   return $perms;
 }
@@ -97,21 +86,19 @@ function ack_node_node_access($node, $op, $account) {
   $type = is_string($node) ? $node : $node->type;
 
   if (in_array($type, node_permissions_get_configured_types())) {
-    foreach (array_keys(ack_node_schemes()) as $scheme) {
-      if ($op == 'create' && user_access('create ' . $type . ' content in ack ' . $scheme, $account)) {
+    if ($op == 'create' && user_access('ack create ' . $type . ' content', $account)) {
+      return NODE_ACCESS_ALLOW;
+    }
+
+    if ($op == 'update') {
+      if (access_user_object_access('ack edit any ' . $type . ' content', 'node', $node, $account) || (access_user_object_access('ack edit own ' . $type . ' content', 'node', $node, $account) && ($account->uid == $node->uid))) {
         return NODE_ACCESS_ALLOW;
       }
+    }
 
-      if ($op == 'update') {
-        if (access_user_object_access('edit any ' . $type . ' content in ack ' . $scheme, 'node', $node, $scheme, $account) || (access_user_object_access('edit own ' . $type . ' content in ack ' . $scheme, 'node', $node, $scheme, $account) && ($account->uid == $node->uid))) {
-          return NODE_ACCESS_ALLOW;
-        }
-      }
-
-      if ($op == 'delete') {
-        if (access_user_object_access('delete any ' . $type . ' content in ack ' . $scheme, 'node', $node, $scheme, $account) || (access_user_object_access('delete own ' . $type . ' content in ack ' . $scheme, 'node', $node, $scheme, $account) && ($account->uid == $node->uid))) {
-          return NODE_ACCESS_ALLOW;
-        }
+    if ($op == 'delete') {
+      if (access_user_object_access('ack delete any ' . $type . ' content', 'node', $node, $account) || (access_user_object_access('ack delete own ' . $type . ' content', 'node', $node, $account) && ($account->uid == $node->uid))) {
+        return NODE_ACCESS_ALLOW;
       }
     }
   }
@@ -128,38 +115,30 @@ function ack_node_node_access($node, $op, $account) {
 function ack_node_form_node_form_alter(&$form, &$form_state, $form_id) {
   global $user;
   $node = $form_state['node'];
-  $schemes = array_keys(ack_node_schemes());
+  $schemes = access_object_schemes('node');
 
-  // If we are creating a new node, check the create permissions.
+  // Check whether the user has global permission to create/edit this node type,
+  // which trumps any of our ACK permissions.
   if (empty($node->nid)) {
-    // Global access trumps scheme-level access.
-    if (user_access('create ' . $node->type . ' content')) {
-      return;
-    }
-
-    // Otherwise, only allow the node to be created in granted realms.
-    foreach ($schemes as $machine_name) {
-      $realms = access_user_permission_realms('create ' . $node->type . ' content in ack ' . $machine_name, $machine_name);
-      $scheme = access_scheme_get_scheme($machine_name);
-      $scheme->handlers['node']->formAlterNew($form, $form_state, $form_id, $node, $realms);
+    $global = user_access('create ' . $node->type . ' content');
+    if (!$global) {
+      // Get the list of realms in which the user can create this type of node.
+      $realms = access_user_permission_realms('ack create ' . $node->type . ' content', $user, $schemes);
     }
   }
-  // If we are editing an existing node, check the delete permissions.
   else {
-    // Again, global access trumps scheme-level access.
-    if (user_access('delete any ' . $node->type . ' content') || (user_access('delete own ' . $node->type . ' content') && ($user->uid == $node->uid))) {
-      return;
-    }
+    $global = (user_access('edit any ' . $node->type . ' content') || (user_access('edit own ' . $node->type . ' content') && ($user->uid == $node->uid)));
+  }
 
-    // Otherwise, lock down the access-related fields/properties and restrict
-    // access to the delete button by realm.
-    foreach ($schemes as $machine_name) {
-      $realms = access_user_permission_realms('delete any ' . $node->type . ' content in ack ' . $machine_name, $machine_name);
-      if ($user->uid == $node->uid) {
-        $realms += access_user_permission_realms('delete own ' . $node->type . ' content in ack ' . $machine_name, $machine_name);
+  // If no global access, filter the form.
+  if (!$global) {
+    foreach ($schemes as $scheme) {
+      if (empty($node->nid)) {
+        $scheme->handlers['node']->objectFormAlter('node', $node, $form, $form_state, $form_id, $realms[$scheme->machine_name]);
       }
-      $scheme = access_scheme_get_scheme($machine_name);
-      $scheme->handlers['node']->formAlterExisting($form, $form_state, $form_id, $node, $realms);
+      else {
+        $scheme->handlers['node']->objectFormAlter('node', $node, $form, $form_state, $form_id);
+      }
     }
   }
 }

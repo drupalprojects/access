@@ -5,13 +5,13 @@ package = Access control kit
 dependencies[] = field
 dependencies[] = options
 
-; The access grant entity controller class.
+; Access grant entity controller class.
 files[] = access_grant_entity_controller.inc
 
-; The AccessControlKit class and interface.
-files[] = ack.inc
+; Access scheme entity controller class.
+files[] = access_scheme_entity_controller.inc
 
-; Handlers
+; Access control kit handler interface and classes.
+files[] = ack_handler.inc
 files[] = handlers/ack_entity_field.inc
-files[] = handlers/ack_entity_list.inc
 files[] = handlers/ack_entity_taxonomy_term_reference.inc

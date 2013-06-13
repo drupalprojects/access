@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @file
  * Access grants administrative UI for the access control kit module.
@@ -7,7 +8,7 @@
 /**
  * Menu page callback; the access grants overview page.
  */
-function access_overview_grants($form, $form_state) {
+function access_overview_grants($form, &$form_state) {
   // Check for the delete confirmation form.
   if (isset($form_state['values']['operation']) && $form_state['values']['operation'] == 'delete') {
     return access_grant_multiple_delete_confirm($form, $form_state, array_filter($form_state['values']['grants']));
@@ -60,7 +61,7 @@ function access_admin_grants() {
 
   $query->join('users', 'u', 'g.uid = u.uid');
   $query->join('role', 'r', 'g.rid = r.rid');
-  $query->join('access_scheme', 's', 'g.scheme = s.scheme');
+  $query->join('access_scheme', 's', 'g.scheme = s.machine_name');
   $query->addField('g', 'gid', 'gid');
   $query->addField('r', 'name', 'role');
   $query->addField('s', 'name', 'scheme');
@@ -132,6 +133,7 @@ function access_admin_grants() {
 /**
  * Form validation handler for access_admin_grants().
  *
+ * @see access_admin_grants()
  * @see access_admin_grants_submit()
  */
 function access_admin_grants_validate($form, &$form_state) {
@@ -144,6 +146,7 @@ function access_admin_grants_validate($form, &$form_state) {
 /**
  * Form submission handler for access_admin_grants().
  *
+ * @see access_admin_grants()
  * @see access_admin_grants_validate()
  */
 function access_admin_grants_submit($form, &$form_state) {
@@ -158,6 +161,8 @@ function access_admin_grants_submit($form, &$form_state) {
 
 /**
  * Form constructor for the access grant administration filter form.
+ *
+ * @see access_admin_grants_filter_form_submit()
  */
 function access_admin_grants_filter_form() {
   $session = isset($_SESSION['access_overview_grant_filter']) ? $_SESSION['access_overview_grant_filter'] : array();
@@ -248,6 +253,8 @@ function access_admin_grants_filter_form() {
 
 /**
  * Form submission handler for access_admin_grants_filter_form().
+ *
+ * @see access_admin_grants_filter_form()
  */
 function access_admin_grants_filter_form_submit($form, &$form_state) {
   $filters = access_admin_grants_filters();
@@ -257,13 +264,13 @@ function access_admin_grants_filter_form_submit($form, &$form_state) {
       // Apply every filter that has a choice selected other than 'any'.
       foreach ($filters as $filter => $options) {
         if (!empty($form_state['values'][$filter])) {
-          if (!isset($filters[$filter]['options'])) {
+          if (!isset($options['options'])) {
             // Filters lacking an 'options' key are text input.
             $_SESSION['access_overview_grant_filter'][] = array($filter, $form_state['values'][$filter]);
           }
           elseif ($form_state['values'][$filter] != '[any]') {
             // Flatten the options array to accommodate hierarchical/nested options.
-            $flat_options = form_options_flatten($filters[$filter]['options']);
+            $flat_options = form_options_flatten($options['options']);
             // Only accept valid selections offered on the dropdown, block bad input.
             if (isset($flat_options[$form_state['values'][$filter]])) {
               $_SESSION['access_overview_grant_filter'][] = array($filter, $form_state['values'][$filter]);
@@ -294,15 +301,19 @@ function access_admin_grants_filter_form_submit($form, &$form_state) {
  */
 function access_admin_grants_filters() {
   // By role.
+  $roles = array();
+  foreach (access_scheme_load_multiple() as $scheme) {
+    $roles[$scheme->machine_name] = $scheme->roles;
+  }
   $filters['rid'] = array(
     'title' => t('role'),
-    'options' => array('[any]' => t('any')) + options_array_flatten(access_scheme_roles()),
+    'options' => array('[any]' => t('any')) + options_array_flatten($roles),
   );
 
   // By scheme.
   $filters['scheme'] = array(
     'title' => t('scheme'),
-    'options' => array('[any]' => t('any')) + access_scheme_get_names(),
+    'options' => array('[any]' => t('any')) + access_scheme_names(),
   );
 
   // By username.
@@ -336,17 +347,15 @@ function access_admin_grants_build_filter_query(SelectQueryInterface $query) {
 }
 
 /**
- * Menu page callback; the access grant add list page.
+ * Menu page callback; the add access grant list page.
  */
 function access_grant_add_list() {
-  $schemes = access_scheme_get_schemes();
   $content = array();
-
-  foreach ($schemes as $key => $scheme) {
-    $content[$key] = array(
+  foreach (access_scheme_load_multiple() as $scheme) {
+    $content[$scheme->machine_name] = array(
       'title' => $scheme->name,
       'description' => $scheme->description,
-      'href' => 'admin/access/add/' . str_replace('_', '-', $scheme->scheme),
+      'href' => 'admin/access/add/' . str_replace('_', '-', $scheme->machine_name),
       'localized_options' => array(),
     );
   }
@@ -369,7 +378,7 @@ function access_grant_add_list() {
  *   The access scheme in which to create a new grant.
  */
 function access_grant_add($scheme) {
-  $grant = (object) array('scheme' => $scheme->scheme);
+  $grant = entity_get_controller('access_grant')->create(array('scheme' => $scheme->machine_name));
   return drupal_get_form('access_grant_form', $grant);
 }
 
@@ -380,8 +389,8 @@ function access_grant_add($scheme) {
  *   The access grant to edit.
  */
 function access_grant_edit($grant) {
-  $scheme = access_scheme_get_scheme($grant);
-  drupal_set_title(t('<em>Edit @scheme for</em> @grant', array('@scheme' => $scheme->name, '@grant' => access_grant_label($grant))), PASS_THROUGH);
+  $scheme = access_scheme_machine_name_load($grant->scheme);
+  drupal_set_title(t('<em>Edit @scheme for</em> @grant', array('@scheme' => $scheme->name, '@grant' => entity_label('access_grant', $grant))), PASS_THROUGH);
   return drupal_get_form('access_grant_form', $grant);
 }
 
@@ -407,14 +416,6 @@ function access_grant_form($form, &$form_state, $grant) {
   }
   $is_new = empty($grant->gid);
   $admin = user_access('administer users');
-
-  // Basic grant information.  Not user-configurable.
-  foreach (array('gid', 'uid', 'rid', 'scheme') as $key) {
-    $form[$key] = array(
-      '#type' => 'value',
-      '#value' => isset($grant->$key) ? $grant->$key : NULL,
-    );
-  }
 
   // The ACK user reference field.
   $form['user'] = array(
@@ -479,8 +480,8 @@ function access_grant_form($form, &$form_state, $grant) {
     );
   }
   else {
-    $role = FALSE;
-    $role_options = access_scheme_roles($grant->scheme);
+    $scheme = access_scheme_machine_name_load($grant->scheme);
+    $role_options = $scheme->roles;
     if ($account) {
       foreach (array_keys($role_options) as $option) {
         // Duplicate grants (same user, role, and scheme) are not permitted.
@@ -544,21 +545,33 @@ function access_grant_form($form, &$form_state, $grant) {
  * @see access_grant_form_submit()
  */
 function access_grant_form_validate($form, &$form_state) {
-  $grant = (object) $form_state['values'];
+  $grant = $form_state['grant'];
 
-  // Validate properties of new grants.  Not needed on existing grants, since
-  // their properties are not modifiable by the form.
+  // Validate the properties of new grants.
   if (empty($grant->gid)) {
-    $account = user_load_by_name($grant->user);
-    $role = user_role_load($grant->role);
     // Validate the user reference.
+    $account = user_load_by_name($form_state['values']['user']);
     if (empty($account)) {
-      form_set_error('user', t('The username %name does not exist.', array('%name' => $grant->user)));
+      form_set_error('user', t('The username %name does not exist.', array('%name' => $form_state['values']['user'])));
+    }
+    else {
+      $form_state['values']['uid'] = $account->uid;
     }
 
     // Validate the role reference.
+    $role = user_role_load($form_state['values']['role']);
+    $scheme = access_scheme_machine_name_load($grant->scheme);
     if (empty($role)) {
-      form_set_error('role', t('A role with ID %rid does not exist.', array('%rid' => $grant->role)));
+      form_set_error('role', t('A role with ID %rid does not exist.', array('%rid' => $form_state['values']['role'])));
+    }
+    elseif (empty($scheme->roles[$role->rid])) {
+      form_set_error('role', t('The %role role cannot be used in @scheme.', array('%role' => $role->name)));
+    }
+    elseif ($account && empty($account->roles[$role->rid]) && !user_access('administer users')) {
+      form_set_error('role', t('%user is not a member of the %role role.  You must have administrative access to user accounts in order to add a user to a new role.', array('%user' => $account->name, '%role' => $role->name)));
+    }
+    else {
+      $form_state['values']['rid'] = $role->rid;
     }
 
     // If the above tests passed, validate that the user-role-scheme combination
@@ -566,14 +579,8 @@ function access_grant_form_validate($form, &$form_state) {
     if (!form_get_errors()) {
       $existing = access_grant_load_by_condition(array('uid' => $account->uid, 'rid' => $role->rid, 'scheme' => $grant->scheme));
       if (!empty($existing)) {
-        $scheme = access_scheme_load($grant->scheme);
         $existing = reset($existing);
         form_set_error('', t('%user has already been granted access as %role in @scheme. Duplicate access grants are not permitted. Please <a href="@url">edit the existing grant</a> instead.', array('%user' => $account->name, '%role' => $role->name, '@scheme' => $scheme->name, '@url' => url('admin/access/grant/' . $existing->gid . '/edit'))));
-      }
-      // If the selected user is not yet a member of the selected role, check
-      // whether the user submitting the form has authority to grant new roles.
-      elseif (empty($account->roles[$role->rid]) && !user_access('administer users')) {
-        form_set_error('role', t('%user is not a member of the %role role.  You must have administrative access to user accounts in order to add a user to a new role.', array('%user' => $account->name, '%role' => $role->name)));
       }
     }
   }
@@ -588,10 +595,12 @@ function access_grant_form_validate($form, &$form_state) {
  * @see access_grant_form_validate()
  */
 function access_grant_form_submit($form, &$form_state) {
-  $grant = access_grant_form_submit_build_grant($form, $form_state);
+  $grant = $form_state['grant'];
+  entity_form_submit_build_entity('access_grant', $grant, $form, $form_state);
+
   $account = user_load($grant->uid);
   $role = user_role_load($grant->rid);
-  $scheme = access_scheme_load($grant->scheme);
+  $scheme = access_scheme_machine_name_load($grant->scheme);
 
   // Add the user to the role, if not already a member.
   if (empty($account->roles[$role->rid])) {
@@ -600,10 +609,8 @@ function access_grant_form_submit($form, &$form_state) {
     user_save($account, array('roles' => $roles));
   }
 
-  // Save the grant and update form state.
+  // Save the grant.
   $status = access_grant_save($grant);
-  $form_state['values']['gid'] = $grant->gid;
-  $form_state['grant'] = $grant;
 
   // Report the change.
   $t_args = array(
@@ -622,24 +629,6 @@ function access_grant_form_submit($form, &$form_state) {
   }
   drupal_set_message(t($message, $t_args));
   watchdog('access', $message, $t_args, WATCHDOG_NOTICE, l(t('edit'), 'admin/access/grant/' . $grant->gid . '/edit'));
-}
-
-/**
- * Updates the form state's grant entity by processing the submission values.
- *
- * @see access_grant_form_submit()
- */
-function access_grant_form_submit_build_grant($form, &$form_state) {
-  $grant = $form_state['grant'];
-  entity_form_submit_build_entity('access_grant', $grant, $form, $form_state);
-
-  if (empty($grant->gid)) {
-    $account = user_load_by_name($form_state['values']['user']);
-    $grant->uid = $account->uid;
-    $grant->rid = $form_state['values']['role'];
-  }
-
-  return $grant;
 }
 
 /**
@@ -670,7 +659,7 @@ function access_grant_delete_confirm($form, &$form_state, $grant) {
 
   $account = user_load($grant->uid);
   $role = user_role_load($grant->rid);
-  $scheme = access_scheme_load($grant->scheme);
+  $scheme = access_scheme_machine_name_load($grant->scheme);
 
   $t_args = array(
     '%user' => format_username($account),
@@ -702,7 +691,7 @@ function access_grant_delete_confirm_submit($form, &$form_state) {
   $grant = $form_state['grant'];
   $account = user_load($grant->uid);
   $role = user_role_load($grant->rid);
-  $scheme = access_scheme_load($grant->scheme);
+  $scheme = access_scheme_machine_name_load($grant->scheme);
 
   // Delete the grant.
   access_grant_delete($grant->gid);
@@ -737,7 +726,7 @@ function access_grant_multiple_delete_confirm($form, &$form_state, $selected) {
   $gids = array_keys($selected);
   $grants = access_grant_load_multiple($gids);
   $roles = user_roles();
-  $schemes = access_scheme_get_names();
+  $schemes = access_scheme_names();
   $usernames = db_query('SELECT g.uid, u.name FROM {access_grant} g INNER JOIN {users} u ON g.uid = u.uid WHERE g.gid IN (:gids)', array(':gids' => $gids))->fetchAllKeyed();
 
   $form['grants'] = array(
@@ -765,6 +754,8 @@ function access_grant_multiple_delete_confirm($form, &$form_state, $selected) {
 
 /**
  * Form submission handler for access_grant_multiple_delete_confirm().
+ *
+ * @see access_grant_multiple_delete_confirm()
  */
 function access_grant_multiple_delete_confirm_submit($form, &$form_state) {
   if ($form_state['values']['confirm']) {
@@ -776,34 +767,4 @@ function access_grant_multiple_delete_confirm_submit($form, &$form_state) {
     drupal_set_message(format_plural($count, 'Deleted 1 access grant.', 'Deleted @count access grants.'));
   }
   $form_state['redirect'] = 'admin/access';
-}
-
-/**
- * Process variables for access-grant.tpl.php.
- *
- * The $variables array contains the following arguments:
- * - $access_grant
- *
- * @see access-grant.tpl.php
- */
-function template_preprocess_access_grant(&$variables) {
-  $grant = $variables['elements']['#access_grant'];
-  $variables['access_grant'] = $grant;
-
-  // Helpful $ack variable for templates.
-  foreach (element_children($variables['elements']) as $key) {
-    $variables['ack'][$key] = $variables['elements'][$key];
-  }
-  field_attach_preprocess('access_grant', $grant, $variables['elements'], $variables);
-
-  // Add helper variables for the access realm field, since the name is dynamic.
-  $fieldname = access_scheme_fieldname($grant->scheme);
-  $variables['access_field'] = $fieldname;
-  $variables['ack_realms'] = empty($variables[$fieldname]) ? array() : $variables[$fieldname];
-
-  // Add a class to identify the scheme.
-  $variables['classes_array'][] = drupal_html_class('access-grant-' . $grant->scheme);
-
-  // Allow per scheme templates.
-  $variables['theme_hook_suggestions'][] = 'access_grant__' . $grant->scheme;
 }

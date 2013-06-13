@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @file
  * Install, update, and uninstall functions for the access control kit module.
@@ -31,7 +32,7 @@ function access_schema() {
         'not null' => TRUE,
       ),
       'scheme' => array(
-        'description' => 'The {access_scheme}.scheme of this grant.',
+        'description' => 'The {access_scheme}.machine_name of this grant.',
         'type' => 'varchar',
         'length' => 28,
         'not null' => TRUE,
@@ -57,16 +58,20 @@ function access_schema() {
       ),
       'grant_scheme' => array(
         'table' => 'access_scheme',
-        'columns' => array('scheme' => 'scheme'),
+        'columns' => array('scheme' => 'machine_name'),
       ),
     ),
   );
 
-  // The access scheme (bundle) table.
+  // The access scheme (bundle/entity) table.
   $schema['access_scheme'] = array(
     'description' => 'Stores information about all defined {access_grant} schemes.',
     'fields' => array(
-      'scheme' => array(
+      'sid' => array(
+        'description' => 'The scheme ID.',
+        'type' => 'serial',
+      ),
+      'machine_name' => array(
         'description' => 'The machine-readable name of this scheme.',
         'type' => 'varchar',
         'length' => 28,
@@ -92,7 +97,10 @@ function access_schema() {
         'not null' => FALSE,
       ),
     ),
-    'primary key' => array('scheme'),
+    'primary key' => array('sid'),
+    'unique keys' => array(
+      'machine_name' => array('machine_name'),
+    ),
   );
 
   // The access handler table.
@@ -100,7 +108,7 @@ function access_schema() {
     'description' => 'Attaches object access handlers to {access_scheme} schemes.',
     'fields' => array(
       'scheme' => array(
-        'description' => 'The {access_scheme}.scheme to which this handler is attached.',
+        'description' => 'The {access_scheme}.machine_name to which this handler is attached.',
         'type' => 'varchar',
         'length' => 28,
         'not null' => TRUE,
@@ -139,7 +147,7 @@ function access_schema() {
     'foreign keys' => array(
       'handler_scheme' => array(
         'table' => 'access_scheme',
-        'columns' => array('scheme' => 'scheme'),
+        'columns' => array('scheme' => 'machine_name'),
       ),
     ),
     'indexes' => array(
@@ -199,7 +207,7 @@ function access_field_schema($field) {
  * Implements hook_uninstall().
  */
 function access_uninstall() {
-  $schemes = access_scheme_get_names();
+  $schemes = access_scheme_names();
   foreach (array_keys($schemes) as $scheme) {
     variable_del('access_scheme_roles_' . $scheme);
   }
@@ -226,7 +234,7 @@ function access_update_7100() {
   }
   // Store the set of enabled roles for each defined scheme for backwards
   // compatibility, then purge the old variable.
-  $schemes = access_scheme_get_names();
+  $schemes = access_scheme_names();
   foreach (array_keys($schemes) as $scheme) {
     variable_set('access_scheme_roles_' . $scheme, $realm_roles);
   }
@@ -237,13 +245,50 @@ function access_update_7100() {
  * Switch access fields to buttons widget.
  */
 function access_update_7101() {
-  $schemes = access_scheme_get_names();
-  foreach (array_keys($schemes) as $scheme) {
-    $field_name = access_scheme_fieldname($scheme);
-    $instance = field_info_instance('access_grant', $field_name, $scheme);
+  foreach (access_scheme_load_multiple() as $scheme) {
+    $field_name = $scheme->realm_field['field_name'];
+    $instance = field_info_instance('access_grant', $field_name, $scheme->machine_name);
     if (!empty($instance) && $instance['widget']['type'] == 'options_select') {
       $instance['widget']['type'] = 'options_buttons';
       field_update_instance($instance);
     }
   }
+}
+
+/**
+ * Convert schemes to entities.
+ */
+function access_update_7102() {
+  // Entities are required to have an integer ID.
+  db_drop_primary_key('access_scheme');
+  db_add_field('access_scheme', 'sid', array('description' => 'The scheme ID.', 'type' => 'serial'), array('primary key' => array('sid')));
+
+  // Rename and index the machine name field.
+  db_change_field('access_scheme', 'scheme', 'machine_name', array('description' => 'The machine-readable name of this scheme.', 'type' => 'varchar', 'length' => 28, 'not null' => TRUE), array('unique keys' => array('machine_name' => array('machine_name'))));
+}
+
+/**
+ * Convert list-based schemes to new realm settings and handlers.
+ */
+function access_update_7103() {
+  // Get a list of all access realm fields.
+  $field_names = db_query('SELECT field_name FROM {field_config} WHERE type IN (:types)', array(':types' => array('access_boolean', 'access_integer', 'access_float', 'access_text')))->fetchCol();
+
+  // Convert the 'field' setting on the realm fields to 'field_name'.
+  foreach ($field_names as $field_name) {
+    $field = field_info_field($field_name);
+    if (isset($field['settings']['arguments']['field'])) {
+      $field['settings']['arguments']['field_name'] = $field['settings']['arguments']['field'];
+      unset($field['settings']['arguments']['field']);
+      field_update_field($field);
+    }
+  }
+
+  // Convert ACKEntityList handlers to ACKEntityField.
+  db_update('access_handler')
+    ->fields(array(
+      'handler' => 'ACKEntityField',
+    ))
+    ->condition('handler', 'ACKEntityList')
+    ->execute();
 }

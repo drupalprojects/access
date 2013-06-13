@@ -1,10 +1,30 @@
 <?php
+
 /**
  * @file
- * The access grant entity controller.
+ * Contains the access grant entity controller.
  */
 
 class AccessGrantEntityController extends DrupalDefaultEntityController {
+
+  /**
+   * Constructs a new grant object without saving it.
+   *
+   * @param array $values
+   *   (optional) An array of values to set, keyed by property name.
+   *
+   * @return
+   *   An access grant object.
+   */
+  public function create(array $values = array()) {
+    $grant = new stdClass();
+    $grant->gid = NULL;
+    $grant->uid = empty($values['uid']) ? NULL : $values['uid'];
+    $grant->rid = empty($values['rid']) ? NULL : $values['rid'];
+    $grant->scheme = empty($values['scheme']) ? '' : $values['scheme'];
+    return $grant;
+  }
+
   /**
    * Saves an access grant to the database.
    *
@@ -74,14 +94,14 @@ class AccessGrantEntityController extends DrupalDefaultEntityController {
   public function delete($gid) {
     $transaction = db_transaction();
     try {
-      if ($grant = access_grant_load($gid)) {
+      if ($grant = entity_load_unchanged('access_grant', $gid)) {
+        module_invoke_all('access_grant_delete', $grant);
+        module_invoke_all('entity_delete', $grant, 'access_grant');
+        field_attach_delete('access_grant', $grant);
+
         db_delete('access_grant')
           ->condition('gid', $gid)
           ->execute();
-
-        field_attach_delete('access_grant', $grant);
-        module_invoke_all('access_grant_delete', $grant);
-        module_invoke_all('entity_delete', $grant, 'access_grant');
       }
       return SAVED_DELETED;
     }

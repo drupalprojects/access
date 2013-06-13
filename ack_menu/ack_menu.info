@@ -1,5 +1,5 @@
 name = ACK menu
-description = "Controls access to menu items."
+description = "Controls access to menu links."
 core = 7.x
 package = Access control kit
 dependencies[] = access

@@ -1,4 +1,5 @@
 <?php
+
 /**
  * @file
  * Install, update, and uninstall functions for the ACK node module.
@@ -11,7 +12,7 @@ function ack_node_update_7100() {
   // Update handler names.
   $query = db_update('access_handler')
     ->fields(array(
-      'handler' => 'ACKEntityList',
+      'handler' => 'ACKEntityField',
     ))
     ->condition('handler', 'ACKNodeList')
     ->execute();
