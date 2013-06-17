@@ -15,3 +15,5 @@ files[] = access_scheme_entity_controller.inc
 files[] = ack_handler.inc
 files[] = handlers/ack_entity_field.inc
 files[] = handlers/ack_entity_taxonomy_term_reference.inc
+; Test cases.
+files[] = access.test

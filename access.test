@@ -1,0 +1,120 @@
+<?php
+
+/**
+ * @file
+ * Tests for the access control kit module.
+ */
+
+/**
+ * Provides common helper methods for access control kit module tests.
+ */
+class AccessWebTestCase extends DrupalWebTestCase {
+
+  /**
+   * Returns a new access scheme with random properties.
+   */
+  function createScheme() {
+    // Create a scheme.
+    $scheme = new stdClass();
+    $scheme->machine_name = drupal_strtolower($this->randomName());
+    $scheme->name = $this->randomName();
+    $scheme->realm_type = 'boolean';
+    $scheme->description = $this->randomName();
+    access_scheme_save($scheme);
+    // Reload so we get the full object with everything attached.
+    return access_scheme_load($scheme->sid, TRUE);
+  }
+
+}
+
+/**
+ * Tests the access scheme interface.
+ */
+class AccessSchemeFunctionalTest extends AccessWebTestCase {
+
+  protected $admin_user;
+  protected $ack_role_rid;
+
+  public static function getInfo() {
+    return array(
+      'name' => 'Access scheme interface',
+      'description' => 'Tests the access scheme admin interface.',
+      'group' => 'Access control kit',
+    );
+  }
+
+  public function setUp() {
+    // Enable the access control kit module.
+    parent::setUp(array('access'));
+    // Create and log in our admin user.
+    $this->admin_user = $this->drupalCreateUser(array('administer access schemes'));
+    $this->drupalLogin($this->admin_user);
+    // Create a user role for use in the access scheme.
+    $this->ack_role_rid = $this->drupalCreateRole(array('access content'));
+  }
+
+  /**
+   * Create, edit, and delete an access scheme via the user interface.
+   */
+  function testSchemeInterface() {
+    // Visit the scheme admin overview page.
+    $this->drupalGet('admin/structure/access');
+
+    // Create a new scheme through the admin form.
+    $this->clickLink(t('Add access scheme'));
+    $this->clickLink(t('Boolean'));
+    $edit = array();
+    $machine_name = drupal_strtolower($this->randomName());
+    $edit['machine_name'] = $machine_name;
+    $edit['name'] = $this->randomName();
+    $edit['description'] = $this->randomName();
+    $edit['roles[' . $this->ack_role_rid . ']'] = TRUE;
+    $this->drupalPost(NULL, $edit, t('Save access scheme and continue'));
+    $this->assertRaw(t('Added access scheme %name.', array('%name' => $edit['name'])), 'Scheme created successfully.');
+
+    // Edit the scheme.
+    $this->drupalGet('admin/structure/access');
+    $this->assertText($edit['name'], 'Scheme found in the scheme admin overview listing.');
+    $this->clickLink(t('edit'));
+    $edit = array();
+    $edit['name'] = $this->randomName();
+    $this->drupalPost(NULL, $edit, t('Save access scheme'));
+    $this->assertText(t('@name (Machine name: @machine_name)', array('@name' => $edit['name'], '@machine_name' => $machine_name)), 'Updated scheme found in the scheme admin overview listing.');
+
+    // Try to submit a new scheme with a duplicate human-readable name.
+    $edit['machine_name'] = drupal_strtolower($this->randomName());
+    $this->drupalPost('admin/structure/access/add/boolean', $edit, t('Save access scheme and continue'));
+    $this->assertRaw(t('The name %name is already in use.', array('%name' => $edit['name'])));
+
+    // Try to submit a new scheme with a duplicate machine name.
+    $edit['name'] = $this->randomName();
+    $edit['machine_name'] = $machine_name;
+    $this->drupalPost('admin/structure/access/add/boolean', $edit, t('Save access scheme and continue'));
+    $this->assertText(t('The machine-readable name is already in use. It must be unique.'));
+
+    // Try to submit an invalid machine name.
+    $edit['machine_name'] = '!&^%';
+    $this->drupalPost('admin/structure/access/add/boolean', $edit, t('Save access scheme and continue'));
+    $this->assertText(t('The machine-readable name must contain only lowercase letters, numbers, and underscores.'));
+
+    // Ensure that scheme names and descriptions are escaped properly.
+    $edit = array();
+    $description = '<strong>' . $this->randomName() . '</strong>';
+    $edit['machine_name'] = 'don_t_panic';
+    $edit['name'] = 'Don\'t Panic & Carry a Towel';
+    $edit['description'] = '<script>' . $description . '</script>';
+    $this->drupalPost('admin/structure/access/add/boolean', $edit, t('Save access scheme and continue'));
+    // Check that the name isn't double-filtered when used as the page title.
+    $site_name = variable_get('site_name', 'Drupal');
+    $this->assertTitle(t('Don\'t Panic & Carry a Towel | @site-name', array('@site-name' => $site_name)));
+    $this->assertNoTitle(t('Don&#039;t Panic &amp; Carry a Towel | @site-name', array('@site-name' => $site_name)));
+    // Check that the name is sanitized in overview.
+    $this->drupalGet('admin/structure/access');
+    $this->assertRaw('Don&#039;t Panic &amp; Carry a Towel');
+    $this->assertNoRaw($edit['name']);
+    // Check that the description is sanitized in overview.
+    $this->assertRaw($description);
+    $this->assertNoRaw($edit['description']);
+  }
+
+}
