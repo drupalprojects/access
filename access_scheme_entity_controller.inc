@@ -103,11 +103,13 @@ class AccessSchemeEntityController extends DrupalDefaultEntityController {
       if (empty($scheme->sid)) {
         $op = 'insert';
         $status = drupal_write_record('access_scheme', $scheme);
+        access_scheme_static_reset();
         field_attach_create_bundle('access_grant', $scheme->machine_name);
       }
       else {
         $op = 'update';
         $status = drupal_write_record('access_scheme', $scheme, 'sid');
+        access_scheme_static_reset(array($scheme->sid));
       }
 
       module_invoke_all('access_scheme_' . $op, $scheme);
@@ -154,6 +156,8 @@ class AccessSchemeEntityController extends DrupalDefaultEntityController {
         field_attach_delete_bundle('access_grant', $scheme->machine_name);
         module_invoke_all('access_scheme_delete', $scheme);
         module_invoke_all('entity_delete', $scheme, 'access_scheme');
+        cache_clear_all();
+        access_scheme_static_reset();
       }
       return SAVED_DELETED;
     }

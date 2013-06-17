@@ -453,6 +453,18 @@ function access_scheme_delete($sid) {
 }
 
 /**
+ * Clear all static cache variables for access schemes.
+ *
+ * @param $ids
+ *   An array of ids to reset in the entity controller cache.
+ */
+function access_scheme_static_reset($ids = NULL) {
+  drupal_static_reset('access_scheme_names');
+  drupal_static_reset('access_scheme_machine_name_load');
+  entity_get_controller('access_scheme')->resetCache($ids);
+}
+
+/**
  * Implements hook_access_scheme_insert().
  */
 function access_access_scheme_insert($scheme) {
