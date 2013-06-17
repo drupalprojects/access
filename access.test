@@ -54,7 +54,7 @@ class AccessSchemeFunctionalTest extends AccessWebTestCase {
   }
 
   /**
-   * Create, edit, and delete an access scheme via the user interface.
+   * Create and edit an access scheme via the user interface.
    */
   function testSchemeInterface() {
     // Visit the scheme admin overview page.
@@ -117,4 +117,19 @@ class AccessSchemeFunctionalTest extends AccessWebTestCase {
     $this->assertNoRaw($edit['description']);
   }
 
+  /**
+   * Test the scheme overview with no schemes.
+   */
+  function testSchemeOverviewEmpty() {
+    // Delete all schemes.
+    $schemes = access_scheme_load_multiple(FALSE);
+    foreach ($schemes as $sid => $scheme) {
+      access_scheme_delete($sid);
+    }
+    // Confirm that no schemes remain in the database.
+    $this->assertFalse(access_scheme_load_multiple(FALSE), 'No access schemes found in the database.');
+    // Check the default message for no schemes.
+    $this->drupalGet('admin/structure/access');
+    $this->assertText(t('No access schemes available.'), 'No access schemes were found.');
+  }
 }
