@@ -414,7 +414,8 @@ function access_scheme_form_submit($form, &$form_state) {
   switch ($status) {
     case SAVED_NEW:
       $message = 'Added access scheme %name.';
-      // New schemes stay on the same page to configure handlers.
+      // New schemes redirect to the edit page to configure handlers.
+      $form_state['redirect'] = 'admin/structure/access/' . str_replace('_', '-', $scheme->machine_name);
       break;
 
     case SAVED_UPDATED:
