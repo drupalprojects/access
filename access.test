@@ -11,7 +11,10 @@
 class AccessWebTestCase extends DrupalWebTestCase {
 
   /**
-   * Returns a new access scheme with random properties.
+   * Creates and returns a new access scheme with random properties.
+   *
+   * @return
+   *   An access scheme.
    */
   function createScheme() {
     // Create a scheme.
@@ -21,8 +24,45 @@ class AccessWebTestCase extends DrupalWebTestCase {
     $scheme->realm_type = 'boolean';
     $scheme->description = $this->randomName();
     access_scheme_save($scheme);
-    // Reload so we get the full object with everything attached.
-    return access_scheme_load($scheme->sid, TRUE);
+    return $scheme;
+  }
+
+  /**
+   * Creates and returns a new access grant for the given scheme.
+   *
+   * @param $scheme
+   *   An access scheme.
+   * @param $rid
+   *   (optional) A role ID. If omitted, uses the first available scheme role.
+   *   If no role is available, creates one using drupalCreateRole().
+   * @param $account
+   *   (optional) A user account. If omitted, uses drupalCreateUser().
+   *
+   * @return
+   *   An access grant.
+   */
+  function createGrant($scheme, $rid = NULL, $account = NULL) {
+    if (!isset($rid)) {
+      $roles = variable_get('access_scheme_roles_' . $scheme->machine_name, array());
+      if (empty($roles)) {
+        $rid = $this->drupalCreateRole(array('access content'));
+        $role = user_role_load($rid);
+        $roles = array($rid => $role->name);
+        variable_set('access_scheme_roles_' . $scheme->machine_name, $roles);
+      }
+      else {
+        $rid = key($roles);
+      }
+    }
+    if (!isset($account)) {
+      $account = $this->drupalCreateUser(array('access content'));
+    }
+    $grant = new stdClass();
+    $grant->rid = $rid;
+    $grant->uid = $account->uid;
+    $grant->scheme = $scheme->machine_name;
+    access_grant_save($grant);
+    return $grant;
   }
 
 }
@@ -30,7 +70,7 @@ class AccessWebTestCase extends DrupalWebTestCase {
 /**
  * Tests the access scheme interface.
  */
-class AccessSchemeFunctionalTest extends AccessWebTestCase {
+class AccessSchemeInterfaceTest extends AccessWebTestCase {
 
   protected $admin_user;
   protected $ack_role_rid;
@@ -74,7 +114,7 @@ class AccessSchemeFunctionalTest extends AccessWebTestCase {
 
     // Edit the scheme.
     $this->drupalGet('admin/structure/access');
-    $this->assertText($edit['name'], 'Scheme found in the scheme admin overview listing.');
+    $this->assertText(t('@name (Machine name: @machine_name)', array('@name' => $edit['name'], '@machine_name' => $machine_name)), 'Scheme found in the scheme admin overview listing.');
     $this->clickLink(t('edit'));
     $edit = array();
     $edit['name'] = $this->randomName();
@@ -139,19 +179,12 @@ class AccessSchemeFunctionalTest extends AccessWebTestCase {
   function testSchemeDelete() {
     // Create an access scheme.
     $scheme = $this->createScheme();
-    entity_get_controller('access_scheme')->resetCache();
-    $scheme = access_scheme_load($scheme->sid);
+    $scheme = access_scheme_load($scheme->sid, TRUE);
     $this->assertTrue($scheme, 'Access scheme found in the database.');
 
     // Create an access grant in the scheme.
-    $grant = entity_get_controller('access_grant')->create(array(
-      'scheme' => $scheme->machine_name,
-      'uid' => $this->admin_user->uid,
-      'rid' => $this->ack_role_rid,
-    ));
-    access_grant_save($grant);
-    entity_get_controller('access_grant')->resetCache();
-    $grant = access_grant_load($grant->gid);
+    $grant = $this->createGrant($scheme);
+    $grant = access_grant_load($grant->gid, TRUE);
     $this->assertTrue($grant, 'Access grant found in the database.');
 
     // Delete the scheme.
@@ -164,10 +197,8 @@ class AccessSchemeFunctionalTest extends AccessWebTestCase {
     // Confirm deletion.
     $this->drupalPost(NULL, NULL, t('Delete'));
     $this->assertRaw(t('Deleted access scheme %name.', array('%name' => $scheme->name)), 'Access scheme deleted.');
-    entity_get_controller('access_grant')->resetCache();
-    $this->assertFalse(access_grant_load($grant->gid), 'Access grant is not found in the database.');
-    entity_get_controller('access_scheme')->resetCache();
-    $this->assertFalse(access_scheme_load($scheme->sid), 'Access scheme is not found in the database.');
+    $this->assertFalse(access_grant_load($grant->gid, TRUE), 'Access grant is not found in the database.');
+    $this->assertFalse(access_scheme_load($scheme->sid, TRUE), 'Access scheme is not found in the database.');
   }
 
 }
