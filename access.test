@@ -132,4 +132,27 @@ class AccessSchemeFunctionalTest extends AccessWebTestCase {
     $this->drupalGet('admin/structure/access');
     $this->assertText(t('No access schemes available.'), 'No access schemes were found.');
   }
+
+  /**
+   * Delete an access scheme via the user interface.
+   */
+  function testSchemeDelete() {
+    // Create an access scheme.
+    $scheme = $this->createScheme();
+    entity_get_controller('access_scheme')->resetCache();
+    $scheme = access_scheme_load($scheme->sid);
+    $this->assertTrue($scheme, 'Access scheme found in the database.');
+
+    // Delete the scheme.
+    $edit = array();
+    $this->drupalPost('admin/structure/access/' . $scheme->machine_name, $edit, t('Delete access scheme'));
+    $this->assertRaw(t('Are you sure you want to delete the access scheme %name?', array('%name' => $scheme->name)), '[confirm deletion] Asks for confirmation.');
+
+    // Confirm deletion.
+    $this->drupalPost(NULL, NULL, t('Delete'));
+    $this->assertRaw(t('Deleted access scheme %name.', array('%name' => $scheme->name)), 'Access scheme deleted.');
+    entity_get_controller('access_scheme')->resetCache();
+    $this->assertFalse(access_scheme_load($scheme->sid), 'Access scheme is not found in the database.');
+  }
+
 }
