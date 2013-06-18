@@ -143,14 +143,29 @@ class AccessSchemeFunctionalTest extends AccessWebTestCase {
     $scheme = access_scheme_load($scheme->sid);
     $this->assertTrue($scheme, 'Access scheme found in the database.');
 
+    // Create an access grant in the scheme.
+    $grant = entity_get_controller('access_grant')->create(array(
+      'scheme' => $scheme->machine_name,
+      'uid' => $this->admin_user->uid,
+      'rid' => $this->ack_role_rid,
+    ));
+    access_grant_save($grant);
+    entity_get_controller('access_grant')->resetCache();
+    $grant = access_grant_load($grant->gid);
+    $this->assertTrue($grant, 'Access grant found in the database.');
+
     // Delete the scheme.
     $edit = array();
     $this->drupalPost('admin/structure/access/' . $scheme->machine_name, $edit, t('Delete access scheme'));
     $this->assertRaw(t('Are you sure you want to delete the access scheme %name?', array('%name' => $scheme->name)), '[confirm deletion] Asks for confirmation.');
+    $this->assertRaw(t('All access grants within the scheme will also be deleted. %scheme currently contains 1 access grant on your site. If you remove this scheme, the user may not be able to exercise the permissions assigned by that grant.', array('%scheme' => $scheme->name)), '[confirm deletion] Informs that all grants will be deleted.');
+    $this->assertText(t('This action cannot be undone.'), '[confirm deletion] Informs that deletion is permanent.');
 
     // Confirm deletion.
     $this->drupalPost(NULL, NULL, t('Delete'));
     $this->assertRaw(t('Deleted access scheme %name.', array('%name' => $scheme->name)), 'Access scheme deleted.');
+    entity_get_controller('access_grant')->resetCache();
+    $this->assertFalse(access_grant_load($grant->gid), 'Access grant is not found in the database.');
     entity_get_controller('access_scheme')->resetCache();
     $this->assertFalse(access_scheme_load($scheme->sid), 'Access scheme is not found in the database.');
   }

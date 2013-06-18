@@ -139,6 +139,12 @@ class AccessSchemeEntityController extends DrupalDefaultEntityController {
     $transaction = db_transaction();
     try {
       if ($scheme = entity_load_unchanged('access_scheme', $sid)) {
+        // Delete all access grants in the scheme.
+        $gids = db_query('SELECT gid FROM {access_grant} WHERE scheme = :scheme', array(':scheme' => $scheme->machine_name))->fetchCol();
+        foreach ($gids as $gid) {
+          access_grant_delete($gid);
+        }
+
         // Detach any access handlers for this scheme.
         db_delete('access_handler')
           ->condition('scheme', $scheme->machine_name)

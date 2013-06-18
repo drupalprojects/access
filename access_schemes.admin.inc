@@ -466,7 +466,7 @@ function access_scheme_delete_confirm($form, &$form_state, $scheme) {
 
   $num_grants = db_query('SELECT COUNT(*) FROM {access_grant} WHERE scheme = :scheme', array(':scheme' => $scheme->machine_name))->fetchField();
   if ($num_grants) {
-    $caption .= '<p>' . format_plural($num_grants, '%scheme is used by 1 access grant on your site. If you remove this scheme, you will not be able to edit the %scheme grant and users may not be able to exercise permissions based on roles assigned by that grant.', '%scheme is used by @count access grants on your site. If you remove this scheme, you will not be able to edit the %scheme grants and users may not be able to exercise permissions based on roles assigned by those grants.', $t_args) . '</p>';
+    $caption .= '<p>' . format_plural($num_grants, 'All access grants within the scheme will also be deleted. %scheme currently contains 1 access grant on your site. If you remove this scheme, the user may not be able to exercise the permissions assigned by that grant.', 'All access grants within the scheme will also be deleted. %scheme currently contains @count access grants on your site. If you remove this scheme, users may not be able to exercise the permissions assigned by those grants.', $t_args) . '</p>';
   }
 
   $caption .= '<p>' . t('This action cannot be undone.') . '</p>';
