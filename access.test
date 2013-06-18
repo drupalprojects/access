@@ -202,3 +202,138 @@ class AccessSchemeInterfaceTest extends AccessWebTestCase {
   }
 
 }
+
+/**
+ * Tests for access scheme functions.
+ */
+class AccessSchemeFunctionTest extends AccessWebTestCase {
+
+  protected $schemes;
+
+  public static function getInfo() {
+    return array(
+      'name' => 'Access schemes',
+      'description' => 'Tests loading, saving, and deleting access schemes.',
+      'group' => 'Access control kit',
+    );
+  }
+
+  public function setUp() {
+    // Enable the access control kit module.
+    parent::setUp(array('access'));
+    // Create two schemes for testing.
+    $this->schemes = array();
+    $this->schemes[] = $this->createScheme();
+    $this->schemes[] = $this->createScheme();
+  }
+
+  /**
+   * Test basic create, read, update, and delete functions.
+   */
+  function testSchemeCRUD() {
+    $loaded_schemes = access_scheme_load_multiple(FALSE, TRUE);
+    $this->assertTrue(count($loaded_schemes), 'Access schemes exist in the database.');
+
+    $i = 0;
+    $count = count($this->schemes);
+    $names = access_scheme_names();
+    foreach ($this->schemes as $scheme) {
+      $i++;
+      // Find the test scheme in the name list.
+      $this->assertTrue(isset($names[$scheme->machine_name]) && $names[$scheme->machine_name] == $scheme->name, "[scheme $i of $count] Found the scheme in the name list.");
+
+      // Confirm that the loaded scheme matches expected values.
+      $loaded_scheme = $loaded_schemes[$scheme->sid];
+      $this->assertEqual($scheme->sid, $loaded_scheme->sid, "[scheme $i of $count] ID is OK.");
+      $this->assertEqual($scheme->machine_name, $loaded_scheme->machine_name, "[scheme $i of $count] Machine name is OK.");
+      $this->assertEqual($scheme->name, $loaded_scheme->name, "[scheme $i of $count] Human-readable name is OK.");
+      $this->assertEqual($scheme->realm_type, $loaded_scheme->realm_type, "[scheme $i of $count] Realm type is OK.");
+      $this->assertEqual($scheme->description, $loaded_scheme->description, "[scheme $i of $count] Description is OK.");
+
+      // Confirm that the scheme's access realm field exists.
+      $this->assertTrue(isset($loaded_scheme->realm_field) && isset($loaded_scheme->realm_field['field_name']) && $loaded_scheme->realm_field['field_name'] == _access_realm_field_name($scheme), "[scheme $i of $count] Realm field exists.");
+    }
+
+    // Attempt to load a scheme that doesn't exist.
+    $sid = count($loaded_schemes) + 1;
+    $scheme = access_scheme_load($sid);
+    $this->assertFalse($scheme, 'Invalid scheme ID does not load.');
+    // Create a new scheme, which should end up with $sid as its ID.
+    $this->createScheme();
+    // Make sure that the previously invalid ID now loads properly.
+    $scheme = access_scheme_load($sid);
+    $this->assertTrue(!empty($scheme) && is_object($scheme), 'Newly created access scheme loads properly.');
+    $this->assertEqual($scheme->sid, $sid, 'Loaded scheme ID is the same as the previously invalid ID.');
+
+    // Confirm that schemes can be loaded by machine name.
+    $loaded_scheme = access_scheme_machine_name_load(str_replace('_', '-', $scheme->machine_name));
+    $this->assertEqual($scheme->sid, $loaded_scheme->sid, 'Scheme loads by machine name.');
+
+    // Confirm that the scheme can be updated.
+    $loaded_scheme->name = $this->randomName();
+    $this->assertEqual(access_scheme_save($loaded_scheme), SAVED_UPDATED, 'Scheme updated.');
+
+    // Confirm that the scheme can be deleted.
+    $this->assertEqual(access_scheme_delete($loaded_scheme->sid), SAVED_DELETED, 'Scheme deleted.');
+
+    // Confirm that the scheme can be recreated.
+    unset($loaded_scheme->sid);
+    $this->assertEqual(access_scheme_save($loaded_scheme), SAVED_NEW, 'Scheme created.');
+  }
+
+  /**
+   * Test deleting an access scheme that contains grants.
+   */
+  function testSchemeDeleteWithGrants() {
+    $this->assertEqual(2, count($this->schemes));
+
+    // Create five access grants each for the two test schemes.
+    foreach ($this->schemes as $scheme) {
+      // Assert that there are no existing grants for the access scheme.
+      $this->assertEqual(0, db_query('SELECT COUNT(*) FROM {access_grant} WHERE scheme = :scheme', array(':scheme' => $scheme->machine_name))->fetchField());
+
+      for ($i = 0; $i < 5; $i++) {
+        $this->createGrant($scheme);
+      }
+
+      // Assert that there are now five grants for the access scheme.
+      $this->assertEqual(5, db_query('SELECT COUNT(*) FROM {access_grant} WHERE scheme = :scheme', array(':scheme' => $scheme->machine_name))->fetchField());
+    }
+
+    // Delete the first scheme.
+    $scheme = reset($this->schemes);
+    access_scheme_delete($scheme->sid);
+
+    // Assert that there are no grants left for the deleted scheme.
+    $this->assertEqual(0, db_query('SELECT COUNT(*) FROM {access_grant} WHERE scheme = :scheme', array(':scheme' => $scheme->machine_name))->fetchField());
+
+    // Assert that there are still five grants for the remaining scheme.
+    $scheme = array_pop($this->schemes);
+    $this->assertEqual(5, db_query('SELECT COUNT(*) FROM {access_grant} WHERE scheme = :scheme', array(':scheme' => $scheme->machine_name))->fetchField());
+  }
+
+  /**
+   * Ensure that the access scheme static reset works correctly.
+   */
+  function testSchemeStaticReset() {
+    $original_scheme = access_scheme_load($this->schemes[0]->sid);
+    $this->assertTrue(is_object($original_scheme) && $original_scheme->name == $this->schemes[0]->name, 'Scheme loaded successfully.');
+
+    // Change the name and description.
+    $scheme = $original_scheme;
+    $scheme->name = $this->randomName();
+    $scheme->description = $this->randomName();
+    access_scheme_save($scheme);
+
+    // Load the scheme.
+    $new_scheme = access_scheme_load($original_scheme->sid);
+    $this->assertEqual($new_scheme->name, $scheme->name);
+    $this->assertEqual($new_scheme->description, $scheme->description);
+
+    // Delete the scheme.
+    access_scheme_delete($this->schemes[0]->sid);
+    $schemes = access_scheme_load_multiple(FALSE);
+    $this->assertTrue(!isset($schemes[$this->schemes[0]->sid]), 'The scheme was deleted.');
+  }
+
+}
