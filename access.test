@@ -137,6 +137,11 @@ class AccessSchemeInterfaceTest extends AccessWebTestCase {
     $this->drupalPost('admin/structure/access/add/boolean', $edit, t('Save access scheme and continue'));
     $this->assertText(t('The machine-readable name must contain only lowercase letters, numbers, and underscores.'));
 
+    // Try to submit a disallowed machine name.
+    $edit['machine_name'] = 'add';
+    $this->drupalPost('admin/structure/access/add/boolean', $edit, t('Save access scheme and continue'));
+    $this->assertText(t('Invalid machine-readable name. Enter a name other than add.'));
+
     // Ensure that scheme names and descriptions are escaped properly.
     $edit = array();
     $description = '<strong>' . $this->randomName() . '</strong>';
