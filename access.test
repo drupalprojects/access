@@ -257,6 +257,16 @@ class AccessSchemeFunctionTest extends AccessWebTestCase {
 
       // Confirm that the scheme's access realm field exists.
       $this->assertTrue(isset($loaded_scheme->realm_field) && isset($loaded_scheme->realm_field['field_name']) && $loaded_scheme->realm_field['field_name'] == _access_realm_field_name($scheme), "[scheme $i of $count] Realm field exists.");
+
+      // Confirm that realm information was attached.
+      $this->assertTrue(isset($loaded_scheme->realm_info) && isset($loaded_scheme->realm_info['realm_type']) && $loaded_scheme->realm_info['realm_type'] == 'boolean', "[scheme $i of $count] Realm info was attached.");
+      $this->assertTrue(isset($loaded_scheme->realms) && is_array($loaded_scheme->realms) && ($loaded_scheme->realms[0] == t('False')) && ($loaded_scheme->realms[1] == t('True')), "[scheme $i of $count] Realm values were attached.");
+
+      // Confirm that role information was attached.
+      $this->assertTrue(isset($loaded_scheme->roles) && is_array($loaded_scheme->roles), "[scheme $i of $count] Roles were attached.");
+
+      // Confirm that handlers were attached.
+      $this->assertTrue(isset($loaded_scheme->handlers) && is_array($loaded_scheme->handlers), "[scheme $i of $count] Handlers were attached.");
     }
 
     // Attempt to load a scheme that doesn't exist.
