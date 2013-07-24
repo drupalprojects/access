@@ -107,7 +107,7 @@ function hook_access_handler_info() {
  */
 function hook_access_handler_info_alter(&$info) {
   // Change the label used for the node "sticky" property handler.
-  $info['node']['label'] = t('Node is marked sticky');
+  $info['ACKNodeSticky']['label'] = t('Node is marked sticky');
 }
 
 /**
