@@ -32,35 +32,48 @@ class AccessWebTestCase extends DrupalWebTestCase {
    *
    * @param $scheme
    *   An access scheme.
-   * @param $rid
-   *   (optional) A role ID. If omitted, uses the first available scheme role.
+   * @param $role
+   *   (optional) A user role. If omitted, uses the first available scheme role.
    *   If no role is available, creates one using drupalCreateRole().
    * @param $account
-   *   (optional) A user account. If omitted, uses drupalCreateUser().
+   *   (optional) A user account. If omitted, uses drupalCreateUser() and adds
+   *   the user to the role.
    *
    * @return
    *   An access grant.
    */
-  function createGrant($scheme, $rid = NULL, $account = NULL) {
-    if (!isset($rid)) {
-      $roles = variable_get('access_scheme_roles_' . $scheme->machine_name, array());
-      if (empty($roles)) {
+  function createGrant($scheme, $role = NULL, $account = NULL) {
+    // Make sure we have a user role to assign.
+    if (!isset($role)) {
+      // Get the list of roles enabled for this scheme.
+      $scheme_roles = variable_get('access_scheme_roles_' . $scheme->machine_name, array());
+      // If the scheme has no enabled roles, create one for it.
+      if (empty($scheme_roles)) {
         $rid = $this->drupalCreateRole(array('access content'));
         $role = user_role_load($rid);
-        $roles = array($rid => $role->name);
-        variable_set('access_scheme_roles_' . $scheme->machine_name, $roles);
+        $scheme_roles = array($role->rid => $role->name);
+        variable_set('access_scheme_roles_' . $scheme->machine_name, $scheme_roles);
       }
+      // Otherwise, use the first enabled role.
       else {
-        $rid = key($roles);
+        $rid = key($scheme_roles);
+        $role = user_role_load($rid);
       }
     }
+
+    // Make sure we have a user to assign.
     if (!isset($account)) {
+      // Create an account and add it to the role.
       $account = $this->drupalCreateUser(array('access content'));
+      $account->original = clone $account;
+      $user_roles = $account->roles + array($role->rid => $role->name);
+      user_save($account, array('roles' => $user_roles));
     }
-    $grant = new stdClass();
-    $grant->rid = $rid;
+
+    // Create an access grant.
+    $grant = entity_get_controller('access_grant')->create(array('scheme' => $scheme->machine_name));
+    $grant->rid = $role->rid;
     $grant->uid = $account->uid;
-    $grant->scheme = $scheme->machine_name;
     access_grant_save($grant);
     return $grant;
   }
@@ -116,6 +129,7 @@ class AccessSchemeInterfaceTest extends AccessWebTestCase {
     $this->drupalGet('admin/structure/access');
     $this->assertText(t('@name (Machine name: @machine_name)', array('@name' => $edit['name'], '@machine_name' => $machine_name)), 'Scheme found in the scheme admin overview listing.');
     $this->clickLink(t('edit'));
+    $this->assertText(t('No access-controllable objects available.'), 'Informs that no access-controllable object types have been defined.');
     $edit = array();
     $edit['name'] = $this->randomName();
     $this->drupalPost(NULL, $edit, t('Save access scheme'));
@@ -350,5 +364,98 @@ class AccessSchemeFunctionTest extends AccessWebTestCase {
     $schemes = access_scheme_load_multiple(FALSE);
     $this->assertTrue(!isset($schemes[$this->schemes[0]->sid]), 'The scheme was deleted.');
   }
+
+}
+
+/**
+ * Tests the access control kit API.
+ */
+class AccessAPITest extends AccessWebTestCase {
+
+  protected $ack_role;
+  protected $scheme;
+
+  public static function getInfo() {
+    return array(
+      'name' => 'Access control kit API',
+      'description' => 'Tests the access control kit API and handler interface.',
+      'group' => 'Access control kit',
+    );
+  }
+
+  public function setUp() {
+    // Enable the access control kit module and our dummy test module.
+    parent::setUp(array('access', 'access_test'));
+    // Create a role that uses the permission defined in access_test.module.
+    $rid = $this->drupalCreateRole(array('meow'));
+    $this->ack_role = user_role_load($rid);
+    // Create an access scheme that uses the test role.
+    $scheme = $this->createScheme();
+    $scheme->roles = array($this->ack_role->rid => $this->ack_role->name);
+    variable_set('access_scheme_roles_' . $scheme->machine_name, $scheme->roles);
+    $this->scheme = $scheme;
+  }
+
+  /**
+   * Attach a handler to the test scheme through the UI, checking that the ACK
+   * hooks and their alter hooks fire correctly as we go.
+   */
+  function testHandlerInterface() {
+    // Create and log in an admin user.
+    $admin_user = $this->drupalCreateUser(array('administer access schemes'));
+    $this->drupalLogin($admin_user);
+
+    // Go to the "add access scheme" page and check that the boolean realm type
+    // label was successfully altered.
+    $this->drupalGet('admin/structure/access/add');
+    $this->assertNoText(t('Boolean'), 'hook_access_realm_info_alter(): The boolean realm type info was changed.');
+    $this->clickLink(t('Yes or no'));
+
+    // Check that the access-controllable object types and handlers were
+    // successfully registered and altered.
+    $this->drupalGet('admin/structure/access/' . $this->scheme->machine_name);
+    $this->assertText(t('@object_type access realms are determined by', array('@object_type' => t('Cat'))), 'hook_access_info(): The object type was registered.');
+    $this->assertNoText(t('Kitten'), 'hook_access_info_alter(): The access-controllable object type info was changed.');
+    $this->assertRaw('<option value="ACKTestMeowHandler">', 'hook_access_handler_info(): The handler was registered.');
+    $this->assertText(t('@object_type access realms are determined by', array('@object_type' => t('Dog'))), 'hook_access_handler_info_alter(): The supported object types for the handler were changed.');
+    $this->assertText(t('No object access handlers are available to manage @object_type objects in a @realm_type scheme.', array('@object_type' => t('Bird'), '@realm_type' => t('Yes or no'))), 'The handler UI notifies the user when there are no available handlers.');
+
+    // Attach the handler and confirm that the attachment was saved.
+    $edit = array('handlers[cat][handler]' => 'ACKTestMeowHandler');
+    $this->drupalPost(NULL, $edit, t('Save access scheme'));
+    $this->clickLink(t('edit'));
+    $this->assertOptionSelected('edit-handlers-cat-handler', 'ACKTestMeowHandler', 'The handler was attached to the correct object type.');
+    $this->assertNoOptionSelected('edit-handlers-dog-handler', 'ACKTestMeowHandler', 'The handler was not attached to the incorrect object type.');
+    $this->assertText(t('The meow handler assigns the boolean TRUE realm to cats and the boolean FALSE realm to everything else.'), 'The handler description was displayed.');
+  }
+
+  /**
+   * Test access arbitration through our dummy handler.
+   */
+   function testHandlerMethods() {
+     $dummy_object = new stdClass();
+
+     // Attach the test "meow" handler for dummy "cat" and "dog" object types.
+     access_handler_save($this->scheme, 'cat', 'ACKTestMeowHandler', 'access_test');
+     access_handler_save($this->scheme, 'dog', 'ACKTestMeowHandler', 'access_test');
+     // Reset the scheme cache.
+     $this->scheme = access_scheme_load($this->scheme->sid, TRUE);
+
+     // Create an access grant in the scheme for a test user.
+     $grant = $this->createGrant($this->scheme, $this->ack_role);
+     // Assign access in the TRUE realm.
+     $fieldname = _access_realm_field_name($this->scheme);
+     $grant->$fieldname = array(LANGUAGE_NONE => array(array('value' => TRUE)));
+     access_grant_save($grant);
+     // Reset grant cache.
+     access_grant_load($grant->gid, TRUE);
+
+     // Get the test user.
+     $test_user = user_load($grant->uid, TRUE);
+
+     // Check access.
+     $this->assertTrue(access_user_object_access('meow', 'cat', $dummy_object, $test_user), 'User has access to an object in an assigned realm.');
+     $this->assertFalse(access_user_object_access('meow', 'dog', $dummy_object, $test_user), 'User does not have access to an object in an unassigned realm.');
+   }
 
 }

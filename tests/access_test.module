@@ -1,0 +1,77 @@
+<?php
+
+/**
+ * @file
+ * A dummy module for testing the access control kit API.
+ *
+ * This is a dummy module that implements hooks defined in the access control
+ * kit module in order to test that its API functions as expected.
+ */
+
+/**
+ * Implements hook_access_info().
+ */
+function access_test_access_info() {
+  // Declare some fictitious access-controllable object types.
+  $info['cat'] = array('label' => t('Kitten'));
+  $info['dog'] = array('label' => t('Dog'));
+  $info['bird'] = array('label' => t('Bird'));
+  return $info;
+}
+
+/**
+ * Implements hook_access_info_alter().
+ */
+function access_test_access_info_alter(&$info) {
+  // Override one of the object type labels that we set above.
+  if (isset($info['cat']['label'])) {
+    $info['cat']['label'] = t('Cat');
+  }
+}
+
+/**
+ * Implements hook_access_handler_info().
+ */
+function access_test_access_handler_info() {
+  // Register a handler for one of our fictitious object types.
+  $info['ACKTestMeowHandler'] = array(
+    'label' => t('Meow'),
+    'realm types' => array('boolean'),
+    'object types' => array('cat'),
+  );
+  return $info;
+}
+
+/**
+ * Implements hook_access_handler_info_alter().
+ */
+function access_test_access_handler_info_alter(&$info) {
+  // Add another object type to the handler that we registered above.
+  if (isset($info['ACKTestMeowHandler']['object types'])) {
+    $info['ACKTestMeowHandler']['object types'][] = 'dog';
+  }
+}
+
+/**
+ * Implements hook_access_realm_info_alter().
+ */
+function access_test_access_realm_info_alter(&$info) {
+  // Override the boolean realm type's info (defined in access.access.inc).
+  if (isset($info['boolean'])) {
+    $info['boolean']['label'] = t('Yes or no');
+    $info['boolean']['description'] = t('Does it meow?');
+  }
+}
+
+/**
+ * Implements hook_permission().
+ */
+function access_test_permission() {
+  // Create a permission for our dummy objects.
+  return array(
+    'meow' =>  array(
+      'title' => t('Access meowing objects'),
+      'description' => t('Allows the user to access objects that meow.'),
+    ),
+  );
+}

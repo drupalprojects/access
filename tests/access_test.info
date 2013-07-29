@@ -1,0 +1,9 @@
+name = Access control kit API tests
+description = Support module for testing the access control kit API.
+core = 7.x
+package = Testing
+hidden = TRUE
+dependencies[] = access
+
+; Access control kit handler classes.
+files[] = ack_test.inc
