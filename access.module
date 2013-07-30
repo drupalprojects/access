@@ -1066,8 +1066,9 @@ function access_object_realms($object_type, $object, $schemes = NULL) {
  * @return
  *   A nested array indexed first by role ID, then by scheme machine name, where
  *   each value is an array containing the user's assigned realms for that role
- *   in that scheme. Note that the list of roles is limited to those found in
- *   $scheme->roles for each scheme; non-ACK roles are excluded.
+ *   in that scheme as realm_value => realm_label. Note that the list of roles
+ *   is limited to those found in $scheme->roles for each scheme; non-ACK roles
+ *   are excluded.
  */
 function access_user_roles($account = NULL) {
   global $user;
@@ -1147,7 +1148,7 @@ function access_user_permission_realms($string, $account = NULL, $schemes = NULL
         $scheme_realms += $access[$scheme->machine_name];
       }
     }
-    $realms[$scheme->machine_name] = $scheme_realms;
+    $realms[$scheme->machine_name] = array_keys($scheme_realms);
   }
   return $realms;
 }

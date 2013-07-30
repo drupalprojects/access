@@ -76,7 +76,11 @@ class ACKNodeTaxonomyIndex extends AccessControlKitHandler {
               }
 
               // Include only those options that correspond to allowed realms.
-              $options += array_intersect_key($element['#options'], $realms);
+              foreach ($realms as $realm) {
+                if (isset($element['#options'][$realm])) {
+                  $options[$realm] = $element['#options'][$realm];
+                }
+              }
 
               // If the element is required and only one option remains besides the
               // empty value, then remove the empty value as an option.
