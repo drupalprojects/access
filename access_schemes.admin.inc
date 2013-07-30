@@ -118,7 +118,8 @@ function access_scheme_form($form, &$form_state, $scheme) {
   }
 
   // Determine whether grants already exist for this scheme.
-  if ($is_new = empty($scheme->sid)) {
+  $is_new = empty($scheme->sid);
+  if ($is_new) {
     $has_data = FALSE;
   }
   else {
@@ -440,9 +441,8 @@ function access_scheme_form_submit($form, &$form_state) {
  * @see access_scheme_form_validate()
  */
 function access_scheme_form_delete_submit($form, &$form_state) {
-  $destination = array();
   if (isset($_GET['destination'])) {
-    $destination = drupal_get_destination();
+    drupal_get_destination();
     unset($_GET['destination']);
   }
   $scheme = $form_state['scheme'];

@@ -213,6 +213,7 @@ function hook_access_realm_settings($realm_type, $has_data, $values = array()) {
     );
     return $form;
   }
+  return array();
 }
 
 /**
@@ -242,6 +243,7 @@ function hook_access_realms($realm_type, $arguments = array()) {
     $field['settings']['allowed_values'][] = array('vocabulary' => $arguments['vocabulary'], 'parent' => 0);
     return taxonomy_allowed_values($field);
   }
+  return array();
 }
 
 /**

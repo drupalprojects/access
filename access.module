@@ -149,7 +149,8 @@ function access_grant_load_by_condition($conditions = array(), $reset = FALSE) {
     $query->entityCondition('bundle', $conditions['scheme']);
     if (isset($conditions['realms'])) {
       // Make sure that the referenced scheme actually exists.
-      if ($scheme = access_scheme_machine_name_load($conditions['scheme'])) {
+      $scheme = access_scheme_machine_name_load($conditions['scheme']);
+      if ($scheme) {
         $query->fieldCondition($scheme->realm_field['field_name'], 'value', $conditions['realms']);
       }
       // If the scheme doesn't exist, then we can't filter on its realm values,
@@ -469,7 +470,8 @@ function access_scheme_static_reset($ids = NULL) {
  */
 function access_access_scheme_insert($scheme) {
   // Create the realm field for the scheme.
-  if ($realm_info = access_realm_info($scheme->realm_type)) {
+  $realm_info = access_realm_info($scheme->realm_type);
+  if ($realm_info) {
     $field_name = _access_realm_field_name($scheme);
 
     // Create the field.
@@ -491,7 +493,7 @@ function access_access_scheme_insert($scheme) {
       if (!empty($field['settings']['arguments']) && isset($scheme->realm_settings)) {
         $field['settings']['arguments'] = array_merge($field['settings']['arguments'], $scheme->realm_settings);
       }
-      $field = field_create_field($field);
+      field_create_field($field);
     }
 
     // Create the instance.
@@ -505,7 +507,7 @@ function access_access_scheme_insert($scheme) {
         'description' => filter_xss($scheme->description),
         'required' => TRUE,
       );
-      $instance = field_create_instance($instance);
+      field_create_instance($instance);
     }
   }
 }
@@ -689,6 +691,7 @@ function access_field_allowed_values($field) {
     $scheme = access_scheme_machine_name_load(reset($field['bundles']['access_grant']));
     return $scheme->realms;
   }
+  return array();
 }
 
 /**
@@ -823,12 +826,14 @@ function access_handler_info() {
   // @todo Make all of the _info() functions consistent.
   $info = &drupal_static(__FUNCTION__, array());
   if (empty($info)) {
-    if ($cache = cache_get('access_handler_info')) {
+    $cache = cache_get('access_handler_info');
+    if ($cache) {
       $info = $cache->data;
     }
     else {
       foreach (module_implements('access_handler_info') as $module) {
-        if ($module_info = module_invoke($module, 'access_handler_info')) {
+        $module_info = module_invoke($module, 'access_handler_info');
+        if ($module_info) {
           foreach ($module_info as $handler_name => $handler_info) {
             // Merge in default values.
             $module_info[$handler_name] += array(
@@ -869,7 +874,7 @@ function access_handler_info() {
  *   (SAVED_NEW) or updated (SAVED_UPDATED).
  */
 function access_handler_save($scheme, $object_type, $class, $module, $settings = array()) {
-  // The scheme and object type pairing must be unique (i.e., there cannnot be
+  // The scheme and object type pairing must be unique (i.e., there cannot be
   // more than one handler for a given object type attached to the scheme).
   $key = array(
     'scheme' => $scheme->machine_name,
@@ -946,13 +951,15 @@ function access_handler_form_ajax($form, $form_state) {
 function access_info() {
   $info = &drupal_static(__FUNCTION__, array());
   if (empty($info)) {
-    if ($cache = cache_get('access_info')) {
+    $cache = cache_get('access_info');
+    if ($cache) {
       $info = $cache->data;
     }
     else {
       $handlers = access_handler_info();
       foreach (module_implements('access_info') as $module) {
-        if ($module_info = module_invoke($module, 'access_info')) {
+        $module_info = module_invoke($module, 'access_info');
+        if ($module_info) {
           foreach ($module_info as $object_type => $object_info) {
             $info[$object_type]['label'] = $object_info['label'];
             $info[$object_type]['type'] = $object_type;

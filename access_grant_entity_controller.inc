@@ -94,7 +94,8 @@ class AccessGrantEntityController extends DrupalDefaultEntityController {
   public function delete($gid) {
     $transaction = db_transaction();
     try {
-      if ($grant = entity_load_unchanged('access_grant', $gid)) {
+      $grant = entity_load_unchanged('access_grant', $gid);
+      if ($grant) {
         module_invoke_all('access_grant_delete', $grant);
         module_invoke_all('entity_delete', $grant, 'access_grant');
         field_attach_delete('access_grant', $grant);

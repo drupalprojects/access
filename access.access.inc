@@ -87,7 +87,8 @@ function access_access_realm_settings($realm_type, $has_data, $values = array())
     case 'list_integer':
     case 'list_float':
     case 'list_text':
-      if ($fields = field_read_fields(array('type' => $realm_type))) {
+      $fields = field_read_fields(array('type' => $realm_type));
+      if ($fields) {
         $options = drupal_map_assoc(array_keys($fields));
         $form['field'] = array(
           '#type' => 'select',

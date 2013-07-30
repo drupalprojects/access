@@ -151,7 +151,7 @@ function access_admin_grants_validate($form, &$form_state) {
  */
 function access_admin_grants_submit($form, &$form_state) {
   // Filter out unchecked grants.
-  $grants = array_filter($form_state['values']['grants']);
+  array_filter($form_state['values']['grants']);
 
   if ($form_state['values']['op'] == t('Delete selected grants')) {
     $form_state['values']['operation'] = 'delete';
@@ -332,7 +332,7 @@ function access_admin_grants_filters() {
  */
 function access_admin_grants_build_filter_query(SelectQueryInterface $query) {
   $filter_data = isset($_SESSION['access_overview_grant_filter']) ? $_SESSION['access_overview_grant_filter'] : array();
-  foreach ($filter_data as $index => $filter) {
+  foreach ($filter_data as $filter) {
     list($key, $value) = $filter;
     switch ($key) {
       case 'rid':
@@ -640,9 +640,8 @@ function access_grant_form_submit($form, &$form_state) {
  * @see access_grant_form_validate()
  */
 function access_grant_form_delete_submit($form, &$form_state) {
-  $destination = array();
   if (isset($_GET['destination'])) {
-    $destination = drupal_get_destination();
+    drupal_get_destination();
     unset($_GET['destination']);
   }
   $grant = $form_state['grant'];

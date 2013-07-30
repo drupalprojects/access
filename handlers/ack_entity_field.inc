@@ -50,10 +50,13 @@ class ACKEntityField extends AccessControlKitHandler {
    */
   public function objectRealms($object_type, $object) {
     $values = array();
-    if (!empty($this->field_name) && ($items = field_get_items($object_type, $object, $this->field_name))) {
-      foreach ($items as $item) {
-        if (isset($item[$this->field_value_key])) {
-          $values[] = $item[$this->field_value_key];
+    if (!empty($this->field_name)) {
+      $items = field_get_items($object_type, $object, $this->field_name);
+      if (is_array($items)) {
+        foreach ($items as $item) {
+          if (isset($item[$this->field_value_key])) {
+            $values[] = $item[$this->field_value_key];
+          }
         }
       }
     }
