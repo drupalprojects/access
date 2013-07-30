@@ -88,6 +88,9 @@ class AccessSchemeInterfaceTest extends AccessWebTestCase {
   protected $admin_user;
   protected $ack_role_rid;
 
+  /**
+   * Implements getInfo(), required method for SimpleTest.
+   */
   public static function getInfo() {
     return array(
       'name' => 'Access scheme interface',
@@ -96,6 +99,9 @@ class AccessSchemeInterfaceTest extends AccessWebTestCase {
     );
   }
 
+  /**
+   * Overrides DrupalWebTestCase::setUp().
+   */
   public function setUp() {
     // Enable the access control kit module.
     parent::setUp(array('access'));
@@ -229,6 +235,9 @@ class AccessSchemeFunctionTest extends AccessWebTestCase {
 
   protected $schemes;
 
+  /**
+   * Implements getInfo(), required method for SimpleTest.
+   */
   public static function getInfo() {
     return array(
       'name' => 'Access schemes',
@@ -237,6 +246,9 @@ class AccessSchemeFunctionTest extends AccessWebTestCase {
     );
   }
 
+  /**
+   * Overrides DrupalWebTestCase::setUp().
+   */
   public function setUp() {
     // Enable the access control kit module.
     parent::setUp(array('access'));
@@ -375,6 +387,9 @@ class AccessAPITest extends AccessWebTestCase {
   protected $ack_role;
   protected $scheme;
 
+  /**
+   * Implements getInfo(), required method for SimpleTest.
+   */
   public static function getInfo() {
     return array(
       'name' => 'Access control kit API',
@@ -383,6 +398,9 @@ class AccessAPITest extends AccessWebTestCase {
     );
   }
 
+  /**
+   * Overrides DrupalWebTestCase::setUp().
+   */
   public function setUp() {
     // Enable the access control kit module and our dummy test module.
     parent::setUp(array('access', 'access_test'));
