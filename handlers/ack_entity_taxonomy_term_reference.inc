@@ -26,8 +26,8 @@ class ACKEntityTaxonomyTermReference extends ACKEntityField {
     $this->field_name = isset($settings['field_name']) ? $settings['field_name'] : NULL;
     // Taxonomy term reference fields use 'tid' as the value key.
     $this->field_value_key = 'tid';
-    // Get the vocabulary from the realm settings.
-    $this->vocabulary = isset($scheme->realm_field['settings']['arguments']['vocabulary']) ? $scheme->realm_field['settings']['arguments']['vocabulary'] : NULL;
+    // Get the vocabulary from the scheme settings.
+    $this->vocabulary = isset($scheme->settings['vocabulary']) ? $scheme->settings['vocabulary'] : NULL;
   }
 
   /**

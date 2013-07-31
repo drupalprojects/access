@@ -154,13 +154,12 @@ function access_scheme_form($form, &$form_state, $scheme) {
     '#disabled' => !$is_new,
   );
 
-  // Add the realm settings elements, if such exist.
-  $realm_settings = isset($scheme->realm_field) ? $scheme->realm_field['settings']['arguments'] : array();
-  $realm_elements = module_invoke($scheme->realm_info['module'], 'access_realm_settings', $scheme->realm_type, $has_data, $realm_settings);
-  if (!empty($realm_elements)) {
-    $form['realm_settings'] = $realm_elements;
-    $form['realm_settings']['#type'] = 'container';
-    $form['realm_settings']['#tree'] = TRUE;
+  // Add any additional settings defined for this realm type.
+  $settings = module_invoke($scheme->realm_info['module'], 'access_realm_settings', $scheme->realm_type, $has_data, $scheme->settings);
+  if (!empty($settings)) {
+    $form['settings'] = $settings;
+    $form['settings']['#type'] = 'container';
+    $form['settings']['#tree'] = TRUE;
   }
 
   // Description.

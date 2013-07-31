@@ -23,6 +23,7 @@ class AccessSchemeEntityController extends DrupalDefaultEntityController {
     $scheme->name = empty($values['name']) ? '' : $values['name'];
     $scheme->realm_type = empty($values['realm_type']) ? '' : $values['realm_type'];
     $scheme->description = empty($values['description']) ? '' : $values['description'];
+    $scheme->settings = array();
     return $scheme;
   }
 
@@ -35,10 +36,13 @@ class AccessSchemeEntityController extends DrupalDefaultEntityController {
     unset($roles[DRUPAL_AUTHENTICATED_RID]);
 
     foreach ($schemes as $scheme) {
+      // Make sure the settings property is an array.
+      $scheme->settings = isset($scheme->settings) ? unserialize($scheme->settings) : array();
+
       // Attach realm information.
       $scheme->realm_field = field_info_field(_access_realm_field_name($scheme));
       $scheme->realm_info = access_realm_info($scheme->realm_type);
-      $scheme->realms = module_invoke($scheme->realm_info['module'], 'access_realms', $scheme->realm_type, $scheme->realm_field['settings']['arguments']);
+      $scheme->realms = module_invoke($scheme->realm_info['module'], 'access_realms', $scheme->realm_type, $scheme->settings);
 
       // Attach role information.
       $scheme_roles = variable_get('access_scheme_roles_' . $scheme->machine_name, array());
@@ -68,6 +72,7 @@ class AccessSchemeEntityController extends DrupalDefaultEntityController {
    *   - name: The human-readable name of the scheme.
    *   - realm_type: The type of object or value that defines the access realms.
    *   - description: A description of the access scheme.
+   *   - settings: (optional) An array of additional scheme settings.
    *   - original: (optional) The original scheme object before any changes were
    *     applied. When omitted, the unchanged scheme object is loaded from the
    *     database and stored in the property.
@@ -83,6 +88,11 @@ class AccessSchemeEntityController extends DrupalDefaultEntityController {
       // Prevent leading and trailing spaces in scheme names.
       if (!empty($scheme->name)) {
         $scheme->name = trim($scheme->name);
+      }
+
+      // Make sure the settings property is valid.
+      if (!isset($scheme->settings) || !is_array($scheme->settings)) {
+        $scheme->settings = array();
       }
 
       // Load the stored scheme, if any.

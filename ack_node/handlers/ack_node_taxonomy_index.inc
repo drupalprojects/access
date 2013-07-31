@@ -22,8 +22,8 @@ class ACKNodeTaxonomyIndex extends AccessControlKitHandler {
    */
   public function __construct($scheme, array $settings = array()) {
     parent::__construct($scheme, $settings);
-    // Get the vocabulary from the realm settings.
-    $this->vocabulary = isset($scheme->realm_field['settings']['arguments']['vocabulary']) ? $scheme->realm_field['settings']['arguments']['vocabulary'] : NULL;
+    // Get the vocabulary from the scheme settings.
+    $this->vocabulary = isset($scheme->settings['vocabulary']) ? $scheme->settings['vocabulary'] : NULL;
   }
 
   /**

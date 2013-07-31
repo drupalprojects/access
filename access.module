@@ -483,16 +483,7 @@ function access_access_scheme_insert($scheme) {
         'entity_types' => array('access_grant'),
         'cardinality' => FIELD_CARDINALITY_UNLIMITED,
         'locked' => TRUE,
-        // @todo Move settings to the scheme?
-        'settings' => array(
-          'arguments' => isset($realm_info['arguments']) ? $realm_info['arguments'] : array(),
-        ),
       );
-      // If the realm field is configurable, merge in any available field
-      // settings attached to the scheme.
-      if (!empty($field['settings']['arguments']) && isset($scheme->realm_settings)) {
-        $field['settings']['arguments'] = array_merge($field['settings']['arguments'], $scheme->realm_settings);
-      }
       field_create_field($field);
     }
 
@@ -509,20 +500,6 @@ function access_access_scheme_insert($scheme) {
       );
       field_create_instance($instance);
     }
-  }
-}
-
-/**
- * Implements hook_access_scheme_update().
- */
-function access_access_scheme_update($scheme) {
-  // If the realm field is configurable, merge in any available field settings
-  // attached to the scheme.
-  // @todo Move settings to the scheme?
-  $field = $scheme->realm_field;
-  if (!empty($field['settings']['arguments']) && isset($scheme->realm_settings)) {
-    $field['settings']['arguments'] = array_merge($field['settings']['arguments'], $scheme->realm_settings);
-    field_update_field($field);
   }
 }
 
@@ -597,19 +574,13 @@ function _access_realm_field_name($scheme) {
  * @see list_field_info()
  */
 function access_field_info() {
-  // @todo Replace these with normal list fields (and move custom settings to the scheme?).
-  $settings = array(
-    'arguments' => array(),
-  );
-
-  // These are similar to the field types defined in list.module, but with an
-  // 'arguments' setting to be used by ACK realm plugins and 'no_ui' set to
-  // prevent access fields from being reused in other scheme bundles.
+  // @todo Replace these with normal list fields.
+  // These are similar to the field types defined in list.module, but with
+  // 'no_ui' set to prevent access fields from being reused in other bundles.
   return array(
     'access_integer' => array(
       'label' => t('Access control kit realm (integer)'),
       'description' => t('Controls access via an integer value.'),
-      'settings' => $settings,
       'default_widget' => 'options_buttons',
       'default_formatter' => 'access_default',
       'no_ui' => TRUE,
@@ -617,7 +588,6 @@ function access_field_info() {
     'access_float' => array(
       'label' => t('Access control kit realm (float)'),
       'description' => t('Controls access via a float value.'),
-      'settings' => $settings,
       'default_widget' => 'options_buttons',
       'default_formatter' => 'access_default',
       'no_ui' => TRUE,
@@ -625,7 +595,6 @@ function access_field_info() {
     'access_text' => array(
       'label' => t('Access control kit realm (text)'),
       'description' => t('Controls access via a text value.'),
-      'settings' => $settings,
       'default_widget' => 'options_buttons',
       'default_formatter' => 'access_default',
       'no_ui' => TRUE,
@@ -633,7 +602,6 @@ function access_field_info() {
     'access_boolean' => array(
       'label' => t('Access control kit realm (boolean)'),
       'description' => t('Controls access via a boolean value.'),
-      'settings' => $settings,
       'default_widget' => 'options_buttons',
       'default_formatter' => 'access_default',
       'no_ui' => TRUE,
@@ -716,24 +684,6 @@ function access_field_widget_info_alter(&$info) {
  */
 function access_options_list($field, $instance, $entity_type, $entity) {
   return access_field_allowed_values($field);
-}
-
-/**
- * Implements hook_field_settings_form().
- *
- * @see hook_access_realm_settings()
- */
-function access_field_settings_form($field, $instance, $has_data) {
-  // @todo Move settings to the scheme?
-  $form = array();
-  // Make sure the field is an access field.
-  // Only supports a one-to-one relationship between schemes and access fields.
-  if (!empty($field['bundles']['access_grant'])) {
-    $scheme = access_scheme_machine_name_load(reset($field['bundles']['access_grant']));
-    $form['arguments'] = module_invoke($scheme->realm_info['module'], 'access_realm_settings', $scheme->realm_type, $has_data, $field['settings']['arguments']);
-    $form['arguments']['#tree'] = TRUE;
-  }
-  return $form;
 }
 
 /**

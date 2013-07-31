@@ -28,7 +28,6 @@ function access_access_realm_info() {
       if ($exists) {
         $info['list_' . $type] = array(
           'field_type' => 'access_' . $type,
-          'arguments' => array('field_name' => ''),
         );
         switch ($type) {
           case 'integer':
@@ -62,7 +61,6 @@ function access_access_realm_info() {
         'label' => t('Taxonomy'),
         'field_type' => 'access_integer',
         // @todo Support cascading hierarchical privileges as an option.
-        'arguments' => array('vocabulary' => ''),
         'description' => t('A <em>taxonomy</em> scheme controls access based on the terms of a selected vocabulary. You will be able to grant access to any ACK-supported fieldable entity based on the terms associated with that entity through a taxonomy term reference field. ACK modules that support non-fieldable objects (such as the ACK menu module, for menu links) may also provide the ability to map those objects to a term.'),
       );
     }
@@ -90,7 +88,7 @@ function access_access_realm_settings($realm_type, $has_data, $values = array())
       $fields = field_read_fields(array('type' => $realm_type));
       if ($fields) {
         $options = drupal_map_assoc(array_keys($fields));
-        $form['field'] = array(
+        $form['field_name'] = array(
           '#type' => 'select',
           '#title' => t('List field'),
           '#description' => t('The allowed values list from this field will become the access realms for the scheme.'),
@@ -126,7 +124,7 @@ function access_access_realm_settings($realm_type, $has_data, $values = array())
 /**
  * Implements hook_access_realms().
  */
-function access_access_realms($realm_type, $arguments = array()) {
+function access_access_realms($realm_type, $settings = array()) {
   $values = array();
   switch ($realm_type) {
     case 'boolean':
@@ -136,16 +134,16 @@ function access_access_realms($realm_type, $arguments = array()) {
     case 'list_integer':
     case 'list_float':
     case 'list_text':
-      if (module_exists('list') && !empty($arguments['field_name']) && $field = field_info_field($arguments['field_name'])) {
+      if (module_exists('list') && !empty($settings['field_name']) && $field = field_info_field($settings['field_name'])) {
         $values = list_allowed_values($field);
       }
       break;
 
     case 'taxonomy_term':
-      if (module_exists('taxonomy') && !empty($arguments['vocabulary'])) {
+      if (module_exists('taxonomy') && !empty($settings['vocabulary'])) {
         // Re-use the allowed values function for term reference fields.
         $field = array();
-        $field['settings']['allowed_values'][] = array('vocabulary' => $arguments['vocabulary'], 'parent' => 0);
+        $field['settings']['allowed_values'][] = array('vocabulary' => $settings['vocabulary'], 'parent' => 0);
         $values = taxonomy_allowed_values($field);
       }
       break;

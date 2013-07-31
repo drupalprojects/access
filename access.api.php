@@ -131,11 +131,6 @@ function hook_access_handler_info_alter(&$info) {
  *     field types are access_boolean, access_integer, access_float, and
  *     access_text.
  *   - description: (optional) A translated string describing the realm type.
- *   - arguments: (optional) An array defining additional settings needed to
- *     configure the realm type.  Keys are the names of the settings variables
- *     and values are the default, unconfigured values for those variables.
- *     Module should implement hook_access_realm_settings() to provide a form
- *     for configuring these settings.
  *
  * @see access_realm_info()
  * @see hook_access_realm_info_alter()
@@ -143,7 +138,6 @@ function hook_access_handler_info_alter(&$info) {
  * @see hook_access_realms()
  */
 function hook_access_realm_info() {
-// @todo Is the arguments parameter even needed, or can we just take the submitted values of the settings form?
 // @todo Replace hook_access_realm_settings() and hook_access_realms() with callback parameters?
   // Allow taxonomy vocabularies to be used as realm lists for access schemes.
   // Note that the field_type is an integer because the primary identifier for a
@@ -151,7 +145,6 @@ function hook_access_realm_info() {
   $info['taxonomy_term'] = array(
     'label' => t('Taxonomy'),
     'field_type' => 'access_integer',
-    'arguments' => array('vocabulary' => ''),
     'description' => t('A <em>taxonomy</em> scheme controls access based on the terms of a selected vocabulary.'),
   );
   return $info;
@@ -177,10 +170,10 @@ function hook_access_realm_info_alter(&$info) {
 /**
  * Provides the form elements needed to configure the realm list for a scheme.
  *
- * Modules that define an access realm type that requires additional settings
- * (as defined by the 'arguments' property in hook_access_realm_info()), should
- * implement this hook to provide the form elements needed to configure those
- * settings.
+ * Modules that define an access realm type in hook_access_realm_info() may use
+ * this hook to implement custom settings for the realm type. These form fields
+ * will be displayed on the add/edit form for schemes based on the realm type,
+ * and the submitted values will be stored in $scheme->settings.
  *
  * @param $realm_type
  *   The name of the access realm type being configured.
@@ -188,12 +181,10 @@ function hook_access_realm_info_alter(&$info) {
  *   Boolean indicating whether access grants already exist for the scheme that
  *   is using this realm type.
  * @param $values
- *   The current values of the realm type's arguments.
+ *   The current values of the realm type's settings.
  *
  * @return
- *   An array containing the form elements that define the realm type's settings
- *   form.  The top-level keys should correspond to the realm type's 'arguments'
- *   array in hook_access_realm_info().
+ *   An array containing the form elements for the realm type's settings.
  *
  * @see hook_access_realm_info()
  */
@@ -224,9 +215,8 @@ function hook_access_realm_settings($realm_type, $has_data, $values = array()) {
  *
  * @param $realm_type
  *   The name of the access realm type being configured.
- * @param $arguments
- *   The configured realm settings, as defined by the realm type's 'arguments'
- *   property in hook_access_realm_info(), if such exists.
+ * @param $settings
+ *   The currently configured scheme settings.
  *
  * @return
  *   An array listing the currently available access realms, where the keys are
@@ -236,11 +226,11 @@ function hook_access_realm_settings($realm_type, $has_data, $values = array()) {
  *
  * @see hook_access_realm_info()
  */
-function hook_access_realms($realm_type, $arguments = array()) {
+function hook_access_realms($realm_type, $settings = array()) {
   if ($realm_type == 'taxonomy_term') {
     // Re-use the allowed values function for term reference fields.
     $field = array();
-    $field['settings']['allowed_values'][] = array('vocabulary' => $arguments['vocabulary'], 'parent' => 0);
+    $field['settings']['allowed_values'][] = array('vocabulary' => $settings['vocabulary'], 'parent' => 0);
     return taxonomy_allowed_values($field);
   }
   return array();

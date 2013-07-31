@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Install, update, and uninstall functions for the access control kit module.
+ * Install, update and uninstall functions for the access control kit module.
  */
 
 /**
@@ -11,7 +11,7 @@
 function access_schema() {
   // The access grant (entity) table.
   $schema['access_grant'] = array(
-    'description' => 'The base table for access grants. Each combination of uid, rid, and scheme must be unique.',
+    'description' => 'The base table for access grants. Each combination of uid, rid and scheme must be unique.',
     'fields' => array(
       'gid' => array(
         'description' => 'The primary identifier for an access grant.',
@@ -95,6 +95,12 @@ function access_schema() {
         'description' => 'A brief description of this access scheme.',
         'type' => 'text',
         'not null' => FALSE,
+      ),
+      'settings' => array(
+        'description' => 'Serialized data containing scheme settings defined by the realm type.',
+        'type' => 'blob',
+        'size' => 'big',
+        'serialize' => TRUE,
       ),
     ),
     'primary key' => array('sid'),
@@ -291,4 +297,30 @@ function access_update_7103() {
     ))
     ->condition('handler', 'ACKEntityList')
     ->execute();
+}
+
+/**
+ * Move access scheme settings from field definition to {access_scheme} table.
+ */
+function access_update_7104() {
+  // Create the scheme settings field.
+  db_add_field('access_scheme', 'settings', array(
+    'description' => 'Serialized data containing scheme settings defined by the realm type.',
+    'type' => 'blob',
+    'size' => 'big',
+    'serialize' => TRUE,
+  ));
+
+  // Update the scheme and field configs.
+  foreach (access_scheme_load_multiple() as $scheme) {
+    if (!empty($scheme->realm_field['settings']['arguments'])) {
+      $settings = $scheme->realm_field['settings']['arguments'];
+      db_update('access_scheme')
+        ->fields(array('settings' => serialize($settings)))
+        ->condition('sid', $scheme->sid)
+        ->execute();
+      $scheme->realm_field['settings']['arguments'] = array();
+      field_update_field($scheme->realm_field);
+    }
+  }
 }

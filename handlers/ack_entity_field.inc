@@ -29,7 +29,7 @@ class ACKEntityField extends AccessControlKitHandler {
    */
   public function __construct($scheme, array $settings = array()) {
     parent::__construct($scheme, $settings);
-    $this->field_name = isset($scheme->realm_field['settings']['arguments']['field_name']) ? $scheme->realm_field['settings']['arguments']['field_name'] : NULL;
+    $this->field_name = isset($scheme->settings['field_name']) ? $scheme->settings['field_name'] : NULL;
     $this->field_value_key = 'value';
   }
 
