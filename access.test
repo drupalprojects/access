@@ -183,6 +183,53 @@ class AccessSchemeInterfaceTest extends AccessWebTestCase {
   }
 
   /**
+   * Confirm that realm fields are hidden from the scheme UI and Field UI.
+   */
+  function testSchemeRealmFieldsHidden() {
+    // Confirm that we're starting clean.
+    $this->drupalGet('admin/structure/access/add');
+    $this->assertNoText(t('List (integer) field'), 'The list (integer) realm type is not available.');
+
+    // Create a user account scheme, which uses a list_integer realm field.
+    $edit = array();
+    $machine_name = drupal_strtolower($this->randomName());
+    $edit['machine_name'] = $machine_name;
+    $edit['name'] = $this->randomName();
+    $this->drupalPost('admin/structure/access/add/user', $edit, t('Save access scheme and continue'));
+    $this->drupalGet('admin/structure/access');
+    $this->assertText(t('@name (Machine name: @machine_name)', array('@name' => $edit['name'], '@machine_name' => $machine_name)), 'Scheme found in the scheme admin overview listing.');
+
+    // Confirm that realm fields cannot be deleted through the Field UI.
+    $this->drupalGet('admin/structure/access/' . $machine_name . '/fields/ack_' . $machine_name . '/delete');
+    $this->assertText(t('This field is locked and cannot be deleted.'), 'Realm fields are locked.');
+
+    // Confirm that the presence of a scheme with a list_integer realm field
+    // does not make the list_integer realm type available.
+    $this->drupalGet('admin/structure/access/add');
+    $this->assertNoText(t('List (integer) field'), 'Realm fields are ignored when determining whether a list-based scheme can be created.');
+
+    // Create a valid list_integer field and confirm that the realm type does
+    // become available.
+    $field = array(
+      'field_name' => 'field_valid_list',
+      'type' => 'list_integer',
+    );
+    field_create_field($field);
+    $this->drupalGet('admin/structure/access/add');
+    $this->assertText(t('List (integer) field'), 'List-based schemes become available when usable fields are present.');
+
+    // Confirm that the scheme's realm field is hidden from the scheme UI.
+    $this->clickLink(t('List (integer) field'));
+    $this->assertNoRaw('ack_' . $machine_name, 'Realm fields are hidden when selecting the base field for a list-based scheme.');
+    $this->assertRaw($field['field_name'], 'Usable list fields are selectable on a list-based scheme.');
+
+    // Confirm that realm fields are hidden from the Field UI.
+    $scheme = $this->createScheme();
+    $this->drupalGet('admin/structure/access/' . $scheme->machine_name . '/fields');
+    $this->assertNoRaw('ack_' . $machine_name, 'Realm fields are hidden from the Field UI.');
+  }
+
+  /**
    * Test the scheme overview with no schemes.
    */
   function testSchemeOverviewEmpty() {

@@ -4,6 +4,7 @@ core = 7.x
 package = Access control kit
 dependencies[] = field
 dependencies[] = options
+dependencies[] = list
 
 ; Access grant entity controller class.
 files[] = access_grant_entity_controller.inc

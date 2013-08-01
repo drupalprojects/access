@@ -11,40 +11,38 @@
 function access_access_realm_info() {
   $info['boolean'] = array(
     'label' => t('Boolean'),
-    'field_type' => 'access_boolean',
+    'field_type' => 'list_boolean',
     'description' => t('A <em>boolean</em> scheme controls access based on a true/false value (or yes/no, checked/unchecked, etc.). For example, you could grant access to content based on the "sticky" property, or to user profiles based on the value of a boolean field provided by the list module.'),
   );
 
-  if (module_exists('list')) {
-    foreach (array('integer', 'float', 'text') as $type) {
-      // See if a field exists of this type.
-      $exists = db_select('field_config', 'f')
-        ->condition('f.type', 'list_' . $type)
-        ->condition('f.deleted', 0)
-        ->fields('f', array('id'))
-        ->range(0, 1)
-        ->execute()
-        ->fetchField();
-      if ($exists) {
-        $info['list_' . $type] = array(
-          'field_type' => 'access_' . $type,
-        );
-        switch ($type) {
-          case 'integer':
-            $info['list_' . $type]['label'] = t('List (integer) field');
-            $info['list_' . $type]['description'] = t('A <em>list (integer) field</em> scheme controls access based on the value of an integer field provided by the list module. The allowed values list of the selected field will become the access realms for the site, and you will be able to grant access based on the value of that field to any ACK-supported fieldable entity that uses the field. ACK modules that support non-fieldable objects (such as the ACK menu module, for menu links) may also provide the ability to map those objects to a list value.');
-            break;
+  foreach (array('integer', 'float', 'text') as $type) {
+    // See if a list field exists of this type.
+    $fields = field_read_fields(array('type' => 'list_' . $type));
+    // Don't include other realm fields.
+    foreach ($fields as $field_name => $field) {
+      if (!empty($field['settings']['allowed_values_function']) && $field['settings']['allowed_values_function'] == '_access_field_allowed_values') {
+        unset($fields[$field_name]);
+      }
+    }
+    if (!empty($fields)) {
+      $info['list_' . $type] = array(
+        'field_type' => 'list_' . $type,
+      );
+      switch ($type) {
+        case 'integer':
+          $info['list_' . $type]['label'] = t('List (integer) field');
+          $info['list_' . $type]['description'] = t('A <em>list (integer) field</em> scheme controls access based on the value of an integer field provided by the list module. The allowed values list of the selected field will become the access realms for the site, and you will be able to grant access based on the value of that field to any ACK-supported fieldable entity that uses the field. ACK modules that support non-fieldable objects (such as the ACK menu module, for menu links) may also provide the ability to map those objects to a list value.');
+          break;
 
-          case 'float':
-            $info['list_' . $type]['label'] = t('List (float) field');
-            $info['list_' . $type]['description'] = t('A <em>list (float) field</em> scheme controls access based on the value of a float field provided by the list module. The allowed values list of the selected field will become the access realms for the site, and you will be able to grant access based on the value of that field to any ACK-supported fieldable entity that uses the field. ACK modules that support non-fieldable objects (such as the ACK menu module, for menu links) may also provide the ability to map those objects to a list value.');
-            break;
+        case 'float':
+          $info['list_' . $type]['label'] = t('List (float) field');
+          $info['list_' . $type]['description'] = t('A <em>list (float) field</em> scheme controls access based on the value of a float field provided by the list module. The allowed values list of the selected field will become the access realms for the site, and you will be able to grant access based on the value of that field to any ACK-supported fieldable entity that uses the field. ACK modules that support non-fieldable objects (such as the ACK menu module, for menu links) may also provide the ability to map those objects to a list value.');
+          break;
 
-          case 'text':
-            $info['list_' . $type]['label'] = t('List (text) field');
-            $info['list_' . $type]['description'] = t('A <em>list (text) field</em> scheme controls access based on the value of a text field provided by the list module. The allowed values list of the selected field will become the access realms for the site, and you will be able to grant access based on the value of that field to any ACK-supported fieldable entity that uses the field. ACK modules that support non-fieldable objects (such as the ACK menu module, for menu links) may also provide the ability to map those objects to a list value.');
-            break;
-        }
+        case 'text':
+          $info['list_' . $type]['label'] = t('List (text) field');
+          $info['list_' . $type]['description'] = t('A <em>list (text) field</em> scheme controls access based on the value of a text field provided by the list module. The allowed values list of the selected field will become the access realms for the site, and you will be able to grant access based on the value of that field to any ACK-supported fieldable entity that uses the field. ACK modules that support non-fieldable objects (such as the ACK menu module, for menu links) may also provide the ability to map those objects to a list value.');
+          break;
       }
     }
   }
@@ -59,7 +57,7 @@ function access_access_realm_info() {
     if ($exists) {
       $info['taxonomy_term'] = array(
         'label' => t('Taxonomy'),
-        'field_type' => 'access_integer',
+        'field_type' => 'list_integer',
         // @todo Support cascading hierarchical privileges as an option.
         'description' => t('A <em>taxonomy</em> scheme controls access based on the terms of a selected vocabulary. You will be able to grant access to any ACK-supported fieldable entity based on the terms associated with that entity through a taxonomy term reference field. ACK modules that support non-fieldable objects (such as the ACK menu module, for menu links) may also provide the ability to map those objects to a term.'),
       );
@@ -68,7 +66,7 @@ function access_access_realm_info() {
 
   $info['user'] = array(
     'label' => t('User account'),
-    'field_type' => 'access_integer',
+    'field_type' => 'list_integer',
     'description' => t('A <em>user account</em> scheme controls access to ACK-supported objects based on the users associated with those objects. For example, you could grant User A access to all content authored by User B.'),
   );
   // @todo Support access to nodes based on authorship, menu items based on the authorship of the node it links to, etc. (ex. "You can edit any nodes written by Bob and any menu links that point to them.").
@@ -86,7 +84,13 @@ function access_access_realm_settings($realm_type, $has_data, $values = array())
     case 'list_float':
     case 'list_text':
       $fields = field_read_fields(array('type' => $realm_type));
-      if ($fields) {
+      // Don't include other realm fields.
+      foreach ($fields as $field_name => $field) {
+        if (!empty($field['settings']['allowed_values_function']) && $field['settings']['allowed_values_function'] == '_access_field_allowed_values') {
+          unset($fields[$field_name]);
+        }
+      }
+      if (!empty($fields)) {
         $options = drupal_map_assoc(array_keys($fields));
         $form['field_name'] = array(
           '#type' => 'select',
@@ -134,7 +138,7 @@ function access_access_realms($realm_type, $settings = array()) {
     case 'list_integer':
     case 'list_float':
     case 'list_text':
-      if (module_exists('list') && !empty($settings['field_name']) && $field = field_info_field($settings['field_name'])) {
+      if (!empty($settings['field_name']) && $field = field_info_field($settings['field_name'])) {
         $values = list_allowed_values($field);
       }
       break;
@@ -162,14 +166,13 @@ function access_access_handler_info() {
   // Generic Field API handler.
   $info['ACKEntityField'] = array(
     'label' => t('Field instance'),
-    'realm types' => array(),
+    'realm types' => array(
+      'list_integer',
+      'list_float',
+      'list_text',
+    ),
     'object types' => array('fieldable entity'),
   );
-  if (module_exists('list')) {
-    $info['ACKEntityField']['realm types'][] = 'list_integer';
-    $info['ACKEntityField']['realm types'][] = 'list_float';
-    $info['ACKEntityField']['realm types'][] = 'list_text';
-  }
 
   // Handler for taxonomy term reference fields.
   if (module_exists('taxonomy')) {

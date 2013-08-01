@@ -128,8 +128,7 @@ function hook_access_handler_info_alter(&$info) {
  *   properties of those types that are needed by the access control kit module:
  *   - label: The human-readable name of the realm type.
  *   - field_type: The type of field that is used to store realm values.  Valid
- *     field types are access_boolean, access_integer, access_float, and
- *     access_text.
+ *     field types are list_boolean, list_integer, list_float, and list_text.
  *   - description: (optional) A translated string describing the realm type.
  *
  * @see access_realm_info()
@@ -144,7 +143,7 @@ function hook_access_realm_info() {
   // taxonomy term is its tid.
   $info['taxonomy_term'] = array(
     'label' => t('Taxonomy'),
-    'field_type' => 'access_integer',
+    'field_type' => 'list_integer',
     'description' => t('A <em>taxonomy</em> scheme controls access based on the terms of a selected vocabulary.'),
   );
   return $info;

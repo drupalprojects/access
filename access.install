@@ -165,51 +165,6 @@ function access_schema() {
 }
 
 /**
- * Implements hook_field_schema().
- *
- * @see list_field_schema()
- */
-function access_field_schema($field) {
-  // This is basically the same as list_field_schema() from core's list module,
-  // but with the type strings changed.  Unfortunately, we can't reuse list's
-  // definitions because we need 'no_ui' and custom 'settings' on our fields.
-  switch ($field['type']) {
-    case 'access_text':
-      $columns = array(
-        'value' => array(
-          'type' => 'varchar',
-          'length' => 255,
-          'not null' => FALSE,
-        ),
-      );
-      break;
-    case 'access_float':
-      $columns = array(
-        'value' => array(
-          'type' => 'float',
-          'not null' => FALSE,
-        ),
-      );
-      break;
-    case 'access_integer':
-    case 'access_boolean':
-      $columns = array(
-        'value' => array(
-          'type' => 'int',
-          'not null' => FALSE,
-        ),
-      );
-      break;
-  }
-  return array(
-    'columns' => $columns,
-    'indexes' => array(
-      'value' => array('value'),
-    ),
-  );
-}
-
-/**
  * Implements hook_uninstall().
  */
 function access_uninstall() {
@@ -323,4 +278,46 @@ function access_update_7104() {
       field_update_field($scheme->realm_field);
     }
   }
+}
+
+/**
+ * Convert access control kit fields to standard list fields.
+ */
+function access_update_7105() {
+  if (!module_exists('list')) {
+    module_enable(array('list'));
+  }
+
+  $map = array(
+    'access_integer' => 'list_integer',
+    'access_float'   => 'list_float',
+    'access_text'    => 'list_text',
+    'access_boolean' => 'list_boolean',
+  );
+
+  $query = db_select('field_config', 'f');
+  $query
+    ->fields('f')
+    ->condition('f.type', array_keys($map), 'IN');
+  $result = $query->execute();
+  foreach ($result as $field) {
+    $update = array();
+    $update['type'] = $map[$field->type];
+    $update['module'] = 'list';
+
+    $data = unserialize($field->data);
+    $data['settings'] = array(
+      'allowed_values' => array(),
+      'allowed_values_function' => '_access_field_allowed_values',
+    );
+    $update['data'] = serialize($data);
+
+    db_update('field_config')
+      ->fields($update)
+      ->condition('id', $field->id)
+      ->execute();
+  }
+
+  field_cache_clear(TRUE);
+  drupal_static_reset('access_realm_info');
 }
