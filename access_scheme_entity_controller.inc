@@ -21,7 +21,7 @@ class AccessSchemeEntityController extends DrupalDefaultEntityController {
     $scheme->sid = NULL;
     $scheme->machine_name = empty($values['machine_name']) ? '' : $values['machine_name'];
     $scheme->name = empty($values['name']) ? '' : $values['name'];
-    $scheme->realm_type = empty($values['realm_type']) ? '' : $values['realm_type'];
+    $scheme->type = empty($values['type']) ? '' : $values['type'];
     $scheme->description = empty($values['description']) ? '' : $values['description'];
     $scheme->settings = array();
     return $scheme;
@@ -39,10 +39,12 @@ class AccessSchemeEntityController extends DrupalDefaultEntityController {
       // Make sure the settings property is an array.
       $scheme->settings = isset($scheme->settings) ? unserialize($scheme->settings) : array();
 
+      // Attach scheme type definition.
+      $scheme->info = access_scheme_info($scheme->type);
+
       // Attach realm information.
       $scheme->realm_field = field_info_field(_access_realm_field_name($scheme));
-      $scheme->realm_info = access_realm_info($scheme->realm_type);
-      $scheme->realms = module_invoke($scheme->realm_info['module'], 'access_realms', $scheme->realm_type, $scheme->settings);
+      $scheme->realms = module_invoke($scheme->info['module'], 'access_realms', $scheme->type, $scheme->settings);
 
       // Attach role information.
       $scheme_roles = variable_get('access_scheme_roles_' . $scheme->machine_name, array());
@@ -70,7 +72,7 @@ class AccessSchemeEntityController extends DrupalDefaultEntityController {
    *     $scheme->sid is empty or omitted, a new scheme will be inserted.
    *   - machine_name: The unique, machine-readable name of the scheme.
    *   - name: The human-readable name of the scheme.
-   *   - realm_type: The type of object or value that defines the access realms.
+   *   - type: The type of object or value that defines the scheme's realms.
    *   - description: A description of the access scheme.
    *   - settings: (optional) An array of additional scheme settings.
    *   - original: (optional) The original scheme object before any changes were
@@ -100,11 +102,11 @@ class AccessSchemeEntityController extends DrupalDefaultEntityController {
         $scheme->original = entity_load_unchanged('access_scheme', $scheme->sid);
       }
 
-      // The machine name and realm type are not editable after creation.
+      // The machine name and type are not editable after creation.
       // @todo Allow machine name to change by changing grants (and handlers?) to reference sid instead of machine name?  Doing so might also make the static cache in _machine_name_load() unnecessary.
       if (!empty($scheme->original)) {
         $scheme->machine_name = $scheme->original->machine_name;
-        $scheme->realm_type = $scheme->original->realm_type;
+        $scheme->type = $scheme->original->type;
       }
 
       module_invoke_all('access_scheme_presave', $scheme);

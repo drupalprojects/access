@@ -6,7 +6,7 @@
  */
 
 /**
- * Controls access to a fieldable entity based on a Fields API field.
+ * Controls access to a fieldable entity based on a Field API field.
  */
 class ACKEntityField extends AccessControlKitHandler {
 

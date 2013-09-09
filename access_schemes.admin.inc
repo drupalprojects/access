@@ -58,7 +58,7 @@ function theme_access_overview_scheme_name($variables) {
   $scheme = $variables['scheme'];
 
   $output = check_plain($scheme->name);
-  $output .= ' <small>' . t('(Machine name: @type)', array('@type' => $scheme->machine_name)) . '</small>';
+  $output .= ' <small>' . t('(Machine name: @name)', array('@name' => $scheme->machine_name)) . '</small>';
   $output .= '<div class="description">' . filter_xss_admin($scheme->description) . '</div>';
   return $output;
 }
@@ -71,11 +71,11 @@ function access_scheme_add_list() {
 
   // @todo Need some helpful instructions on the add scheme list page.
   $content = array();
-  foreach (access_realm_info() as $realm_type => $realm_info) {
-    $content[$realm_type] = array(
-      'title' => $realm_info['label'],
-      'description' => $realm_info['description'],
-      'href' => 'admin/structure/access/add/' . str_replace('_', '-', $realm_type),
+  foreach (access_scheme_info() as $type => $info) {
+    $content[$type] = array(
+      'title' => $info['label'],
+      'description' => $info['description'],
+      'href' => 'admin/structure/access/add/' . str_replace('_', '-', $type),
       'localized_options' => array(),
     );
   }
@@ -83,16 +83,16 @@ function access_scheme_add_list() {
 }
 
 /**
- * Menu page callback; add an access scheme of a given realm type.
+ * Menu page callback; add an access scheme of a given type.
  *
- * @param $realm_type_info
- *   The realm type definition.
+ * @param $info
+ *   The scheme type definition.
  */
-function access_scheme_add($realm_type_info) {
-  drupal_set_title(t('Add access scheme: <em>@type</em>', array('@type' => $realm_type_info['label'])), PASS_THROUGH);
+function access_scheme_add($info) {
+  drupal_set_title(t('Add access scheme: <em>@type</em>', array('@type' => $info['label'])), PASS_THROUGH);
 
-  $scheme = entity_get_controller('access_scheme')->create(array('realm_type' => $realm_type_info['realm_type']));
-  $scheme->realm_info = $realm_type_info;
+  $scheme = entity_get_controller('access_scheme')->create(array('type' => $info['type']));
+  $scheme->info = $info;
   return drupal_get_form('access_scheme_form', $scheme);
 }
 
@@ -154,8 +154,8 @@ function access_scheme_form($form, &$form_state, $scheme) {
     '#disabled' => !$is_new,
   );
 
-  // Add any additional settings defined for this realm type.
-  $settings = module_invoke($scheme->realm_info['module'], 'access_realm_settings', $scheme->realm_type, $has_data, $scheme->settings);
+  // Add any additional settings defined for this scheme type.
+  $settings = module_invoke($scheme->info['module'], 'access_realm_settings', $scheme->type, $has_data, $scheme->settings);
   if (!empty($settings)) {
     $form['settings'] = $settings;
     $form['settings']['#type'] = 'container';
@@ -217,10 +217,10 @@ function access_scheme_form($form, &$form_state, $scheme) {
         '#group' => 'handler_tabs',
       );
 
-      // Find handlers that support this realm type and object type.
+      // Find handlers that support this scheme type and object type.
       $handler_options = array();
       foreach ($object_info['handlers'] as $handler_class) {
-        if (isset($handler_info[$handler_class]) && in_array($scheme->realm_type, $handler_info[$handler_class]['realm types'])) {
+        if (isset($handler_info[$handler_class]) && in_array($scheme->type, $handler_info[$handler_class]['scheme types'])) {
           $handler_options[$handler_class] = $handler_info[$handler_class]['label'];
         }
       }
@@ -228,7 +228,7 @@ function access_scheme_form($form, &$form_state, $scheme) {
       if (empty($handler_options)) {
         $fieldset['#description'] = t('No handlers available.');
         $fieldset['empty'] = array(
-          '#markup' => t('No object access handlers are available to manage @object_type objects in a @realm_type scheme.', array('@object_type' => $object_info['label'], '@realm_type' => $scheme->realm_info['label'])),
+          '#markup' => t('No object access handlers are available to manage @object_type objects in a @scheme_type scheme.', array('@object_type' => $object_info['label'], '@scheme_type' => $scheme->info['label'])),
         );
       }
       else {

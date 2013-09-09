@@ -10,13 +10,13 @@
  */
 function ack_node_update_7100() {
   // Update handler names.
-  $query = db_update('access_handler')
+  db_update('access_handler')
     ->fields(array(
       'handler' => 'ACKEntityField',
     ))
     ->condition('handler', 'ACKNodeList')
     ->execute();
-  $query = db_update('access_handler')
+  db_update('access_handler')
     ->fields(array(
       'handler' => 'ACKEntityTaxonomyTermReference',
     ))

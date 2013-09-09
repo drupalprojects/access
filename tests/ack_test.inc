@@ -6,7 +6,7 @@
  */
 
 /**
- * Controls access to the fictitious cats and dogs object type.
+ * Controls access to the fictitious 'cat' and 'dog' object types.
  */
 class ACKTestMeowHandler extends AccessControlKitHandler {
 

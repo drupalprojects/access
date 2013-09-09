@@ -21,7 +21,7 @@ class AccessWebTestCase extends DrupalWebTestCase {
     $scheme = new stdClass();
     $scheme->machine_name = drupal_strtolower($this->randomName());
     $scheme->name = $this->randomName();
-    $scheme->realm_type = 'boolean';
+    $scheme->type = 'boolean';
     $scheme->description = $this->randomName();
     access_scheme_save($scheme);
     return $scheme;
@@ -188,7 +188,7 @@ class AccessSchemeInterfaceTest extends AccessWebTestCase {
   function testSchemeRealmFieldsHidden() {
     // Confirm that we're starting clean.
     $this->drupalGet('admin/structure/access/add');
-    $this->assertNoText(t('List (integer) field'), 'The list (integer) realm type is not available.');
+    $this->assertNoText(t('List (integer) field'), 'The list (integer) scheme type is not available.');
 
     // Create a user account scheme, which uses a list_integer realm field.
     $edit = array();
@@ -204,11 +204,11 @@ class AccessSchemeInterfaceTest extends AccessWebTestCase {
     $this->assertText(t('This field is locked and cannot be deleted.'), 'Realm fields are locked.');
 
     // Confirm that the presence of a scheme with a list_integer realm field
-    // does not make the list_integer realm type available.
+    // does not make the list_integer scheme type available.
     $this->drupalGet('admin/structure/access/add');
     $this->assertNoText(t('List (integer) field'), 'Realm fields are ignored when determining whether a list-based scheme can be created.');
 
-    // Create a valid list_integer field and confirm that the realm type does
+    // Create a valid list_integer field and confirm that the scheme type does
     // become available.
     $field = array(
       'field_name' => 'field_valid_list',
@@ -288,7 +288,7 @@ class AccessSchemeFunctionTest extends AccessWebTestCase {
   public static function getInfo() {
     return array(
       'name' => 'Access schemes',
-      'description' => 'Tests loading, saving, and deleting access schemes.',
+      'description' => 'Tests loading, saving and deleting access schemes.',
       'group' => 'Access control kit',
     );
   }
@@ -325,14 +325,14 @@ class AccessSchemeFunctionTest extends AccessWebTestCase {
       $this->assertEqual($scheme->sid, $loaded_scheme->sid, "[scheme $i of $count] ID is OK.");
       $this->assertEqual($scheme->machine_name, $loaded_scheme->machine_name, "[scheme $i of $count] Machine name is OK.");
       $this->assertEqual($scheme->name, $loaded_scheme->name, "[scheme $i of $count] Human-readable name is OK.");
-      $this->assertEqual($scheme->realm_type, $loaded_scheme->realm_type, "[scheme $i of $count] Realm type is OK.");
+      $this->assertEqual($scheme->type, $loaded_scheme->type, "[scheme $i of $count] Scheme type is OK.");
       $this->assertEqual($scheme->description, $loaded_scheme->description, "[scheme $i of $count] Description is OK.");
 
       // Confirm that the scheme's access realm field exists.
       $this->assertTrue(isset($loaded_scheme->realm_field) && isset($loaded_scheme->realm_field['field_name']) && $loaded_scheme->realm_field['field_name'] == _access_realm_field_name($scheme), "[scheme $i of $count] Realm field exists.");
 
-      // Confirm that realm information was attached.
-      $this->assertTrue(isset($loaded_scheme->realm_info) && isset($loaded_scheme->realm_info['realm_type']) && $loaded_scheme->realm_info['realm_type'] == 'boolean', "[scheme $i of $count] Realm info was attached.");
+      // Confirm that scheme type and realm information were attached.
+      $this->assertTrue(isset($loaded_scheme->info) && isset($loaded_scheme->info['type']) && $loaded_scheme->info['type'] == 'boolean', "[scheme $i of $count] Scheme type info was attached.");
       $this->assertTrue(isset($loaded_scheme->realms) && is_array($loaded_scheme->realms) && ($loaded_scheme->realms[0] == t('False')) && ($loaded_scheme->realms[1] == t('True')), "[scheme $i of $count] Realm values were attached.");
 
       // Confirm that role information was attached.
@@ -470,10 +470,10 @@ class AccessAPITest extends AccessWebTestCase {
     $admin_user = $this->drupalCreateUser(array('administer access schemes'));
     $this->drupalLogin($admin_user);
 
-    // Go to the "add access scheme" page and check that the boolean realm type
+    // Go to the "add access scheme" page and check that the boolean scheme type
     // label was successfully altered.
     $this->drupalGet('admin/structure/access/add');
-    $this->assertNoText(t('Boolean'), 'hook_access_realm_info_alter(): The boolean realm type info was changed.');
+    $this->assertNoText(t('Boolean'), 'hook_access_scheme_info_alter(): The boolean scheme type info was changed.');
     $this->clickLink(t('Yes or no'));
 
     // Check that the access-controllable object types and handlers were
@@ -483,7 +483,7 @@ class AccessAPITest extends AccessWebTestCase {
     $this->assertNoText(t('Kitten'), 'hook_access_info_alter(): The access-controllable object type info was changed.');
     $this->assertRaw('<option value="ACKTestMeowHandler">', 'hook_access_handler_info(): The handler was registered.');
     $this->assertText(t('@object_type access realms are determined by', array('@object_type' => t('Dog'))), 'hook_access_handler_info_alter(): The supported object types for the handler were changed.');
-    $this->assertText(t('No object access handlers are available to manage @object_type objects in a @realm_type scheme.', array('@object_type' => t('Bird'), '@realm_type' => t('Yes or no'))), 'The handler UI notifies the user when there are no available handlers.');
+    $this->assertText(t('No object access handlers are available to manage @object_type objects in a @scheme_type scheme.', array('@object_type' => t('Bird'), '@scheme_type' => t('Yes or no'))), 'The handler UI notifies the user when there are no available handlers.');
 
     // Attach the handler and confirm that the attachment was saved.
     $edit = array('handlers[cat][handler]' => 'ACKTestMeowHandler');

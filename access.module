@@ -469,9 +469,12 @@ function access_scheme_static_reset($ids = NULL) {
  * Implements hook_access_scheme_insert().
  */
 function access_access_scheme_insert($scheme) {
+  // Make sure we have the scheme type definition on the object.
+  if (empty($scheme->info)) {
+    $scheme->info = access_scheme_info($scheme->type);
+  }
   // Create the realm field for the scheme.
-  $realm_info = access_realm_info($scheme->realm_type);
-  if ($realm_info) {
+  if (!empty($scheme->info)) {
     $field_name = _access_realm_field_name($scheme);
 
     // Create the field.
@@ -479,7 +482,7 @@ function access_access_scheme_insert($scheme) {
     if (empty($field)) {
       $field = array(
         'field_name' => $field_name,
-        'type' => $realm_info['field_type'],
+        'type' => 'list_' . $scheme->info['data_type'],
         'entity_types' => array('access_grant'),
         'cardinality' => FIELD_CARDINALITY_UNLIMITED,
         'locked' => TRUE,
@@ -512,51 +515,51 @@ function access_access_scheme_insert($scheme) {
 }
 
 /**
- * Returns information on available access realm types.
+ * Returns information on available access scheme types.
  *
- * @param $realm_type
- *   (optional) A realm type string.
+ * @param $type
+ *   (optional) A scheme type string.
  *
  * @return
- *   The information array for the requested $realm_type, or FALSE if not found.
- *   If $realm_type is omitted, returns information for all available types.
+ *   The information array for the requested $type, or FALSE if not found.
+ *   If $type is omitted, returns information for all available types.
  *
- * @see hook_access_realm_info()
+ * @see hook_access_scheme_info()
  */
-function access_realm_info($realm_type = NULL) {
+function access_scheme_info($type = NULL) {
   $types = &drupal_static(__FUNCTION__);
   if (!isset($types)) {
     $types = array();
-    foreach (module_implements('access_realm_info') as $module) {
-      $info = module_invoke($module, 'access_realm_info');
-      foreach (array_keys($info) as $type) {
-        if (!isset($info[$type]['description'])) {
-          $info[$type]['description'] = '';
+    foreach (module_implements('access_scheme_info') as $module) {
+      foreach (module_invoke($module, 'access_scheme_info') as $type_name => $type_info) {
+        if (!isset($type_info['description'])) {
+          $type_info['description'] = '';
         }
-        $info[$type]['module'] = $module;
-        $info[$type]['realm_type'] = $type;
+        $type_info['module'] = $module;
+        $type_info['type'] = $type_name;
+
+        $types[$type_name] = $type_info;
       }
-      $types += $info;
     }
-    drupal_alter('access_realm_info', $types);
+    drupal_alter('access_scheme_info', $types);
   }
-  if (isset($realm_type)) {
-    return isset($types[$realm_type]) ? $types[$realm_type] : FALSE;
+  if (isset($type)) {
+    return isset($types[$type]) ? $types[$type] : FALSE;
   }
   return $types;
 }
 
 /**
- * Loads the info for a realm type from a URL-friendly argument.
+ * Loads the info for a scheme type from a URL-friendly argument.
  *
- * @param $realm_type
- *   A realm type string, where '_' may be replaced with '-'.
+ * @param $type
+ *   A scheme type string, where '_' may be replaced with '-'.
  *
  * @return
- *   The information array for the requested $realm_type, or FALSE if not found.
+ *   The information array for the requested $type, or FALSE if not found.
  */
-function access_realm_type_load($realm_type) {
-  return access_realm_info(str_replace('-', '_', $realm_type));
+function access_scheme_type_load($type) {
+  return access_scheme_info(str_replace('-', '_', $type));
 }
 
 /**
@@ -572,6 +575,7 @@ function access_realm_type_load($realm_type) {
  * @return
  *   The name to use for the realm field.
  */
+// @todo Move field name generation to the scheme controller.
 function _access_realm_field_name($scheme) {
   return 'ack_' . $scheme->machine_name;
 }
@@ -647,8 +651,8 @@ function access_field_extra_fields() {
  *   An array indexed by handler name where each value is an associative array
  *   with the following keys:
  *   - label: The human-readable name of this handler.
- *   - realm types: An array listing the realm types that this handler supports,
- *     as defined in hook_access_realm_info().
+ *   - scheme types: An array listing the scheme types that this handler
+ *     supports, as defined in hook_access_scheme_info().
  *   - object types: An array listing the object types that this handler
  *     supports, as defined in hook_access_info(). A value of 'fieldable entity'
  *     indicates that the handler supports all object types that are fieldable
@@ -675,7 +679,7 @@ function access_handler_info() {
             // Merge in default values.
             $module_info[$handler_name] += array(
               'label' => '',
-              'realm types' => array(),
+              'scheme types' => array(),
               'object types' => array(),
             );
             // Set inferred values.
@@ -1142,7 +1146,7 @@ function access_menu() {
     'type' => MENU_LOCAL_ACTION,
     'file' => 'access_schemes.admin.inc',
   );
-  $items['admin/structure/access/add/%access_realm_type'] = array(
+  $items['admin/structure/access/add/%access_scheme_type'] = array(
     'title' => 'Add access scheme',
     'page callback' => 'access_scheme_add',
     'page arguments' => array(4),
@@ -1196,7 +1200,7 @@ function access_hook_info() {
   $list = array(
     'access_info',
     'access_handler_info',
-    'access_realm_info',
+    'access_scheme_info',
     'access_realm_settings',
     'access_realms',
     'access_scheme_presave',

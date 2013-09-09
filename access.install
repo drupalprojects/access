@@ -84,8 +84,8 @@ function access_schema() {
         'not null' => TRUE,
         'default' => '',
       ),
-      'realm_type' => array(
-        'description' => 'The realm type used in this scheme.',
+      'type' => array(
+        'description' => 'The scheme type.',
         'type' => 'varchar',
         'length' => 255,
         'not null' => TRUE,
@@ -97,7 +97,7 @@ function access_schema() {
         'not null' => FALSE,
       ),
       'settings' => array(
-        'description' => 'Serialized data containing scheme settings defined by the realm type.',
+        'description' => 'Serialized data containing settings specific to the scheme type.',
         'type' => 'blob',
         'size' => 'big',
         'serialize' => TRUE,
@@ -193,7 +193,7 @@ function access_update_7100() {
       }
     }
   }
-  // Store the set of enabled roles for each defined scheme for backwards
+  // Store the set of enabled roles for each defined scheme for backward
   // compatibility, then purge the old variable.
   $schemes = access_scheme_names();
   foreach (array_keys($schemes) as $scheme) {
@@ -260,7 +260,7 @@ function access_update_7103() {
 function access_update_7104() {
   // Create the scheme settings field.
   db_add_field('access_scheme', 'settings', array(
-    'description' => 'Serialized data containing scheme settings defined by the realm type.',
+    'description' => 'Serialized data containing settings specific to the scheme type.',
     'type' => 'blob',
     'size' => 'big',
     'serialize' => TRUE,
@@ -319,5 +319,18 @@ function access_update_7105() {
   }
 
   field_cache_clear(TRUE);
-  drupal_static_reset('access_realm_info');
+  drupal_static_reset('access_scheme_info');
+}
+
+/**
+ * Rename {access_scheme}.realm_type to {access_scheme}.type.
+ */
+function access_update_7106() {
+  db_change_field('access_scheme', 'realm_type', 'type', array(
+    'description' => 'The scheme type.',
+    'type' => 'varchar',
+    'length' => 255,
+    'not null' => TRUE,
+    'default' => '',
+  ));
 }

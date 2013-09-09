@@ -16,20 +16,20 @@
  *
  * Modules can implement this hook to integrate various types of Drupal objects
  * (such as nodes, menu links, etc.) with the access control kit module's access
- * scheme/grants system.  It is up to the module to handle the actual mechanics
+ * scheme/grants system. It is up to the module to handle the actual mechanics
  * of that integration; implementing this hook simply notifies ACK that the
- * object types are available.  For example, the ACK node module implements this
- * hook to notify ACK that it is making nodes available for access control.  It
+ * object types are available. For example, the ACK node module implements this
+ * hook to notify ACK that it is making nodes available for access control. It
  * then implements other hooks (such as hook_access_handler_info(),
- * hook_permission(), and hook_node_access()) to provide the integration.
+ * hook_permission() and hook_node_access()) to provide the integration.
  *
  * @return
  *   An array whose keys are access-controllable object type names and whose
  *   values declare the properties of those types that are need by the access
- *   control kit module.  If the object type is a Drupal entity, the object type
- *   name should be same as the entity type name that was used as the key for
- *   its definition in hook_entity_info().  For example, if the module provides
- *   access control kit integration for nodes, then the key should be 'node'.
+ *   control kit module. If the object type is a Drupal entity, the object type
+ *   name should be the same as the entity type name that was used as the key
+ *   for its definition in hook_entity_info(). For example, if the module
+ *   provides ACK integration for nodes, the key should be 'node'.
  *
  *   The properties of the object type are declared in an array as follows:
  *   - label: The human-readable name of the object type.
@@ -49,7 +49,7 @@ function hook_access_info() {
  * Alters the access-controllable object type info.
  *
  * Modules may implement this hook to alter the information that defines the
- * types of objects that can be managed by access grants.  All properties that
+ * types of objects that can be managed by access grants. All properties that
  * are available in hook_access_info() can be altered here.
  *
  * @param $info
@@ -68,15 +68,15 @@ function hook_access_info_alter(&$info) {
  * @return
  *   An array whose keys are object access handler class names and whose values
  *   declare the properties of the handler that are needed by access control kit
- *   to attach the handler to an access scheme.  The registered classes must
+ *   to attach the handler to an access scheme. The registered classes must
  *   implement the AccessControlKitHandlerInterface.
  *
  *   The properties of the handler are declared in an array as follows:
  *   - label: The human-readable name of the handler.
- *   - realm types: An array listing the access realm types that the handler
- *     supports, as defined by hook_access_realm_info().
+ *   - scheme types: An array listing the access scheme types that the handler
+ *     supports, as defined by hook_access_scheme_info().
  *   - object types: An array listing the access-controllable object types that
- *     the handler supports, as defined by hook_access_info().  A value of
+ *     the handler supports, as defined by hook_access_info(). A value of
  *     'fieldable entity' indicates that the handler supports all object types
  *     that are fieldable entities, as defined by hook_entity_info().
  *
@@ -84,10 +84,11 @@ function hook_access_info_alter(&$info) {
  * @see hook_access_handler_info_alter()
  */
 function hook_access_handler_info() {
+  // @todo Can handler info be moved to the handler class, and then detect the available classes? Eliminates the need for this hook, but how would it be altered when modules define new scheme/object types that work with it?
   // Register the handler for the node "sticky" property.
   $info['ACKNodeSticky'] = array(
     'label' => t('Sticky'),
-    'realm types' => array('boolean'),
+    'scheme types' => array('boolean'),
     'object types' => array('node'),
   );
   return $info;
@@ -97,7 +98,7 @@ function hook_access_handler_info() {
  * Alters the access handler info.
  *
  * Modules may implement this hook to alter the information that registers
- * object access handlers for use with access schemes.  All properties that are
+ * object access handlers for use with access schemes. All properties that are
  * available in hook_access_handler_info() can be altered here.
  *
  * @param $info
@@ -111,12 +112,12 @@ function hook_access_handler_info_alter(&$info) {
 }
 
 /**
- * Informs the access control kit module about one or more realm types that
+ * Informs the access control kit module about one or more scheme types that
  * can be used to define access schemes.
  *
  * Modules can implement this hook to make various types of Drupal data
  * available to the access control kit module as the basis for defining realms
- * in an access scheme.  For example, ACK itself implements this hook to allow
+ * in an access scheme. For example, ACK itself implements this hook to allow
  * access schemes to be based on taxonomy vocabularies or the allowed values of
  * list fields.
  *
@@ -124,44 +125,44 @@ function hook_access_handler_info_alter(&$info) {
  * and may also implement hook_access_realm_settings().
  *
  * @return
- *   An array whose keys are realm type names and whose values declare the
+ *   An array whose keys are scheme type names and whose values declare the
  *   properties of those types that are needed by the access control kit module:
- *   - label: The human-readable name of the realm type.
- *   - field_type: The type of field that is used to store realm values.  Valid
- *     field types are list_boolean, list_integer, list_float, and list_text.
- *   - description: (optional) A translated string describing the realm type.
+ *   - label: The human-readable name of the scheme type.
+ *   - data_type: The data type of the realm values. Valid data types are
+ *     'boolean', 'integer', 'float' and 'text'.
+ *   - description: (optional) A translated string describing the scheme type.
  *
- * @see access_realm_info()
- * @see hook_access_realm_info_alter()
+ * @see access_scheme_info()
+ * @see hook_access_scheme_info_alter()
  * @see hook_access_realm_settings()
  * @see hook_access_realms()
  */
-function hook_access_realm_info() {
+function hook_access_scheme_info() {
 // @todo Replace hook_access_realm_settings() and hook_access_realms() with callback parameters?
   // Allow taxonomy vocabularies to be used as realm lists for access schemes.
-  // Note that the field_type is an integer because the primary identifier for a
+  // Note that the data_type is an integer because the primary identifier for a
   // taxonomy term is its tid.
   $info['taxonomy_term'] = array(
     'label' => t('Taxonomy'),
-    'field_type' => 'list_integer',
+    'data_type' => 'integer',
     'description' => t('A <em>taxonomy</em> scheme controls access based on the terms of a selected vocabulary.'),
   );
   return $info;
 }
 
 /**
- * Alters the access realm type info.
+ * Alters the access scheme type info.
  *
  * Modules may implement this hook to alter the information that defines the
- * types of data that can form the basis for an access scheme.  All properties
- * that are available in hook_access_realm_info() can be altered here.
+ * types of data that can form the basis for an access scheme. All properties
+ * that are available in hook_access_scheme_info() can be altered here.
  *
  * @param $info
- *   The access realm type info, keyed by realm type name.
+ *   The access scheme type info, keyed by scheme type name.
  *
- * @see hook_access_realm_info()
+ * @see hook_access_scheme_info()
  */
-function hook_access_realm_info_alter(&$info) {
+function hook_access_scheme_info_alter(&$info) {
   // Change the label used for taxonomy-based schemes.
   $info['taxonomy_term']['label'] = t('Tags');
 }
@@ -169,26 +170,26 @@ function hook_access_realm_info_alter(&$info) {
 /**
  * Provides the form elements needed to configure the realm list for a scheme.
  *
- * Modules that define an access realm type in hook_access_realm_info() may use
- * this hook to implement custom settings for the realm type. These form fields
- * will be displayed on the add/edit form for schemes based on the realm type,
+ * Modules that define an access scheme type in hook_access_scheme_info() may
+ * use this hook to implement custom settings for the scheme type. These form
+ * fields will be displayed on the add/edit form for schemes based on the type,
  * and the submitted values will be stored in $scheme->settings.
  *
- * @param $realm_type
- *   The name of the access realm type being configured.
+ * @param $scheme_type
+ *   The name of the access scheme type being configured.
  * @param $has_data
  *   Boolean indicating whether access grants already exist for the scheme that
- *   is using this realm type.
+ *   is using this type.
  * @param $values
- *   The current values of the realm type's settings.
+ *   The current values of the scheme type's settings.
  *
  * @return
- *   An array containing the form elements for the realm type's settings.
+ *   An array containing the form elements for the scheme type's settings.
  *
- * @see hook_access_realm_info()
+ * @see hook_access_scheme_info()
  */
-function hook_access_realm_settings($realm_type, $has_data, $values = array()) {
-  if ($realm_type == 'taxonomy_term') {
+function hook_access_realm_settings($scheme_type, $has_data, $values = array()) {
+  if ($scheme_type == 'taxonomy_term') {
     $options = array();
     foreach (taxonomy_get_vocabularies() as $vocabulary) {
       $options[$vocabulary->machine_name] = $vocabulary->name;
@@ -209,24 +210,24 @@ function hook_access_realm_settings($realm_type, $has_data, $values = array()) {
 /**
  * Returns the list of realms in an access scheme.
  *
- * Modules that implement hook_access_realm_info() must also implement this hook
- * to provide the list of realms for access schemes based on a given realm type.
+ * Modules that implement hook_access_scheme_info() must also implement this
+ * hook to provide the list of realms for access schemes based on a given type.
  *
- * @param $realm_type
- *   The name of the access realm type being configured.
+ * @param $scheme_type
+ *   The name of the access scheme type being configured.
  * @param $settings
  *   The currently configured scheme settings.
  *
  * @return
  *   An array listing the currently available access realms, where the keys are
  *   the realm values to be stored and the values are the human-readable names
- *   of the access realms.  This array will be used as the '#options' property
+ *   of the access realms. This array will be used as the '#options' property
  *   for the form element that assigns realms to an access grant.
  *
- * @see hook_access_realm_info()
+ * @see hook_access_scheme_info()
  */
-function hook_access_realms($realm_type, $settings = array()) {
-  if ($realm_type == 'taxonomy_term') {
+function hook_access_realms($scheme_type, $settings = array()) {
+  if ($scheme_type == 'taxonomy_term') {
     // Re-use the allowed values function for term reference fields.
     $field = array();
     $field['settings']['allowed_values'][] = array('vocabulary' => $settings['vocabulary'], 'parent' => 0);
@@ -257,12 +258,12 @@ function hook_access_scheme_presave($scheme) {
  * scheduled for execution.
  *
  * Note that when this hook is invoked, the changes have not yet been written to
- * the database because a database transaction is still in progress.  The
+ * the database because a database transaction is still in progress. The
  * transaction is not finalized until the save operation is entirely completed
- * and the save() method goes out of scope.  You should not rely on data in the
- * database at this time, as it has not been updated yet.  You should also note
+ * and the save() method goes out of scope. You should not rely on data in the
+ * database at this time, as it has not been updated yet. You should also note
  * that any write/update database queries executed from this hook are also not
- * committed immediately.  Check AccessSchemeEntityController::save() and
+ * committed immediately. Check AccessSchemeEntityController::save() and
  * db_transaction() for more info.
  *
  * @param $scheme
@@ -282,12 +283,12 @@ function hook_access_scheme_insert($scheme) {
  * scheduled for execution.
  *
  * Note that when this hook is invoked, the changes have not yet been written to
- * the database because a database transaction is still in progress.  The
+ * the database because a database transaction is still in progress. The
  * transaction is not finalized until the save operation is entirely completed
- * and the save() method goes out of scope.  You should not rely on data in the
- * database at this time, as it has not been updated yet.  You should also note
+ * and the save() method goes out of scope. You should not rely on data in the
+ * database at this time, as it has not been updated yet. You should also note
  * that any write/update database queries executed from this hook are also not
- * committed immediately.  Check AccessSchemeEntityController::save() and
+ * committed immediately. Check AccessSchemeEntityController::save() and
  * db_transaction() for more info.
  *
  * @param $scheme
@@ -336,12 +337,12 @@ function hook_access_grant_presave($grant) {
  * scheduled for execution and field_attach_insert() is called.
  *
  * Note that when this hook is invoked, the changes have not yet been written to
- * the database because a database transaction is still in progress.  The
+ * the database because a database transaction is still in progress. The
  * transaction is not finalized until the save operation is entirely completed
- * and the save() method goes out of scope.  You should not rely on data in the
- * database at this time, as it has not been updated yet.  You should also note
+ * and the save() method goes out of scope. You should not rely on data in the
+ * database at this time, as it has not been updated yet. You should also note
  * that any write/update database queries executed from this hook are also not
- * committed immediately.  Check AccessGrantEntityController::save() and
+ * committed immediately. Check AccessGrantEntityController::save() and
  * db_transaction() for more info.
  *
  * @param $grant
@@ -362,12 +363,12 @@ function hook_access_grant_insert($grant) {
  * scheduled for execution and field_attach_update() is called.
  *
  * Note that when this hook is invoked, the changes have not yet been written to
- * the database because a database transaction is still in progress.  The
+ * the database because a database transaction is still in progress. The
  * transaction is not finalized until the save operation is entirely completed
- * and the save() method goes out of scope.  You should not rely on data in the
- * database at this time, as it has not been updated yet.  You should also note
+ * and the save() method goes out of scope. You should not rely on data in the
+ * database at this time, as it has not been updated yet. You should also note
  * that any write/update database queries executed from this hook are also not
- * committed immediately.  Check AccessGrantEntityController::save() and
+ * committed immediately. Check AccessGrantEntityController::save() and
  * db_transaction() for more info.
  *
  * @param $grant
@@ -400,7 +401,7 @@ function hook_access_grant_delete($grant) {
 /**
  * Acts on an access grant that is being assembled before rendering.
  *
- * The module may add elements to $grant->content prior to rendering.  The
+ * The module may add elements to $grant->content prior to rendering. The
  * structure of $grant->content is a renderable array as expected by
  * drupal_render().
  *
@@ -430,7 +431,7 @@ function hook_access_grant_view($grant, $view_mode) {
  *
  * If the module wishes to act on the rendered HTML of the grant rather than the
  * structured array, it may use this hook to add a #post_render callback.
- * Alternatively, it could also implement hook_preprocess_access_grant().  See
+ * Alternatively, it could also implement hook_preprocess_access_grant(). See
  * drupal_render() and theme() documentation respectively for details.
  *
  * @param $build

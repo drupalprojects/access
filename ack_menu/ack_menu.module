@@ -18,10 +18,10 @@ function ack_menu_access_info() {
  * Implements hook_access_handler_info().
  */
 function ack_menu_access_handler_info() {
-  // Handler to map menu links to realms; should work for all realm types.
+  // Handler to map menu links to realms; should work for all scheme types.
   $info['ACKMenuMap'] = array(
     'label' => t('Map menu links to realms'),
-    'realm types' => array_keys(access_realm_info()),
+    'scheme types' => array_keys(access_scheme_info()),
     'object types' => array('menu_link'),
   );
   return $info;

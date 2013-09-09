@@ -36,7 +36,7 @@ function access_test_access_handler_info() {
   // Register a handler for one of our fictitious object types.
   $info['ACKTestMeowHandler'] = array(
     'label' => t('Meow'),
-    'realm types' => array('boolean'),
+    'scheme types' => array('boolean'),
     'object types' => array('cat'),
   );
   return $info;
@@ -53,10 +53,10 @@ function access_test_access_handler_info_alter(&$info) {
 }
 
 /**
- * Implements hook_access_realm_info_alter().
+ * Implements hook_access_scheme_info_alter().
  */
-function access_test_access_realm_info_alter(&$info) {
-  // Override the boolean realm type's info (defined in access.access.inc).
+function access_test_access_scheme_info_alter(&$info) {
+  // Override the boolean scheme type's info (defined in access.access.inc).
   if (isset($info['boolean'])) {
     $info['boolean']['label'] = t('Yes or no');
     $info['boolean']['description'] = t('Does it meow?');

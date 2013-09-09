@@ -21,12 +21,12 @@ function ack_node_access_handler_info() {
   // Handlers for node properties.
   $info['ACKNodeAuthor'] = array(
     'label' => t('Author'),
-    'realm types' => array('user'),
+    'scheme types' => array('user'),
     'object types' => array('node'),
   );
   $info['ACKNodeSticky'] = array(
     'label' => t('Sticky'),
-    'realm types' => array('boolean'),
+    'scheme types' => array('boolean'),
     'object types' => array('node'),
   );
 
@@ -34,7 +34,7 @@ function ack_node_access_handler_info() {
   if (module_exists('taxonomy')) {
     $info['ACKNodeTaxonomyIndex'] = array(
       'label' => t('Term association'),
-      'realm types' => array('taxonomy_term'),
+      'scheme types' => array('taxonomy_term'),
       'object types' => array('node'),
     );
   }

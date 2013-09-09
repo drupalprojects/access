@@ -41,7 +41,7 @@ class ACKEntityTaxonomyTermReference extends ACKEntityField {
    * Overrides AccessControlKitHandler::settingsForm().
    */
   public function settingsForm() {
-    // Find all term reference fields that work with the realm vocabulary.
+    // Find all term reference fields that work with the scheme's vocabulary.
     $options = array();
     if (!empty($this->vocabulary)) {
       $fields = field_read_fields(array('type' => 'taxonomy_term_reference'));
