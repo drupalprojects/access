@@ -69,7 +69,6 @@ function theme_access_overview_scheme_name($variables) {
 function access_scheme_add_list() {
   drupal_set_title(t('Add an access scheme'), PASS_THROUGH);
 
-  // @todo Need some helpful instructions on the add scheme list page.
   $content = array();
   foreach (access_scheme_info() as $type => $info) {
     $content[$type] = array(

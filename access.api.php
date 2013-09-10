@@ -39,7 +39,6 @@
  */
 function hook_access_info() {
 // @todo Should we also have a key to explicitly define an object type as an entity, rather than just relying on keys matching hook_entity_info()?
-// @todo Add the 'module' property as an optional key, so that module implementing the alter hook can override it?
   // Declare nodes as access-controllable objects.
   $info['node'] = array('label' => t('Content'));
   return $info;
@@ -84,7 +83,6 @@ function hook_access_info_alter(&$info) {
  * @see hook_access_handler_info_alter()
  */
 function hook_access_handler_info() {
-  // @todo Can handler info be moved to the handler class, and then detect the available classes? Eliminates the need for this hook, but how would it be altered when modules define new scheme/object types that work with it?
   // Register the handler for the node "sticky" property.
   $info['ACKNodeSticky'] = array(
     'label' => t('Sticky'),

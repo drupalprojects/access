@@ -1219,3 +1219,10 @@ function access_hook_info() {
   }
   return $hooks;
 }
+
+/**
+ * Implements hook_help().
+ */
+function access_help($path, $arg) {
+  // @todo Need some helpful instructions on the add scheme list page.
+}
