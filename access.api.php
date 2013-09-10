@@ -110,8 +110,7 @@ function hook_access_handler_info_alter(&$info) {
 }
 
 /**
- * Informs the access control kit module about one or more scheme types that
- * can be used to define access schemes.
+ * Defines access scheme types.
  *
  * Modules can implement this hook to make various types of Drupal data
  * available to the access control kit module as the basis for defining realms
@@ -119,24 +118,88 @@ function hook_access_handler_info_alter(&$info) {
  * access schemes to be based on taxonomy vocabularies or the allowed values of
  * list fields.
  *
- * Modules that implement this hook should also implement hook_access_realms(),
- * and may also implement hook_access_realm_settings().
+ * @section sec_callback_functions Callback functions
+ * The definition for each scheme type must include a realms callback function,
+ * which is invoked to find the list of realms in the scheme. The definition may
+ * also include a settings callback function, if the scheme type requires
+ * additional configuration. For example, in the taxonomy_term scheme type, the
+ * settings callback provides a form element for selecting the vocabulary that
+ * will define the scheme, and the realms callback returns a list of terms in
+ * the selected vocabulary.
+ *
+ * @subsection sub_callback_realms Realms callbacks
+ * Realms callbacks receive the scheme object as a parameter and return an array
+ * listing the currently available access realms in the scheme. The returned
+ * array will be used as the '#options' property of the realm selector on the
+ * access grant form; thus, the keys of this array are the realm values to be
+ * stored, and its values are the human-readable names of the access realms. For
+ * example, ACK defines taxonomy terms as a scheme type like so:
+ * @code
+ *   function access_access_scheme_info() {
+ *     $info['taxonomy_term'] = array(
+ *       'realms callback' => 'access_scheme_taxonomy_term_realms',
+ *       // ...
+ *     );
+ *     return $items;
+ *   }
+ *
+ *   function access_scheme_taxonomy_term_realms($scheme) {
+ *     // Re-use the allowed values function for term reference fields.
+ *     $field = array();
+ *     $field['settings']['allowed_values'][] = array('vocabulary' => $scheme->settings['vocabulary'], 'parent' => 0);
+ *     return taxonomy_allowed_values($field);
+ *   }
+ * @endcode
+ *
+ * @subsection sub_callback_settings Settings callbacks
+ * Settings callbacks receive as parameters the scheme object and a boolean
+ * indicating whether access grants already exist for the scheme. A callback
+ * should return an array containing the form elements needed to configure the
+ * scheme. These elements will be displayed on the scheme add/edit form, and the
+ * submitted values will be stored in $scheme->settings. For example, ACK
+ * configures the taxonomy term scheme type like so:
+ * @code
+ *   function access_access_scheme_info() {
+ *     $info['taxonomy_term'] = array(
+ *       'settings callback' => 'access_scheme_taxonomy_term_settings',
+ *       // ...
+ *     );
+ *     return $items;
+ *   }
+ *
+ *   function access_scheme_taxonomy_term_settings($scheme, $has_data) {
+ *     $options = array();
+ *     foreach (taxonomy_get_vocabularies() as $vocabulary) {
+ *       $options[$vocabulary->machine_name] = $vocabulary->name;
+ *     }
+ *     $form['vocabulary'] = array(
+ *       '#type' => 'select',
+ *       '#title' => t('Vocabulary'),
+ *       '#default_value' => isset($scheme->settings['vocabulary']) ? $scheme->settings['vocabulary'] : NULL,
+ *       '#options' => $options,
+ *       '#required' => TRUE,
+ *       '#disabled' => $has_data,
+ *     );
+ *     return $form;
+ *   }
+ * @endcode
  *
  * @return
- *   An array whose keys are scheme type names and whose values declare the
- *   properties of those types that are needed by the access control kit module:
+ *   An array of scheme types. Each type has a key that defines the type's
+ *   machine-readable name. The corresponding array value is an associative
+ *   array that contains the following key-value pairs:
  *   - label: The human-readable name of the scheme type.
  *   - data_type: The data type of the realm values. Valid data types are
  *     'boolean', 'integer', 'float' and 'text'.
  *   - description: (optional) A translated string describing the scheme type.
+ *   - realms callback: The name of the function that provides the realm list.
+ *   - settings callback: (optional) The name of the function that provides the
+ *     scheme type's settings form.
  *
  * @see access_scheme_info()
  * @see hook_access_scheme_info_alter()
- * @see hook_access_realm_settings()
- * @see hook_access_realms()
  */
 function hook_access_scheme_info() {
-// @todo Replace hook_access_realm_settings() and hook_access_realms() with callback parameters?
   // Allow taxonomy vocabularies to be used as realm lists for access schemes.
   // Note that the data_type is an integer because the primary identifier for a
   // taxonomy term is its tid.
@@ -144,6 +207,8 @@ function hook_access_scheme_info() {
     'label' => t('Taxonomy'),
     'data_type' => 'integer',
     'description' => t('A <em>taxonomy</em> scheme controls access based on the terms of a selected vocabulary.'),
+    'realms callback' => 'access_scheme_taxonomy_term_realms',
+    'settings callback' => 'access_scheme_taxonomy_term_settings',
   );
   return $info;
 }
@@ -163,75 +228,6 @@ function hook_access_scheme_info() {
 function hook_access_scheme_info_alter(&$info) {
   // Change the label used for taxonomy-based schemes.
   $info['taxonomy_term']['label'] = t('Tags');
-}
-
-/**
- * Provides the form elements needed to configure the realm list for a scheme.
- *
- * Modules that define an access scheme type in hook_access_scheme_info() may
- * use this hook to implement custom settings for the scheme type. These form
- * fields will be displayed on the add/edit form for schemes based on the type,
- * and the submitted values will be stored in $scheme->settings.
- *
- * @param $scheme_type
- *   The name of the access scheme type being configured.
- * @param $has_data
- *   Boolean indicating whether access grants already exist for the scheme that
- *   is using this type.
- * @param $values
- *   The current values of the scheme type's settings.
- *
- * @return
- *   An array containing the form elements for the scheme type's settings.
- *
- * @see hook_access_scheme_info()
- */
-function hook_access_realm_settings($scheme_type, $has_data, $values = array()) {
-  if ($scheme_type == 'taxonomy_term') {
-    $options = array();
-    foreach (taxonomy_get_vocabularies() as $vocabulary) {
-      $options[$vocabulary->machine_name] = $vocabulary->name;
-    }
-    $form['vocabulary'] = array(
-      '#type' => 'select',
-      '#title' => t('Vocabulary'),
-      '#default_value' => isset($values['vocabulary']) ? $values['vocabulary'] : NULL,
-      '#options' => $options,
-      '#required' => TRUE,
-      '#disabled' => $has_data,
-    );
-    return $form;
-  }
-  return array();
-}
-
-/**
- * Returns the list of realms in an access scheme.
- *
- * Modules that implement hook_access_scheme_info() must also implement this
- * hook to provide the list of realms for access schemes based on a given type.
- *
- * @param $scheme_type
- *   The name of the access scheme type being configured.
- * @param $settings
- *   The currently configured scheme settings.
- *
- * @return
- *   An array listing the currently available access realms, where the keys are
- *   the realm values to be stored and the values are the human-readable names
- *   of the access realms. This array will be used as the '#options' property
- *   for the form element that assigns realms to an access grant.
- *
- * @see hook_access_scheme_info()
- */
-function hook_access_realms($scheme_type, $settings = array()) {
-  if ($scheme_type == 'taxonomy_term') {
-    // Re-use the allowed values function for term reference fields.
-    $field = array();
-    $field['settings']['allowed_values'][] = array('vocabulary' => $settings['vocabulary'], 'parent' => 0);
-    return taxonomy_allowed_values($field);
-  }
-  return array();
 }
 
 /**

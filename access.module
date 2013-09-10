@@ -1201,8 +1201,6 @@ function access_hook_info() {
     'access_info',
     'access_handler_info',
     'access_scheme_info',
-    'access_realm_settings',
-    'access_realms',
     'access_scheme_presave',
     'access_scheme_insert',
     'access_scheme_update',

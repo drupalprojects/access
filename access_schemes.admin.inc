@@ -154,9 +154,8 @@ function access_scheme_form($form, &$form_state, $scheme) {
   );
 
   // Add any additional settings defined for this scheme type.
-  $settings = module_invoke($scheme->info['module'], 'access_realm_settings', $scheme->type, $has_data, $scheme->settings);
-  if (!empty($settings)) {
-    $form['settings'] = $settings;
+  if (!empty($scheme->info['settings callback']) && function_exists($scheme->info['settings callback'])) {
+    $form['settings'] = call_user_func_array($scheme->info['settings callback'], array($scheme, $has_data));
     $form['settings']['#type'] = 'container';
     $form['settings']['#tree'] = TRUE;
   }

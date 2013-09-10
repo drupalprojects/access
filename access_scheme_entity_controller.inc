@@ -44,7 +44,12 @@ class AccessSchemeEntityController extends DrupalDefaultEntityController {
 
       // Attach realm information.
       $scheme->realm_field = field_info_field(_access_realm_field_name($scheme));
-      $scheme->realms = module_invoke($scheme->info['module'], 'access_realms', $scheme->type, $scheme->settings);
+      if (!empty($scheme->info['realms callback']) && function_exists($scheme->info['realms callback'])) {
+        $scheme->realms = call_user_func_array($scheme->info['realms callback'], array($scheme));
+      }
+      else {
+        $scheme->realms = array();
+      }
 
       // Attach role information.
       $scheme_roles = variable_get('access_scheme_roles_' . $scheme->machine_name, array());
