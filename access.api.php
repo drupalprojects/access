@@ -38,7 +38,6 @@
  * @see hook_access_info_alter()
  */
 function hook_access_info() {
-// @todo Should we also have a key to explicitly define an object type as an entity, rather than just relying on keys matching hook_entity_info()?
   // Declare nodes as access-controllable objects.
   $info['node'] = array('label' => t('Content'));
   return $info;
