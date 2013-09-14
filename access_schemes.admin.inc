@@ -366,6 +366,7 @@ function access_scheme_form_validate($form, &$form_state) {
  */
 function access_scheme_form_submit($form, &$form_state) {
   $scheme = $form_state['scheme'];
+  $original_scheme = clone $scheme;
   form_state_values_clean($form_state);
   entity_form_submit_build_entity('access_scheme', $scheme, $form, $form_state);
   unset($scheme->handler_tabs__active_tab);
@@ -391,7 +392,7 @@ function access_scheme_form_submit($form, &$form_state) {
       // Check whether the handler element was set to the #empty_option.
       if (empty($handler_values['handler'])) {
         // If there was a handler chosen before, we need to delete it.
-        if (!empty($scheme->original) && !empty($scheme->original->handlers) && !empty($scheme->original->handlers[$object_type])) {
+        if (!empty($original_scheme->handlers) && !empty($original_scheme->handlers[$object_type])) {
           access_handler_delete($scheme, $object_type);
         }
       }
