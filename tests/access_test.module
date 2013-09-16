@@ -60,7 +60,19 @@ function access_test_access_scheme_info_alter(&$info) {
   if (isset($info['boolean'])) {
     $info['boolean']['label'] = t('Yes or no');
     $info['boolean']['description'] = t('Does it meow?');
+    $info['boolean']['settings callback'] = 'access_test_scheme_settings_callback';
   }
+}
+
+/**
+ * Settings callback for the "Yes or no" scheme.
+ */
+function access_test_scheme_settings_callback($scheme, $has_data) {
+  $form['access_test'] = array(
+    '#type' => 'markup',
+    '#markup' => $has_data ? t('The scheme has grants.') : t('The scheme does not have grants.'),
+  );
+  return $form;
 }
 
 /**

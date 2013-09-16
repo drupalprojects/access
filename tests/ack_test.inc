@@ -24,4 +24,15 @@ class ACKTestMeowHandler extends AccessControlKitHandler {
     return $object_type == 'cat' ? array(TRUE) : array(FALSE);
   }
 
+  /**
+   * Overrides AccessControlKitHandler::settingsForm().
+   */
+  public function settingsForm() {
+    $form['access_test'] = array(
+      '#type' => 'markup',
+      '#markup' => t('Meow handler settings would go here.'),
+    );
+    return $form;
+  }
+
 }

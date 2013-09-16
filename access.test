@@ -122,6 +122,7 @@ class AccessSchemeInterfaceTest extends AccessWebTestCase {
     // Create a new scheme through the admin form.
     $this->clickLink(t('Add access scheme'));
     $this->clickLink(t('Boolean'));
+    $this->assertText(t('Add access scheme: @type', array('@type' => t('Boolean'))));
     $edit = array();
     $machine_name = drupal_strtolower($this->randomName());
     $edit['machine_name'] = $machine_name;
@@ -130,16 +131,31 @@ class AccessSchemeInterfaceTest extends AccessWebTestCase {
     $edit['roles[' . $this->ack_role_rid . ']'] = TRUE;
     $this->drupalPost(NULL, $edit, t('Save access scheme and continue'));
     $this->assertRaw(t('Added access scheme %name.', array('%name' => $edit['name'])), 'Scheme created successfully.');
-
-    // Edit the scheme.
     $this->drupalGet('admin/structure/access');
     $this->assertText(t('@name (Machine name: @machine_name)', array('@name' => $edit['name'], '@machine_name' => $machine_name)), 'Scheme found in the scheme admin overview listing.');
+
+    // Edit the scheme.
     $this->clickLink(t('edit'));
+    $machine_name_disabled = $this->xpath('//input[@id=:id and @disabled="disabled"]', array(':id' => 'edit-machine-name'));
+    $this->assertTrue($machine_name_disabled, 'The machine name cannot be changed.');
     $this->assertText(t('No access-controllable objects available.'), 'Informs that no access-controllable object types have been defined.');
     $edit = array();
     $edit['name'] = $this->randomName();
     $this->drupalPost(NULL, $edit, t('Save access scheme'));
+    $this->assertRaw(t('Updated access scheme %name.', array('%name' => $edit['name'])), 'Scheme updated successfully.');
     $this->assertText(t('@name (Machine name: @machine_name)', array('@name' => $edit['name'], '@machine_name' => $machine_name)), 'Updated scheme found in the scheme admin overview listing.');
+
+    // Check integration with the Field UI.
+    $this->clickLink(t('manage fields'));
+    $this->assertText(t('Manage fields'));
+    $this->assertText(t('Access control kit user reference'));
+    $this->assertText(t('Access control kit role reference'));
+    $this->assertText('ack_' . $machine_name);
+    $this->drupalGet('admin/structure/access');
+    $this->clickLink(t('manage display'));
+    $this->assertText(t('Manage display'));
+    $this->assertText(t('User'));
+    $this->assertText(t('Role'));
 
     // Try to submit a new scheme with a duplicate human-readable name.
     $edit['machine_name'] = drupal_strtolower($this->randomName());
@@ -258,6 +274,11 @@ class AccessSchemeInterfaceTest extends AccessWebTestCase {
     $grant = $this->createGrant($scheme);
     $grant = access_grant_load($grant->gid, TRUE);
     $this->assertTrue($grant, 'Access grant found in the database.');
+
+    // Check deleting from the overview page.
+    $this->drupalGet('admin/structure/access');
+    $this->clickLink(t('delete'));
+    $this->assertRaw(t('Are you sure you want to delete the access scheme %name?', array('%name' => $scheme->name)), '[confirm deletion] Asks for confirmation.');
 
     // Delete the scheme.
     $edit = array();
@@ -476,6 +497,9 @@ class AccessAPITest extends AccessWebTestCase {
     $this->assertNoText(t('Boolean'), 'hook_access_scheme_info_alter(): The boolean scheme type info was changed.');
     $this->clickLink(t('Yes or no'));
 
+    // Check that the settings callback fired.
+    $this->assertText(t('The scheme does not have grants.'), 'Scheme settings callback was called.');
+
     // Check that the access-controllable object types and handlers were
     // successfully registered and altered.
     $this->drupalGet('admin/structure/access/' . $this->scheme->machine_name);
@@ -492,6 +516,18 @@ class AccessAPITest extends AccessWebTestCase {
     $this->assertOptionSelected('edit-handlers-cat-handler', 'ACKTestMeowHandler', 'The handler was attached to the correct object type.');
     $this->assertNoOptionSelected('edit-handlers-dog-handler', 'ACKTestMeowHandler', 'The handler was not attached to the incorrect object type.');
     $this->assertText(t('The meow handler assigns the boolean TRUE realm to cats and the boolean FALSE realm to everything else.'), 'The handler description was displayed.');
+    $this->assertText(t('Meow handler settings would go here.'), 'The handler settings method was called.');
+
+    // Detach the handler and confirm that the attachment was deleted.
+    $edit = array('handlers[cat][handler]' => '');
+    $this->drupalPost(NULL, $edit, t('Save access scheme'));
+    $this->clickLink(t('edit'));
+    $this->assertNoOptionSelected('edit-handlers-cat-handler', 'ACKTestMeowHandler', 'The handler was detached.');
+
+    // Check that the scheme settings form changes when grants are present.
+    $this->createGrant($this->scheme, $this->ack_role);
+    $this->drupalGet('admin/structure/access/' . $this->scheme->machine_name);
+    $this->assertText(t('The scheme has grants.'), 'Scheme form detects existing grants.');
   }
 
   /**
