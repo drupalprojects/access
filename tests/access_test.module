@@ -68,10 +68,7 @@ function access_test_access_scheme_info_alter(&$info) {
  * Settings callback for the "Yes or no" scheme.
  */
 function access_test_scheme_settings_callback($scheme, $has_data) {
-  $form['access_test'] = array(
-    '#type' => 'markup',
-    '#markup' => $has_data ? t('The scheme has grants.') : t('The scheme does not have grants.'),
-  );
+  $form['access_test'] = array('#markup' => $has_data ? t('The scheme has grants.') : t('The scheme does not have grants.'));
   return $form;
 }
 
