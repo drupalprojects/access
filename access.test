@@ -628,6 +628,22 @@ class AccessGrantInterfaceTest extends AccessWebTestCase {
     }
   }
 
+  /**
+   * Test the grant overview with no grants.
+   */
+  function testGrantOverviewEmpty() {
+    // Delete all grants.
+    $grants = access_grant_load_multiple(FALSE);
+    foreach ($grants as $gid => $grant) {
+      access_grant_delete($gid);
+    }
+    // Confirm that no grants remain in the database.
+    $this->assertFalse(access_grant_load_multiple(FALSE), 'No access grants found in the database.');
+    // Check the default message for no grants.
+    $this->drupalGet('admin/access');
+    $this->assertText(t('No access grants available.'), 'No access grants were found.');
+  }
+
 }
 
 /**
