@@ -71,17 +71,21 @@ function access_grant_uri($grant) {
 
 /**
  * Entity label callback for an access grant.
+ *
+ * @see callback_entity_info_label()
  */
 function access_grant_label($grant) {
   // Load the primary descriptors of the grant.
   $account = user_load($grant->uid);
   $role = user_role_load($grant->rid);
 
-  // Sanitize the descriptors.
+  // Dereference the descriptors.
   $username = empty($account) ? $grant->uid : format_username($account);
   $rolename = empty($role) ? $grant->rid : $role->name;
 
-  return t("@user's access as @role", array('@user' => $username, '@role' => $rolename));
+  // We use !token instead of @token because an entity label callback is
+  // supposed to return an unsanitized string.
+  return t("!user's access as !role", array('!user' => $username, '!role' => $rolename));
 }
 
 /**
