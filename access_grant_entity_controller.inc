@@ -62,11 +62,13 @@ class AccessGrantEntityController extends DrupalDefaultEntityController {
         $op = 'insert';
         $status = drupal_write_record('access_grant', $grant);
         field_attach_insert('access_grant', $grant);
+        $this->resetCache();
       }
       else {
         $op = 'update';
         $status = drupal_write_record('access_grant', $grant, 'gid');
         field_attach_update('access_grant', $grant);
+        $this->resetCache(array($grant->gid));
       }
 
       module_invoke_all('access_grant_' . $op, $grant);
