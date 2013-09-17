@@ -417,6 +417,9 @@ function access_grant_form($form, &$form_state, $grant) {
   $is_new = empty($grant->gid);
   $admin = user_access('administer users');
 
+  // Store the scheme property for entity_form_field_validate().
+  $form['scheme'] = array('#type' => 'value', '#value' => $grant->scheme);
+
   // The ACK user reference field.
   $form['user'] = array(
     '#type' => 'container',
