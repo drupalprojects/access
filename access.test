@@ -715,6 +715,123 @@ class AccessGrantInterfaceTest extends AccessWebTestCase {
 }
 
 /**
+ * Tests for access grant functions.
+ */
+class AccessGrantFunctionTest extends AccessWebTestCase {
+
+  protected $scheme;
+  protected $grants;
+
+  /**
+   * Implements getInfo(), required method for SimpleTest.
+   */
+  public static function getInfo() {
+    return array(
+      'name' => 'Access grants',
+      'description' => 'Tests loading, saving and deleting access grants.',
+      'group' => 'Access control kit',
+    );
+  }
+
+  /**
+   * Overrides DrupalWebTestCase::setUp().
+   */
+  public function setUp() {
+    // Enable the access control kit module.
+    parent::setUp(array('access'));
+    // Create the test scheme.
+    $this->scheme = $this->createScheme();
+    $this->scheme = access_scheme_load($this->scheme->sid, TRUE);
+    // Create two grants for testing.
+    $this->grants = array();
+    $this->grants[] = $this->createGrant($this->scheme);
+    $this->grants[] = $this->createGrant($this->scheme);
+  }
+
+  /**
+   * Test basic create, read, update, and delete functions.
+   */
+  function testGrantCRUD() {
+    $loaded_grants = access_grant_load_multiple(FALSE, TRUE);
+    $this->assertTrue(count($loaded_grants), 'Access grants exist in the database.');
+
+    $i = 0;
+    $count = count($this->grants);
+    $field_name = $this->scheme->realm_field['field_name'];
+    foreach ($this->grants as $grant) {
+      $i++;
+      // Confirm that the loaded grant matches expected values.
+      $loaded_grant = $loaded_grants[$grant->gid];
+      $this->assertEqual($grant->gid, $loaded_grant->gid, "[grant $i of $count] ID is OK.");
+      $this->assertEqual($grant->scheme, $loaded_grant->scheme, "[grant $i of $count] Scheme is OK.");
+      $this->assertEqual($grant->uid, $loaded_grant->uid, "[grant $i of $count] User reference is OK.");
+      $this->assertEqual($grant->rid, $loaded_grant->rid, "[grant $i of $count] Role reference is OK.");
+
+      // Confirm that the realm field was attached.
+      $this->assertTrue(isset($loaded_grant->$field_name), "[grant $i of $count] Realm field is attached.");
+    }
+
+    // Attempt to load a grant that doesn't exist.
+    $gid = count($loaded_grants) + 1;
+    $grant = access_grant_load($gid);
+    $this->assertFalse($grant, 'Invalid grant ID does not load.');
+    // Create a new grant, which should end up with $gid as its ID.
+    $this->createGrant($this->scheme);
+    // Make sure that the previously invalid ID now loads properly.
+    $grant = access_grant_load($gid);
+    $this->assertTrue(!empty($grant) && is_object($grant), 'Newly created access grant loads properly.');
+    $this->assertEqual($grant->gid, $gid, 'Loaded grant ID is the same as the previously invalid ID.');
+
+    // Confirm that the grant can be updated.
+    $loaded_grant->$field_name = array('und' => array(array('value' => 1)));
+    $this->assertEqual(access_grant_save($loaded_grant), SAVED_UPDATED, 'Grant updated.');
+
+    // Confirm that the grant can be deleted.
+    $this->assertEqual(access_grant_delete($loaded_grant->gid), SAVED_DELETED, 'Grant deleted.');
+
+    // Confirm that the grant can be recreated.
+    unset($loaded_grant->gid);
+    $this->assertEqual(access_grant_save($loaded_grant), SAVED_NEW, 'Grant created.');
+  }
+
+  /**
+   * Ensure that the access grant static reset works correctly.
+   */
+  function testGrantStaticReset() {
+    // Set the grant's realm value.
+    $field_name = $this->scheme->realm_field['field_name'];
+    $this->grants[0]->$field_name = array('und' => array(array('value' => 0)));
+    access_grant_save($this->grants[0]);
+
+    // Load the grant.
+    $original_grant = access_grant_load($this->grants[0]->gid);
+    $this->assertTrue(is_object($original_grant) && $original_grant->gid == $this->grants[0]->gid, 'Grant loaded successfully.');
+    $this_grant_field = $this->grants[0]->$field_name;
+    $original_grant_field = $original_grant->$field_name;
+    $this->assertEqual($original_grant_field['und'][0]['value'], $this_grant_field['und'][0]['value']);
+
+    // Change the grant's realm value.
+    $grant = $original_grant;
+    $grant->$field_name = array('und' => array(array('value' => 1)));
+    access_grant_save($grant);
+
+    // Reload the grant.
+    $new_grant = access_grant_load($original_grant->gid);
+    $grant_field = $grant->$field_name;
+    $new_grant_field = $new_grant->$field_name;
+    $this->assertEqual($new_grant_field['und'][0]['value'], $grant_field['und'][0]['value']);
+
+    // Delete the grant.
+    $grants = access_grant_load_multiple(FALSE);
+    $this->assertTrue(isset($grants[$this->grants[0]->gid]), 'The grant exists.');
+    access_grant_delete($this->grants[0]->gid);
+    $grants = access_grant_load_multiple(FALSE);
+    $this->assertTrue(!isset($grants[$this->grants[0]->gid]), 'The grant was deleted.');
+  }
+
+}
+
+/**
  * Tests the access control kit API.
  */
 class AccessAPITest extends AccessWebTestCase {
