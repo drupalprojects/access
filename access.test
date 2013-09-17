@@ -644,6 +644,74 @@ class AccessGrantInterfaceTest extends AccessWebTestCase {
     $this->assertText(t('No access grants available.'), 'No access grants were found.');
   }
 
+  /**
+   * Delete an access grant via the user interface.
+   */
+  function testGrantDelete() {
+    // Create an access scheme that uses the test role.
+    $scheme = $this->createScheme();
+    $scheme = access_scheme_load($scheme->sid, TRUE);
+    $scheme->roles = array($this->ack_role->rid => $this->ack_role->name);
+    variable_set('access_scheme_roles_' . $scheme->machine_name, $scheme->roles);
+
+    // Add the test user to the test role.
+    $this->ack_user->original = clone $this->ack_user;
+    $roles = $this->ack_user->roles + array($this->ack_role->rid => $this->ack_role->name);
+    user_save($this->ack_user, array('roles' => $roles));
+    $this->ack_user = user_load($this->ack_user->uid, TRUE);
+
+    // Create an access grant.
+    $grant = $this->createGrant($scheme, $this->ack_role, $this->ack_user);
+    $field_name = $scheme->realm_field['field_name'];
+    $grant->$field_name = array('und' => array(array('value' => 1)));
+    access_grant_save($grant);
+    $grant = access_grant_load($grant->gid, TRUE);
+    $this->assertTrue($grant, 'Access grant found in the database.');
+
+    // Check deleting from the overview page.
+    $this->drupalGet('admin/access');
+    $this->clickLink(t('delete'));
+    $this->assertRaw(t('Are you sure you want to revoke all %scheme for %user\'s access as %role?', array('%scheme' => $scheme->name, '%user' => $this->ack_user->name, '%role' => $this->ack_role->name)), '[confirm deletion] Asks for confirmation.');
+
+    // Delete the grant without removing the user's role.
+    $edit = array();
+    $this->drupalPost('admin/access/grant/' . $grant->gid . '/edit', $edit, t('Delete'));
+    $this->assertRaw(t('Are you sure you want to revoke all %scheme for %user\'s access as %role?', array('%scheme' => $scheme->name, '%user' => $this->ack_user->name, '%role' => $this->ack_role->name)), '[confirm deletion] Asks for confirmation.');
+    $this->assertNoRaw(t('Also revoke %user\'s membership in the %role role?', array('%user' => $this->ack_user->name, '%role' => $this->ack_role->name)), 'Prompt to revoke the role is not shown when user lacks user admin access.');
+    // Give the admin user access to administer users and try again.
+    $this->admin_user->original = clone $this->admin_user;
+    $rid = $this->drupalCreateRole(array('administer users'));
+    $role = user_role_load($rid);
+    $roles = $this->admin_user->roles + array($role->rid => $role->name);
+    user_save($this->admin_user, array('roles' => $roles));
+    $this->drupalGet('admin/access/grant/' . $grant->gid . '/delete');
+    $this->assertRaw(t('Also revoke %user\'s membership in the %role role?', array('%user' => $this->ack_user->name, '%role' => $this->ack_role->name)), 'Prompt to revoke the role is shown when user has user admin access.');
+    $this->assertText(t('This action cannot be undone.'), '[confirm deletion] Informs that deletion is permanent.');
+    $this->drupalPost(NULL, NULL, t('Delete'));
+
+    // Confirm deletion.
+    $this->assertRaw(t('Deleted %scheme for %user\'s access as %role.', array('%scheme' => $scheme->name, '%user' => $this->ack_user->name, '%role' => $this->ack_role->name)), 'Access grant deleted.');
+    $this->assertFalse(access_grant_load($grant->gid, TRUE), 'Access grant is not found in the database.');
+    $this->ack_user = user_load($this->ack_user->uid, TRUE);
+    $this->assertTrue(isset($this->ack_user->roles[$this->ack_role->rid]), 'User is still a member of the role.');
+
+    // Repeat with a new grant and the revoke role option checked.
+    $grant = $this->createGrant($scheme, $this->ack_role, $this->ack_user);
+    $grant->$field_name = array('und' => array(array('value' => 1)));
+    access_grant_save($grant);
+    $grant = access_grant_load($grant->gid, TRUE);
+    $this->assertTrue($grant, 'Access grant found in the database.');
+    $edit = array();
+    $edit['revoke_role'] = TRUE;
+    $this->drupalPost('admin/access/grant/' . $grant->gid . '/delete', $edit, t('Delete'));
+
+    // Confirm deletion and role removal.
+    $this->assertRaw(t('Deleted %scheme for %user\'s access as %role.', array('%scheme' => $scheme->name, '%user' => $this->ack_user->name, '%role' => $this->ack_role->name)), 'Access grant deleted.');
+    $this->assertFalse(access_grant_load($grant->gid, TRUE), 'Access grant is not found in the database.');
+    $this->ack_user = user_load($this->ack_user->uid, TRUE);
+    $this->assertFalse(isset($this->ack_user->roles[$this->ack_role->rid]), 'User was removed from the role.');
+  }
+
 }
 
 /**
