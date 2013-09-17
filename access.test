@@ -448,6 +448,189 @@ class AccessSchemeFunctionTest extends AccessWebTestCase {
 }
 
 /**
+ * Tests the access grant interface.
+ */
+class AccessGrantInterfaceTest extends AccessWebTestCase {
+
+  protected $admin_user;
+  protected $ack_role;
+  protected $ack_user;
+
+  /**
+   * Implements getInfo(), required method for SimpleTest.
+   */
+  public static function getInfo() {
+    return array(
+      'name' => 'Access grant interface',
+      'description' => 'Tests the access grant admin interface.',
+      'group' => 'Access control kit',
+    );
+  }
+
+  /**
+   * Overrides DrupalWebTestCase::setUp().
+   */
+  public function setUp() {
+    // Enable the access control kit module.
+    parent::setUp(array('access'));
+    // Create and log in our admin user.
+    $this->admin_user = $this->drupalCreateUser(array('administer access grants'));
+    $this->drupalLogin($this->admin_user);
+    // Create a user role for use in an access scheme.
+    $rid = $this->drupalCreateRole(array('access content'));
+    $this->ack_role = user_role_load($rid);
+    // Create a user account for use in access grants.
+    $this->ack_user = $this->drupalCreateUser(array('access content'));
+  }
+
+  /**
+   * Create and edit an access grant via the user interface.
+   */
+  function testGrantInterface() {
+    // Visit the grant admin overview page.
+    $this->drupalGet('admin/access');
+
+    // Check that the add grant page responds to the presence of access schemes.
+    $this->clickLink(t('Add access grant'));
+    $this->assertText(t('You have not created any access schemes yet.'), 'Informs that an access scheme must exist before grants can be created.');
+    $scheme = $this->createScheme();
+    $this->drupalGet('admin/access/add');
+    $this->assertNoLink(check_plain($scheme->name), 'The "add grant" list page is bypassed when only one scheme exists.');
+    $this->assertText(t('Grant access to @name', array('@name' => $scheme->name)));
+    $deleted_scheme = $this->createScheme();
+    $this->drupalGet('admin/access/add');
+    $this->assertLink(check_plain($scheme->name), 0, 'The "add grant" list page is shown when more than one scheme exists.');
+    $this->clickLink(check_plain($deleted_scheme->name));
+    $this->assertText(t('Grant access to @name', array('@name' => $deleted_scheme->name)));
+    access_scheme_delete($deleted_scheme->sid);
+    $this->drupalGet('admin/access/add');
+    $this->assertNoLink(check_plain($deleted_scheme->name), 'Deleted schemes are not shown when adding a grant.');
+
+    // Set the scheme to use the test role.
+    $this->assertText(t('No roles are available for new access grants.'));
+    $scheme = access_scheme_load($scheme->sid);
+    $scheme->roles = array($this->ack_role->rid => $this->ack_role->name);
+    variable_set('access_scheme_roles_' . $scheme->machine_name, $scheme->roles);
+    $this->drupalGet('admin/access/add');
+    $this->assertNoText(t('No roles are available for new access grants.'));
+
+    // Attempt to create an access grant through the admin form for a role that
+    // the test user does not yet have.
+    $this->assertText(t('Grant access to @name', array('@name' => $scheme->name)));
+    $edit = array();
+    $edit['user'] = $this->ack_user->name;
+    $edit['role'] = $this->ack_role->rid;
+    $field_name = $scheme->realm_field['field_name'];
+    $edit[$field_name . '[und][1]'] = TRUE;
+    $this->drupalPost(NULL, $edit, t('Save'));
+    $this->assertText(t('@user is not a member of the @role role.', array('@user' => $this->ack_user->name, '@role' => $this->ack_role->name)), 'Cannot add users to roles without access to administer users.');
+
+    // Give the admin user access to grant new roles and try again.
+    $this->admin_user->original = clone $this->admin_user;
+    $rid = $this->drupalCreateRole(array('administer users'));
+    $role = user_role_load($rid);
+    $roles = $this->admin_user->roles + array($role->rid => $role->name);
+    user_save($this->admin_user, array('roles' => $roles));
+    $this->drupalGet('admin/access/add');
+    $this->assertText(t('The user will be added to this role, if not already a member.'), 'User administrators are notified that they can add new roles.');
+    $this->drupalPost(NULL, $edit, t('Save'));
+    $this->assertRaw(t("Added %scheme for %user's access as %role.", array('%scheme' => $scheme->name, '%user' => $this->ack_user->name, '%role' => $this->ack_role->name)), 'Grant created successfully.');
+    $this->drupalGet('admin/access');
+    // Check that all grant fields are correctly shown in the overview.
+    $this->assertText(check_plain($this->ack_user->name), 'Grant found in the grant admin overview listing.');
+    $this->assertText(check_plain($this->ack_role->name));
+    $this->assertText(t('True'));
+    $this->assertText(check_plain($scheme->name));
+
+    // View the grant.
+    $this->clickLink(t('view'));
+    $this->assertRaw(t("@user&#039;s access as @role", array('@user' => $this->ack_user->name, '@role' => $this->ack_role->name)), 'Grant can be rendered.');
+    $this->assertText(check_plain($this->ack_user->name));
+    $this->assertText(check_plain($this->ack_role->name));
+    $this->assertText(t('True'));
+    $this->assertText(check_plain($scheme->name));
+
+    // Edit the grant.
+    $this->clickLink(t('Edit'));
+    $this->assertRaw('<label for="edit-user-display">User </label>', 'User field is display only.');
+    $this->assertRaw('<label for="edit-role-display">Role </label>', 'Role field is display only.');
+    $edit = array();
+    $edit[$field_name . '[und][0]'] = TRUE;
+    $edit[$field_name . '[und][1]'] = FALSE;
+    $this->drupalPost(NULL, $edit, t('Save'));
+    $this->assertRaw(t("Updated %scheme for %user's access as %role.", array('%scheme' => $scheme->name, '%user' => $this->ack_user->name, '%role' => $this->ack_role->name)), 'Grant updated successfully.');
+    $this->assertFieldChecked('edit-' . strtr($field_name, '_', '-') . '-und-0', 'New realm assigned.');
+    $this->assertNoFieldChecked('edit-' . strtr($field_name, '_', '-') . '-und-1', 'Old realm removed.');
+    $this->drupalGet('admin/access');
+    $this->assertText(t('False'), 'Updated grant found in the grant admin overview listing.');
+    $this->assertNoText(t('True'));
+
+    // Try to submit a duplicate grant for this user-role-scheme combination.
+    $this->drupalGet('admin/access/add');
+    $edit = array();
+    $edit['user'] = $this->ack_user->name;
+    $edit['role'] = $this->ack_role->rid;
+    $field_name = $scheme->realm_field['field_name'];
+    $edit[$field_name . '[und][1]'] = TRUE;
+    $this->drupalPost(NULL, $edit, t('Save'));
+    $this->assertRaw(t('%user has already been granted access as %role in @scheme.', array('@scheme' => $scheme->name, '%user' => $this->ack_user->name, '%role' => $this->ack_role->name)), 'Duplicate access grants are not permitted.');
+
+    // Create a user with an unsafe username.
+    $new_user = $this->drupalCreateUser();
+    $new_user->name = 'Don\'t';
+    user_save($new_user);
+    $new_user = user_load($new_user->uid, TRUE);
+    // Create a role with an unsafe name.
+    $new_rid = $this->drupalCreateRole(array('access content'));
+    $new_role = user_role_load($new_rid);
+    $new_role->name = 'Panic & Carry';
+    user_role_save($new_role);
+    $new_role = user_role_load($new_role->rid);
+    // Create a scheme with an unsafe name.
+    $new_scheme = $this->createScheme();
+    $new_scheme = access_scheme_load($new_scheme->sid);
+    $new_scheme->roles = array($new_role->rid => $new_role->name);
+    variable_set('access_scheme_roles_' . $new_scheme->machine_name, $new_scheme->roles);
+    $new_scheme_name = 'a Towel';
+    $new_scheme->name = '<script>' . $new_scheme_name . '</script>';
+    access_scheme_save($new_scheme);
+    $new_scheme = access_scheme_load($new_scheme->sid, TRUE);
+    // Create a grant with the unsafe values.
+    $new_grant = $this->createGrant($new_scheme, $new_role, $new_user);
+    $field_name = $new_scheme->realm_field['field_name'];
+    $new_grant->$field_name = array('und' => array(array('value' => 1)));
+    access_grant_save($new_grant);
+    // Ensure that grant values are escaped properly in displays.
+    for ($i = 0; $i < 2; $i++) {
+      switch ($i) {
+        case 0:
+          // Overview.
+          $this->drupalGet('admin/access');
+          // Check the scheme name.
+          $this->assertRaw('&lt;script&gt;a Towel&lt;/script&gt;');
+          $this->assertNoRaw($new_scheme->name);
+          break;
+
+        case 1:
+          // Rendered view.
+          $this->drupalGet('admin/access/grant/' . $new_grant->gid);
+          // Check that the name isn't double-filtered in the page title.
+          $site_name = variable_get('site_name', 'Drupal');
+          $this->assertTitle(t('Don\'t\'s access as Panic & Carry | @site-name', array('@site-name' => $site_name)));
+          $this->assertNoTitle(t('Don&#039;t\'s access as Panic &amp; Carry | @site-name', array('@site-name' => $site_name)));
+          break;
+      }
+      // Checks common to all displays.
+      $this->assertRaw('Don&#039;t');
+      $this->assertNoRaw($new_user->name);
+      $this->assertRaw('Panic &amp; Carry');
+      $this->assertNoRaw($new_role->name);
+    }
+  }
+
+}
+
+/**
  * Tests the access control kit API.
  */
 class AccessAPITest extends AccessWebTestCase {
