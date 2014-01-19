@@ -78,7 +78,7 @@ function access_test_scheme_settings_callback($scheme, $has_data) {
 function access_test_permission() {
   // Create a permission for our dummy objects.
   return array(
-    'meow' =>  array(
+    'meow' => array(
       'title' => t('Access meowing objects'),
       'description' => t('Allows the user to access objects that meow.'),
     ),

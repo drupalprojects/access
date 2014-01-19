@@ -13,7 +13,7 @@ class AccessSchemeEntityController extends DrupalDefaultEntityController {
    * @param array $values
    *   (optional) An array of values to set, keyed by property name.
    *
-   * @return
+   * @return object
    *   An access scheme object.
    */
   public function create(array $values = array()) {
@@ -59,7 +59,7 @@ class AccessSchemeEntityController extends DrupalDefaultEntityController {
       $scheme->handlers = array();
       $result = db_query('SELECT * FROM {access_handler} WHERE scheme = :scheme', array(':scheme' => $scheme->machine_name));
       foreach ($result as $row) {
-        // Initialize the handler using the class and settings from the database.
+        // Initialize a handler using the class and settings from the database.
         $class = $row->handler;
         $settings = unserialize($row->settings);
         $scheme->handlers[$row->object_type] = new $class($scheme, $settings);
@@ -71,7 +71,7 @@ class AccessSchemeEntityController extends DrupalDefaultEntityController {
   /**
    * Saves an access scheme to the database.
    *
-   * @param $scheme
+   * @param object $scheme
    *   A scheme object with the following properties:
    *   - sid: (optional) The unique ID for the scheme being saved. If
    *     $scheme->sid is empty or omitted, a new scheme will be inserted.
@@ -84,7 +84,7 @@ class AccessSchemeEntityController extends DrupalDefaultEntityController {
    *     applied. When omitted, the unchanged scheme object is loaded from the
    *     database and stored in the property.
    *
-   * @return
+   * @return int
    *   Status constant indicating whether the scheme was inserted (SAVED_NEW) or
    *   updated (SAVED_UPDATED). When inserting a new scheme, $scheme->sid will
    *   contain the ID of the newly created scheme.
@@ -146,10 +146,10 @@ class AccessSchemeEntityController extends DrupalDefaultEntityController {
   /**
    * Deletes an access scheme from the database.
    *
-   * @param $sid
+   * @param int $sid
    *   The scheme ID.
    *
-   * @return
+   * @return int
    *   Status constant indicating deletion.
    */
   public function delete($sid) {

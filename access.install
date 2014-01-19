@@ -225,7 +225,13 @@ function access_update_7102() {
   db_add_field('access_scheme', 'sid', array('description' => 'The scheme ID.', 'type' => 'serial'), array('primary key' => array('sid')));
 
   // Rename and index the machine name field.
-  db_change_field('access_scheme', 'scheme', 'machine_name', array('description' => 'The machine-readable name of this scheme.', 'type' => 'varchar', 'length' => 28, 'not null' => TRUE), array('unique keys' => array('machine_name' => array('machine_name'))));
+  db_change_field('access_scheme', 'scheme', 'machine_name', array(
+    'description' => 'The machine-readable name of this scheme.',
+    'type' => 'varchar',
+    'length' => 28,
+    'not null' => TRUE,
+  ),
+  array('unique keys' => array('machine_name' => array('machine_name'))));
 }
 
 /**
@@ -233,7 +239,14 @@ function access_update_7102() {
  */
 function access_update_7103() {
   // Get a list of all access realm fields.
-  $field_names = db_query('SELECT field_name FROM {field_config} WHERE type IN (:types)', array(':types' => array('access_boolean', 'access_integer', 'access_float', 'access_text')))->fetchCol();
+  $field_names = db_query('SELECT field_name FROM {field_config} WHERE type IN (:types)', array(
+    ':types' => array(
+      'access_boolean',
+      'access_integer',
+      'access_float',
+      'access_text',
+    ),
+  ))->fetchCol();
 
   // Convert the 'field' setting on the realm fields to 'field_name'.
   foreach ($field_names as $field_name) {

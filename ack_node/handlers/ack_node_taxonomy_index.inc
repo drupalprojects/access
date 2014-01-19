@@ -66,7 +66,7 @@ class ACKNodeTaxonomyIndex extends AccessControlKitHandler {
             if (!isset($realms)) {
               $element['#disabled'] = TRUE;
             }
-            // If the field widget uses the #options property, filter the options.
+            // If the widget uses the #options property, filter the options.
             elseif (isset($element['#options'])) {
               $options = array();
 
@@ -82,8 +82,8 @@ class ACKNodeTaxonomyIndex extends AccessControlKitHandler {
                 }
               }
 
-              // If the element is required and only one option remains besides the
-              // empty value, then remove the empty value as an option.
+              // If the element is required and only one option remains besides
+              // the empty value, then remove the empty value as an option.
               if (!empty($element['#required']) && isset($options['_none']) && count($options) == 2) {
                 unset($options['_none']);
               }

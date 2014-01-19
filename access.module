@@ -91,10 +91,10 @@ function access_grant_label($grant) {
 /**
  * Returns the list of realms on an access grant.
  *
- * @param $grant
+ * @param object $grant
  *   An access grant.
  *
- * @return
+ * @return array
  *   A list of assigned realms, where the keys are the values of the grant's
  *   access realm field, and the values are the realm labels.
  */
@@ -117,12 +117,12 @@ function access_grant_realms($grant) {
 /**
  * Loads an access grant by ID.
  *
- * @param $gid
+ * @param int $gid
  *   The grant ID.
- * @param $reset
+ * @param bool $reset
  *   (optional) Whether to reset the internal cache.  Defaults to FALSE.
  *
- * @return
+ * @return object|false
  *   An access grant, or FALSE if the grant is not found.
  */
 function access_grant_load($gid, $reset = FALSE) {
@@ -133,16 +133,16 @@ function access_grant_load($gid, $reset = FALSE) {
 /**
  * Loads all access grants that match a set of conditions.
  *
- * @param $conditions
+ * @param array $conditions
  *   An array of search conditions. Valid conditions are:
  *   - 'scheme': a scheme machine name.
  *   - 'uid': a user ID.
  *   - 'rid': a role ID.
  *   - 'realms': an array of realm field values. Ignored if 'scheme' is omitted.
- * @param $reset
+ * @param bool $reset
  *   (optional) Whether to reset the internal cache.  Defaults to FALSE.
  *
- * @return
+ * @return array
  *   An array of access grants that match the given conditions.
  */
 function access_grant_load_by_condition($conditions = array(), $reset = FALSE) {
@@ -182,12 +182,12 @@ function access_grant_load_by_condition($conditions = array(), $reset = FALSE) {
 /**
  * Loads multiple access grants by ID.
  *
- * @param $gids
+ * @param array|false $gids
  *   An array of grant IDs, or FALSE to load all grants.
- * @param $reset
+ * @param bool $reset
  *   (optional) Whether to reset the internal cache.  Defaults to FALSE.
  *
- * @return
+ * @return array
  *   An array of access grants indexed by their IDs. When no results are found,
  *   returns an empty array.
  *
@@ -200,10 +200,10 @@ function access_grant_load_multiple($gids = FALSE, $reset = FALSE) {
 /**
  * Saves an access grant.
  *
- * @param $grant
+ * @param object $grant
  *   An access grant.
  *
- * @return
+ * @return int
  *   Status constant indicating whether the grant was inserted (SAVED_NEW) or
  *   updated (SAVED_UPDATED). When inserting a new grant, $grant->gid will
  *   contain the ID of the newly created grant.
@@ -217,10 +217,10 @@ function access_grant_save($grant) {
 /**
  * Deletes an access grant.
  *
- * @param $gid
+ * @param int $gid
  *   The grant ID.
  *
- * @return
+ * @return int
  *   Status constant indicating deletion.
  *
  * @see AccessGrantEntityController::delete()
@@ -235,15 +235,15 @@ function access_grant_delete($gid) {
 /**
  * Constructs an array for drupal_render() from an array of access grants.
  *
- * @param $grants
+ * @param array $grants
  *   An array of grants, as returned by access_grant_load_multiple().
- * @param $view_mode
+ * @param string $view_mode
  *   (optional) The view mode. Defaults to 'full'.
- * @param $weight
+ * @param int $weight
  *   (optional) An integer representing the weight of the first grant in the
  *   list. Defaults to 0.
  *
- * @return
+ * @return array
  *   An array in the format expected by drupal_render().
  *
  * @see drupal_render()
@@ -264,12 +264,12 @@ function access_grant_view_multiple($grants, $view_mode = 'full', $weight = 0) {
 /**
  * Generates a renderable array for an access grant.
  *
- * @param $grant
+ * @param object $grant
  *   An access grant.
- * @param $view_mode
+ * @param string $view_mode
  *   (optional) The view mode. Defaults to 'full'.
  *
- * @return
+ * @return array
  *   An array in the format expected by drupal_render().
  *
  * @see drupal_render()
@@ -297,9 +297,9 @@ function access_grant_view($grant, $view_mode = 'full') {
 /**
  * Builds a structured array representing the access grant in $grant->content.
  *
- * @param $grant
+ * @param object $grant
  *   An access grant.
- * @param $view_mode
+ * @param string $view_mode
  *   (optional) The view mode. Defaults to 'full'.
  */
 function access_grant_build_content($grant, $view_mode = 'full') {
@@ -353,7 +353,7 @@ function access_grant_form_ajax($form, $form_state) {
 /**
  * Returns a list of all defined access scheme names.
  *
- * @return
+ * @return array
  *   An array of access scheme names, keyed by machine name.
  */
 function access_scheme_names() {
@@ -367,12 +367,12 @@ function access_scheme_names() {
 /**
  * Loads an access scheme by ID.
  *
- * @param $sid
+ * @param int $sid
  *   The scheme ID.
- * @param $reset
+ * @param bool $reset
  *   (optional) Whether to reset the internal cache.  Defaults to FALSE.
  *
- * @return
+ * @return object|false
  *   An access scheme, or FALSE if the scheme is not found.
  */
 function access_scheme_load($sid, $reset = FALSE) {
@@ -383,12 +383,12 @@ function access_scheme_load($sid, $reset = FALSE) {
 /**
  * Loads an access scheme by its URL-friendly machine name.
  *
- * @param $machine_name
+ * @param string $machine_name
  *   The machine-readable name of a scheme, where '_' may be replaced with '-'.
- * @param $reset
+ * @param bool $reset
  *   (optional) Whether to reset the internal cache.  Defaults to FALSE.
  *
- * @return
+ * @return object|false
  *   An access scheme, or FALSE if the scheme is not found.
  */
 function access_scheme_machine_name_load($machine_name, $reset = FALSE) {
@@ -410,12 +410,12 @@ function access_scheme_machine_name_load($machine_name, $reset = FALSE) {
 /**
  * Loads multiple access schemes by ID.
  *
- * @param $sids
+ * @param array $sids
  *   An array of scheme IDs, or FALSE to load all schemes.
- * @param $reset
+ * @param bool $reset
  *   (optional) Whether to reset the internal cache.  Defaults to FALSE.
  *
- * @return
+ * @return array
  *   An array of access schemes indexed by their IDs. When no results are found,
  *   returns an empty array.
  *
@@ -428,10 +428,10 @@ function access_scheme_load_multiple($sids = FALSE, $reset = FALSE) {
 /**
  * Saves an access scheme.
  *
- * @param $scheme
+ * @param object $scheme
  *   An access scheme.
  *
- * @return
+ * @return int
  *   Status constant indicating whether the scheme was inserted (SAVED_NEW) or
  *   updated (SAVED_UPDATED). When inserting a new scheme, $scheme->sid will
  *   contain the ID of the newly created scheme.
@@ -445,10 +445,10 @@ function access_scheme_save($scheme) {
 /**
  * Deletes an access scheme.
  *
- * @param $sid
+ * @param int $sid
  *   The scheme ID.
  *
- * @return
+ * @return int
  *   Status constant indicating deletion.
  *
  * @see AccessSchemeEntityController::delete()
@@ -460,7 +460,7 @@ function access_scheme_delete($sid) {
 /**
  * Clear all static cache variables for access schemes.
  *
- * @param $ids
+ * @param array $ids
  *   An array of ids to reset in the entity controller cache.
  */
 function access_scheme_static_reset($ids = NULL) {
@@ -521,10 +521,10 @@ function access_access_scheme_insert($scheme) {
 /**
  * Returns information on available access scheme types.
  *
- * @param $type
+ * @param string $type
  *   (optional) A scheme type string.
  *
- * @return
+ * @return array|false
  *   The information array for the requested $type, or FALSE if not found.
  *   If $type is omitted, returns information for all available types.
  *
@@ -556,10 +556,10 @@ function access_scheme_info($type = NULL) {
 /**
  * Loads the info for a scheme type from a URL-friendly argument.
  *
- * @param $type
+ * @param string $type
  *   A scheme type string, where '_' may be replaced with '-'.
  *
- * @return
+ * @return array|false
  *   The information array for the requested $type, or FALSE if not found.
  */
 function access_scheme_type_load($type) {
@@ -573,14 +573,14 @@ function access_scheme_type_load($type) {
  * and load operations.  Once a scheme has been loaded, the name of its realm
  * field can be found at $scheme->realm_field['field_name'].
  *
- * @param $scheme
+ * @param object $scheme
  *   An access scheme.
  *
- * @return
+ * @return string
  *   The name to use for the realm field.
  */
-// @todo Move field name generation to the scheme controller.
 function _access_realm_field_name($scheme) {
+  // @todo Move field name generation to the scheme controller.
   return 'ack_' . $scheme->machine_name;
 }
 
@@ -594,20 +594,20 @@ function _access_realm_field_name($scheme) {
  * The strings are not safe for output. Keys and values of the array should be
  * sanitized through field_filter_xss() before being displayed.
  *
- * @param $field
+ * @param array $field
  *   The field definition.
- * @param $instance
+ * @param array|null $instance
  *   A field instance array. May be NULL.
- * @param $entity_type
+ * @param array|null $entity_type
  *   The type of entity; e.g. 'node' or 'user'. May be NULL.
- * @param $entity
+ * @param object|null $entity
  *   The entity object. May be NULL.
- * @param &$cacheable
+ * @param true &$cacheable
  *   Boolean passed by reference to indicate whether the value list returned by
  *   this function should be cached by list_allowed_values(). Passed in as TRUE;
  *   if set to FALSE, the allowed values list will not be statically cached.
  *
- * @return
+ * @return array
  *   The array of allowed values. Keys of the array are the raw stored values
  *   (number or text), values of the array are the display labels.
  */
@@ -631,7 +631,7 @@ function access_field_extra_fields() {
     'user' => array(
       'label' => t('User'),
       'description' => t('Access control kit user reference'),
-      'weight'=> -5,
+      'weight' => -5,
     ),
     'role' => array(
       'label' => t('Role'),
@@ -651,7 +651,7 @@ function access_field_extra_fields() {
 /**
  * Returns information on all available object access handlers.
  *
- * @return
+ * @return array
  *   An array indexed by handler name where each value is an associative array
  *   with the following keys:
  *   - label: The human-readable name of this handler.
@@ -703,18 +703,18 @@ function access_handler_info() {
 /**
  * Saves an access handler attachment to the database.
  *
- * @param $scheme
+ * @param object $scheme
  *   The access scheme to which the handler will be attached.
- * @param $object_type
+ * @param string $object_type
  *   The type of Drupal object that the handler will manage (e.g., node).
- * @param $class
+ * @param string $class
  *   The name of the access handler class.
- * @param $module
+ * @param string $module
  *   The module that provides the handler.
- * @param $settings
+ * @param array $settings
  *   (optional) An array of settings to control the handler's behavior.
  *
- * @return
+ * @return int
  *   Status constant indicating whether the handler attachment was inserted
  *   (SAVED_NEW) or updated (SAVED_UPDATED).
  */
@@ -743,9 +743,9 @@ function access_handler_save($scheme, $object_type, $class, $module, $settings =
 /**
  * Deletes an access handler attachment from the database.
  *
- * @param $scheme
+ * @param object $scheme
  *   The access scheme to which the handler is currently attached.
- * @param $object_type
+ * @param string $object_type
  *   The type of Drupal object that the handler manages (e.g., node).
  */
 function access_handler_delete($scheme, $object_type) {
@@ -764,10 +764,9 @@ function access_handler_form_ajax($form, $form_state) {
   // The triggering element should be the handler selector, which should have
   // #parents like so:
   //
-  // array(
-  //   [0] => 'handlers',
-  //   [1] => a string indicating the object type that this handler manages,
-  //   [2] => 'handler',
+  // [0] => 'handlers',
+  // [1] => a string indicating the object type that this handler manages,
+  // [2] => 'handler',
   //
   // Thus, we can use the second element in the array to determine which handler
   // settings form needs to be rebuilt.
@@ -778,7 +777,7 @@ function access_handler_form_ajax($form, $form_state) {
 /**
  * Returns information on all available access-controlled object types.
  *
- * @return
+ * @return array
  *   An array indexed by object type (e.g., node, menu_link) where each value is
  *   an associative array with the following keys:
  *   - label: The human-readable name of this object type (e.g., "Content",
@@ -837,15 +836,15 @@ function access_info() {
 /**
  * Finds all access schemes that control access to a given object type.
  *
- * @param $object_type
+ * @param string $object_type
  *   An access-controlled object type name (e.g., node, menu_link), as defined
  *   by hook_access_info().
- * @param $names_only
+ * @param bool $names_only
  *   (optional) If set to TRUE, the returned array will contain only the names
  *   of the applicable access schemes, rather than fully loaded scheme entities.
  *   Defaults to FALSE.
  *
- * @return
+ * @return array
  *   An array containing all access schemes that have an object access handler
  *   attached for the given object type, keyed by scheme machine name.
  */
@@ -877,16 +876,16 @@ function access_object_schemes($object_type, $names_only = FALSE) {
 /**
  * Returns a list of an object's realm memberships.
  *
- * @param $object_type
+ * @param string $object_type
  *   The type of access-controlled object (e.g., node, menu_link).
- * @param $object
+ * @param mixed $object
  *   The access-controlled object.
- * @param $schemes
+ * @param array $schemes
  *   (optional) An array of access schemes, used to limit the list of returned
  *   realm memberships.  If omitted, the returned list will include realm
  *   memberships for all schemes that apply to the object type.
  *
- * @return
+ * @return array
  *   An array indexed by scheme machine name where each value is an array of
  *   realm values.  If the object is not a member of any realm in a scheme, the
  *   value returned for that scheme will be array().
@@ -905,10 +904,10 @@ function access_object_realms($object_type, $object, $schemes = NULL) {
 /**
  * Returns a list of a user's realm-level role memberships.
  *
- * @param $account
+ * @param object $account
  *   (optional) The account to check. Defaults to the currently logged in user.
  *
- * @return
+ * @return array
  *   A nested array indexed first by role ID, then by scheme machine name, where
  *   each value is an array containing the user's assigned realms for that role
  *   in that scheme as realm_value => realm_label. Note that the list of roles
@@ -952,15 +951,15 @@ function access_user_roles($account = NULL) {
 /**
  * Returns a list of realms in which the user has a given permission.
  *
- * @param $string
+ * @param string $string
  *   The permission string (e.g., edit any page).
- * @param $account
+ * @param object $account
  *   (optional) The account to check. Defaults to the currently logged in user.
- * @param $schemes
+ * @param array $schemes
  *   (optional) An array of access schemes, used to limit the list of returned
  *   realms.  If omitted, the returned list will include realms for all schemes.
  *
- * @return
+ * @return array
  *   An array indexed by scheme machine name where each value is an array of
  *   realm values.  If the user does not have the permission for any realm in a
  *   scheme, the value returned for that scheme will be array().
@@ -1001,20 +1000,20 @@ function access_user_permission_realms($string, $account = NULL, $schemes = NULL
 /**
  * Determines whether a user has a permission on an object via an access grant.
  *
- * @param $string
+ * @param string $string
  *   The permission string (e.g., edit any page).
- * @param $object_type
+ * @param string $object_type
  *   The type of access-controlled object (e.g., node, menu_link).
- * @param $object
+ * @param mixed $object
  *   The access-controlled object.
- * @param $account
+ * @param object $account
  *   (optional) The account to check. Defaults to the currently logged in user.
- * @param $schemes
+ * @param array $schemes
  *   (optional) An array of schemes in which to check access on the object. If
  *   omitted, access will be checked in all available schemes that apply to the
  *   object type.
  *
- * @return
+ * @return bool
  *   Boolean TRUE if the user has the requested permission on the object in any
  *   of the tested schemes.
  */

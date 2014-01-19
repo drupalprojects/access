@@ -13,7 +13,7 @@ class AccessGrantEntityController extends DrupalDefaultEntityController {
    * @param array $values
    *   (optional) An array of values to set, keyed by property name.
    *
-   * @return
+   * @return object
    *   An access grant object.
    */
   public function create(array $values = array()) {
@@ -28,7 +28,7 @@ class AccessGrantEntityController extends DrupalDefaultEntityController {
   /**
    * Saves an access grant to the database.
    *
-   * @param $grant
+   * @param object $grant
    *   An access grant object with the following properties:
    *   - gid: (optional) The unique ID for the grant being saved. If $grant->gid
    *     is empty or omitted, a new grant will be inserted.
@@ -41,7 +41,7 @@ class AccessGrantEntityController extends DrupalDefaultEntityController {
    *   Since an access grant is an entity, any fields contained in the grant
    *   object are saved alongside the grant object.
    *
-   * @return
+   * @return int
    *   Status constant indicating whether the grant was inserted (SAVED_NEW) or
    *   updated (SAVED_UPDATED). When inserting a new grant, $grant->gid will
    *   contain the ID of the newly created grant.
@@ -87,10 +87,10 @@ class AccessGrantEntityController extends DrupalDefaultEntityController {
   /**
    * Deletes an access grant from the database.
    *
-   * @param $gid
+   * @param int $gid
    *   The grant ID.
    *
-   * @return
+   * @return int
    *   Status constant indicating deletion.
    */
   public function delete($gid) {

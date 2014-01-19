@@ -10,10 +10,13 @@
  */
 function access_overview_schemes() {
   $field_ui = module_exists('field_ui');
-  $header = array(t('Name'), array(
-    'data' => t('Operations'),
-    'colspan' => $field_ui ? '4' : '2',
-  ));
+  $header = array(
+    t('Name'),
+    array(
+      'data' => t('Operations'),
+      'colspan' => $field_ui ? '4' : '2',
+    ),
+  );
   $rows = array();
 
   foreach (access_scheme_load_multiple() as $scheme) {
@@ -50,7 +53,7 @@ function access_overview_schemes() {
 /**
  * Returns HTML for the Name column on the access scheme admin overview page.
  *
- * @param $variables
+ * @param array $variables
  *   An associative array containing:
  *   - scheme: The access scheme.
  */
@@ -84,7 +87,7 @@ function access_scheme_add_list() {
 /**
  * Menu page callback; add an access scheme of a given type.
  *
- * @param $info
+ * @param array $info
  *   The scheme type definition.
  */
 function access_scheme_add($info) {
@@ -98,7 +101,7 @@ function access_scheme_add($info) {
 /**
  * Form constructor for the access scheme add/edit form.
  *
- * @param $scheme
+ * @param object $scheme
  *   The access scheme to edit.
  *
  * @see access_scheme_form_validate()
@@ -375,13 +378,12 @@ function access_scheme_form_submit($form, &$form_state) {
   $roles = user_roles(TRUE);
   unset($roles[DRUPAL_AUTHENTICATED_RID]);
   $scheme->roles = array_filter($scheme->roles);
-  $scheme->roles = array_intersect_key($roles,  $scheme->roles);
+  $scheme->roles = array_intersect_key($roles, $scheme->roles);
 
   // Save the scheme.
   $status = access_scheme_save($scheme);
 
   // @todo Should role and attached handler saves be moved to the entity controller's save()? Or to access_scheme_save()?
-
   // Save the roles.
   variable_set('access_scheme_roles_' . $scheme->machine_name, $scheme->roles);
 
@@ -412,19 +414,18 @@ function access_scheme_form_submit($form, &$form_state) {
   );
   switch ($status) {
     case SAVED_NEW:
-      $message = 'Added access scheme %name.';
+      drupal_set_message(t('Added access scheme %name.', $t_args));
       // New schemes redirect to the edit page to configure handlers.
       $form_state['redirect'] = 'admin/structure/access/' . str_replace('_', '-', $scheme->machine_name);
       break;
 
     case SAVED_UPDATED:
-      $message = 'Updated access scheme %name.';
+      drupal_set_message(t('Updated access scheme %name.', $t_args));
       // Updated schemes redirect to the admin overview.
       $form_state['redirect'] = 'admin/structure/access';
       break;
   }
-  drupal_set_message(t($message, $t_args));
-  watchdog('access', $message, $t_args, WATCHDOG_NOTICE, l(t('edit'), 'admin/structure/access/' . str_replace('_', '-', $scheme->machine_name)));
+  watchdog('access', 'Saved access scheme %name.', $t_args, WATCHDOG_NOTICE, l(t('edit'), 'admin/structure/access/' . str_replace('_', '-', $scheme->machine_name)));
 
   // Rebuild the menu so that the "add access grant" page is up to date.
   menu_rebuild();
@@ -483,9 +484,8 @@ function access_scheme_delete_confirm_submit($form, &$form_state) {
   $t_args = array(
     '%scheme' => $scheme->name,
   );
-  $message = 'Deleted access scheme %scheme.';
-  drupal_set_message(t($message, $t_args));
-  watchdog('access', $message, $t_args, WATCHDOG_NOTICE);
+  drupal_set_message(t('Deleted access scheme %scheme.', $t_args));
+  watchdog('access', 'Deleted access scheme %scheme.', $t_args, WATCHDOG_NOTICE);
 
   $form_state['redirect'] = 'admin/structure/access';
 

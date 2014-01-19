@@ -269,9 +269,9 @@ function access_admin_grants_filter_form_submit($form, &$form_state) {
             $_SESSION['access_overview_grant_filter'][] = array($filter, $form_state['values'][$filter]);
           }
           elseif ($form_state['values'][$filter] != '[any]') {
-            // Flatten the options array to accommodate hierarchical/nested options.
+            // Flatten the  array to accommodate hierarchical/nested options.
             $flat_options = form_options_flatten($options['options']);
-            // Only accept valid selections offered on the dropdown, block bad input.
+            // Only accept valid selections offered on the dropdown.
             if (isset($flat_options[$form_state['values'][$filter]])) {
               $_SESSION['access_overview_grant_filter'][] = array($filter, $form_state['values'][$filter]);
             }
@@ -279,9 +279,11 @@ function access_admin_grants_filter_form_submit($form, &$form_state) {
         }
       }
       break;
+
     case t('Undo'):
       array_pop($_SESSION['access_overview_grant_filter']);
       break;
+
     case t('Reset'):
       $_SESSION['access_overview_grant_filter'] = array();
       break;
@@ -291,7 +293,7 @@ function access_admin_grants_filter_form_submit($form, &$form_state) {
 /**
  * Lists access grant administration filters that can be applied.
  *
- * @return
+ * @return array
  *   Returns a list of filter definitions for the grant administration form.
  *   Each key is filter identifier for access_admin_grants_build_filter_query(),
  *   and each value is an array with the following keys:
@@ -327,7 +329,7 @@ function access_admin_grants_filters() {
 /**
  * Apply filters for the access grant administration page based on session.
  *
- * @param $query
+ * @param SelectQueryInterface $query
  *   A SelectQuery to which the filters should be applied.
  */
 function access_admin_grants_build_filter_query(SelectQueryInterface $query) {
@@ -339,6 +341,7 @@ function access_admin_grants_build_filter_query(SelectQueryInterface $query) {
       case 'scheme':
         $query->condition('g.' . $key, $value);
         break;
+
       case 'username':
         $query->condition('u.name', $value);
         break;
@@ -374,7 +377,7 @@ function access_grant_add_list() {
 /**
  * Menu page callback; add an access grant for a given scheme.
  *
- * @param $scheme
+ * @param object $scheme
  *   The access scheme in which to create a new grant.
  */
 function access_grant_add($scheme) {
@@ -385,19 +388,22 @@ function access_grant_add($scheme) {
 /**
  * Menu page callback; edit an access grant.
  *
- * @param $grant
+ * @param object $grant
  *   The access grant to edit.
  */
 function access_grant_edit($grant) {
   $scheme = access_scheme_machine_name_load($grant->scheme);
-  drupal_set_title(t('<em>Edit @scheme for</em> @grant', array('@scheme' => $scheme->name, '@grant' => entity_label('access_grant', $grant))), PASS_THROUGH);
+  drupal_set_title(t('<em>Edit @scheme for</em> @grant', array(
+    '@scheme' => $scheme->name,
+    '@grant' => entity_label('access_grant', $grant),
+  )), PASS_THROUGH);
   return drupal_get_form('access_grant_form', $grant);
 }
 
 /**
  * Form constructor for the access grant add/edit form.
  *
- * @param $grant
+ * @param object $grant
  *   The access grant to edit.
  *
  * @see access_grant_form_validate()
@@ -488,7 +494,11 @@ function access_grant_form($form, &$form_state, $grant) {
     if ($account) {
       foreach (array_keys($role_options) as $option) {
         // Duplicate grants (same user, role, and scheme) are not permitted.
-        $duplicate = access_grant_load_by_condition(array('uid' => $account->uid, 'rid' => $option, 'scheme' => $grant->scheme));
+        $duplicate = access_grant_load_by_condition(array(
+          'uid' => $account->uid,
+          'rid' => $option,
+          'scheme' => $grant->scheme,
+        ));
         // Non-admins cannot add users to new roles.
         $disallowed = !$admin && empty($account->roles[$option]);
         // Filter the role options.
@@ -580,10 +590,19 @@ function access_grant_form_validate($form, &$form_state) {
     // If the above tests passed, validate that the user-role-scheme combination
     // is unique.  Duplicate grants are not permitted.
     if (!form_get_errors()) {
-      $existing = access_grant_load_by_condition(array('uid' => $account->uid, 'rid' => $role->rid, 'scheme' => $grant->scheme));
+      $existing = access_grant_load_by_condition(array(
+        'uid' => $account->uid,
+        'rid' => $role->rid,
+        'scheme' => $grant->scheme,
+      ));
       if (!empty($existing)) {
         $existing = reset($existing);
-        form_set_error('', t('%user has already been granted access as %role in @scheme. Duplicate access grants are not permitted. Please <a href="@url">edit the existing grant</a> instead.', array('%user' => $account->name, '%role' => $role->name, '@scheme' => $scheme->name, '@url' => url('admin/access/grant/' . $existing->gid . '/edit'))));
+        form_set_error('', t('%user has already been granted access as %role in @scheme. Duplicate access grants are not permitted. Please <a href="@url">edit the existing grant</a> instead.', array(
+          '%user' => $account->name,
+          '%role' => $role->name,
+          '@scheme' => $scheme->name,
+          '@url' => url('admin/access/grant/' . $existing->gid . '/edit'),
+        )));
       }
     }
   }
@@ -623,15 +642,14 @@ function access_grant_form_submit($form, &$form_state) {
   );
   switch ($status) {
     case SAVED_NEW:
-      $message = "Added %scheme for %user's access as %role.";
+      drupal_set_message(t("Added %scheme for %user's access as %role.", $t_args));
       break;
 
     case SAVED_UPDATED:
-      $message = "Updated %scheme for %user's access as %role.";
+      drupal_set_message(t("Updated %scheme for %user's access as %role.", $t_args));
       break;
   }
-  drupal_set_message(t($message, $t_args));
-  watchdog('access', $message, $t_args, WATCHDOG_NOTICE, l(t('edit'), 'admin/access/grant/' . $grant->gid . '/edit'));
+  watchdog('access', "Changed %scheme for %user as %role.", $t_args, WATCHDOG_NOTICE, l(t('edit'), 'admin/access/grant/' . $grant->gid . '/edit'));
 }
 
 /**
@@ -704,9 +722,8 @@ function access_grant_delete_confirm_submit($form, &$form_state) {
     '%role' => $role->name,
     '%scheme' => $scheme->name,
   );
-  $message = "Deleted %scheme for %user's access as %role.";
-  drupal_set_message(t($message, $t_args));
-  watchdog('access', $message, $t_args, WATCHDOG_NOTICE);
+  drupal_set_message(t("Deleted %scheme for %user's access as %role.", $t_args));
+  watchdog('access', "Deleted %scheme for %user as %role.", $t_args, WATCHDOG_NOTICE);
 
   // Revoke the role entirely, if that option was selected.
   if (!empty($form_state['values']['revoke_role'])) {
@@ -716,7 +733,6 @@ function access_grant_delete_confirm_submit($form, &$form_state) {
   }
 
   $form_state['redirect'] = 'admin/access';
-  return;
 }
 
 /**
@@ -741,7 +757,11 @@ function access_grant_multiple_delete_confirm($form, &$form_state, $selected) {
       '#type' => 'hidden',
       '#value' => $grant->gid,
       '#prefix' => '<li>',
-      '#suffix' => t("@scheme for @user's access as @role", array('@user' => $usernames[$grant->uid], '@role' => $roles[$grant->rid], '@scheme' => $schemes[$grant->scheme])) . "</li>\n",
+      '#suffix' => t("@scheme for @user's access as @role", array(
+        '@user' => $usernames[$grant->uid],
+        '@role' => $roles[$grant->rid],
+        '@scheme' => $schemes[$grant->scheme],
+      )) . "</li>\n",
     );
   }
 

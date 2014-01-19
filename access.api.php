@@ -11,8 +11,7 @@
  */
 
 /**
- * Informs the access control kit module about one or more object types that
- * can be managed through access grants.
+ * Declares manageable object types for access control kit.
  *
  * Modules can implement this hook to integrate various types of Drupal objects
  * (such as nodes, menu links, etc.) with the access control kit module's access
@@ -23,7 +22,7 @@
  * then implements other hooks (such as hook_access_handler_info(),
  * hook_permission() and hook_node_access()) to provide the integration.
  *
- * @return
+ * @return array
  *   An array whose keys are access-controllable object type names and whose
  *   values declare the properties of those types that are need by the access
  *   control kit module. If the object type is a Drupal entity, the object type
@@ -50,7 +49,7 @@ function hook_access_info() {
  * types of objects that can be managed by access grants. All properties that
  * are available in hook_access_info() can be altered here.
  *
- * @param $info
+ * @param array $info
  *   The access-controllable object type info, keyed by object type name.
  *
  * @see hook_access_info()
@@ -63,7 +62,7 @@ function hook_access_info_alter(&$info) {
 /**
  * Registers object access handler classes with the access control kit module.
  *
- * @return
+ * @return array
  *   An array whose keys are object access handler class names and whose values
  *   declare the properties of the handler that are needed by access control kit
  *   to attach the handler to an access scheme. The registered classes must
@@ -98,7 +97,7 @@ function hook_access_handler_info() {
  * object access handlers for use with access schemes. All properties that are
  * available in hook_access_handler_info() can be altered here.
  *
- * @param $info
+ * @param array $info
  *   The access handler info, keyed by object access handler class name.
  *
  * @see hook_access_handler_info()
@@ -145,7 +144,10 @@ function hook_access_handler_info_alter(&$info) {
  *   function access_scheme_taxonomy_term_realms($scheme) {
  *     // Re-use the allowed values function for term reference fields.
  *     $field = array();
- *     $field['settings']['allowed_values'][] = array('vocabulary' => $scheme->settings['vocabulary'], 'parent' => 0);
+ *     $field['settings']['allowed_values'][] = array(
+ *       'vocabulary' => $scheme->settings['vocabulary'],
+ *       'parent' => 0,
+ *     );
  *     return taxonomy_allowed_values($field);
  *   }
  * @endcode
@@ -171,10 +173,12 @@ function hook_access_handler_info_alter(&$info) {
  *     foreach (taxonomy_get_vocabularies() as $vocabulary) {
  *       $options[$vocabulary->machine_name] = $vocabulary->name;
  *     }
+ *     $settings = $scheme->settings;
+ *     $value = isset($settings['vocabulary']) ? $settings['vocabulary'] : NULL;
  *     $form['vocabulary'] = array(
  *       '#type' => 'select',
  *       '#title' => t('Vocabulary'),
- *       '#default_value' => isset($scheme->settings['vocabulary']) ? $scheme->settings['vocabulary'] : NULL,
+ *       '#default_value' => $value,
  *       '#options' => $options,
  *       '#required' => TRUE,
  *       '#disabled' => $has_data,
@@ -183,7 +187,7 @@ function hook_access_handler_info_alter(&$info) {
  *   }
  * @endcode
  *
- * @return
+ * @return array
  *   An array of scheme types. Each type has a key that defines the type's
  *   machine-readable name. The corresponding array value is an associative
  *   array that contains the following key-value pairs:
@@ -219,7 +223,7 @@ function hook_access_scheme_info() {
  * types of data that can form the basis for an access scheme. All properties
  * that are available in hook_access_scheme_info() can be altered here.
  *
- * @param $info
+ * @param array $info
  *   The access scheme type info, keyed by scheme type name.
  *
  * @see hook_access_scheme_info()
@@ -235,7 +239,7 @@ function hook_access_scheme_info_alter(&$info) {
  * This hook is invoked from AccessSchemeEntityController::save() before the
  * scheme is saved to the database.
  *
- * @param $scheme
+ * @param object $scheme
  *   The access scheme that is being inserted or updated.
  */
 function hook_access_scheme_presave($scheme) {
@@ -259,7 +263,7 @@ function hook_access_scheme_presave($scheme) {
  * committed immediately. Check AccessSchemeEntityController::save() and
  * db_transaction() for more info.
  *
- * @param $scheme
+ * @param object $scheme
  *   The access scheme that is being created.
  */
 function hook_access_scheme_insert($scheme) {
@@ -284,7 +288,7 @@ function hook_access_scheme_insert($scheme) {
  * committed immediately. Check AccessSchemeEntityController::save() and
  * db_transaction() for more info.
  *
- * @param $scheme
+ * @param object $scheme
  *   The access scheme that is being updated.
  */
 function hook_access_scheme_update($scheme) {
@@ -300,7 +304,7 @@ function hook_access_scheme_update($scheme) {
  * scheduled for execution, but before the transaction actually completes and
  * the scheme is removed from the database.
  *
- * @param $scheme
+ * @param object $scheme
  *   The access scheme that is being deleted.
  */
 function hook_access_scheme_delete($scheme) {
@@ -314,7 +318,7 @@ function hook_access_scheme_delete($scheme) {
  * This hook is invoked from AccessGrantEntityController::save() before the
  * grant is saved to the database.
  *
- * @param $grant
+ * @param object $grant
  *   The access grant that is being inserted or updated.
  */
 function hook_access_grant_presave($grant) {
@@ -338,7 +342,7 @@ function hook_access_grant_presave($grant) {
  * committed immediately. Check AccessGrantEntityController::save() and
  * db_transaction() for more info.
  *
- * @param $grant
+ * @param object $grant
  *   The access grant that is being created.
  */
 function hook_access_grant_insert($grant) {
@@ -364,7 +368,7 @@ function hook_access_grant_insert($grant) {
  * committed immediately. Check AccessGrantEntityController::save() and
  * db_transaction() for more info.
  *
- * @param $grant
+ * @param object $grant
  *   The access grant that is being updated.
  */
 function hook_access_grant_update($grant) {
@@ -381,7 +385,7 @@ function hook_access_grant_update($grant) {
  * hook_entity_delete() and field_attach_delete() are called, and before the
  * grant is removed from the access_grant table in the database.
  *
- * @param $grant
+ * @param object $grant
  *   The access grant that is being deleted.
  */
 function hook_access_grant_delete($grant) {
@@ -398,9 +402,9 @@ function hook_access_grant_delete($grant) {
  * structure of $grant->content is a renderable array as expected by
  * drupal_render().
  *
- * @param $grant
+ * @param object $grant
  *   The access grant that is being assembled for rendering.
- * @param $view_mode
+ * @param string $view_mode
  *   The $view_mode parameter from access_grant_view().
  *
  * @see hook_entity_view()
@@ -427,7 +431,7 @@ function hook_access_grant_view($grant, $view_mode) {
  * Alternatively, it could also implement hook_preprocess_access_grant(). See
  * drupal_render() and theme() documentation respectively for details.
  *
- * @param $build
+ * @param array $build
  *   A renderable array representing the access grant.
  *
  * @see access_grant_view()

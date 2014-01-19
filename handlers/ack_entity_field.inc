@@ -15,30 +15,30 @@ class ACKEntityField extends AccessControlKitHandler {
    *
    * @var string
    */
-  protected $field_name;
+  protected $fieldName;
 
   /**
    * The key that contains the field's value in calls to field_get_items().
    *
    * @var string
    */
-  protected $field_value_key;
+  protected $fieldValueKey;
 
   /**
    * Overrides AccessControlKitHandler::__construct().
    */
   public function __construct($scheme, array $settings = array()) {
     parent::__construct($scheme, $settings);
-    $this->field_name = isset($scheme->settings['field_name']) ? $scheme->settings['field_name'] : NULL;
-    $this->field_value_key = 'value';
+    $this->fieldName = isset($scheme->settings['field_name']) ? $scheme->settings['field_name'] : NULL;
+    $this->fieldValueKey = 'value';
   }
 
   /**
    * Overrides AccessControlKitHandler::description().
    */
   public function description() {
-    if (isset($this->field_name)) {
-      return t('The value of %field_name will determine realm membership.', array('%field_name' => $this->field_name));
+    if (isset($this->fieldName)) {
+      return t('The value of %field_name will determine realm membership.', array('%field_name' => $this->fieldName));
     }
     else {
       return t('The value of the selected field will determine realm membership.');
@@ -50,12 +50,12 @@ class ACKEntityField extends AccessControlKitHandler {
    */
   public function objectRealms($object_type, $object) {
     $values = array();
-    if (!empty($this->field_name)) {
-      $items = field_get_items($object_type, $object, $this->field_name);
+    if (!empty($this->fieldName)) {
+      $items = field_get_items($object_type, $object, $this->fieldName);
       if (is_array($items)) {
         foreach ($items as $item) {
-          if (isset($item[$this->field_value_key])) {
-            $values[] = $item[$this->field_value_key];
+          if (isset($item[$this->fieldValueKey])) {
+            $values[] = $item[$this->fieldValueKey];
           }
         }
       }
@@ -67,9 +67,9 @@ class ACKEntityField extends AccessControlKitHandler {
    * Overrides AccessControlKitHandler::objectFormAlter().
    */
   public function objectFormAlter($object_type, $object, &$form, &$form_state, $form_id, $realms = NULL) {
-    if (!empty($this->field_name) && !empty($form[$this->field_name])) {
-      $language = $form[$this->field_name]['#language'];
-      $element = &$form[$this->field_name][$language];
+    if (!empty($this->fieldName) && !empty($form[$this->fieldName])) {
+      $language = $form[$this->fieldName]['#language'];
+      $element = &$form[$this->fieldName][$language];
 
       // Lock the field if no realms are allowed.
       if (!isset($realms)) {

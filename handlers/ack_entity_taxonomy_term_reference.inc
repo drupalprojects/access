@@ -23,9 +23,9 @@ class ACKEntityTaxonomyTermReference extends ACKEntityField {
   public function __construct($scheme, array $settings = array()) {
     parent::__construct($scheme, $settings);
     // The choice of field is a handler-level setting.
-    $this->field_name = isset($settings['field_name']) ? $settings['field_name'] : NULL;
+    $this->fieldName = isset($settings['field_name']) ? $settings['field_name'] : NULL;
     // Taxonomy term reference fields use 'tid' as the value key.
-    $this->field_value_key = 'tid';
+    $this->fieldValueKey = 'tid';
     // Get the vocabulary from the scheme settings.
     $this->vocabulary = isset($scheme->settings['vocabulary']) ? $scheme->settings['vocabulary'] : NULL;
   }
@@ -56,7 +56,7 @@ class ACKEntityTaxonomyTermReference extends ACKEntityField {
       '#title' => t('Term reference field'),
       '#type' => 'select',
       '#options' => $options,
-      '#default_value' => $this->field_name,
+      '#default_value' => $this->fieldName,
     );
     return $form;
   }
