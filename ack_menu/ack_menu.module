@@ -20,6 +20,7 @@ function ack_menu_access_info() {
 function ack_menu_access_handler_info() {
   // Handler to map menu links to realms; should work for all scheme types.
   $info['ACKMenuMap'] = array(
+    // @todo Revise this label.
     'label' => t('Map menu links to realms'),
     'scheme types' => array_keys(access_scheme_info()),
     'object types' => array('menu_link'),
@@ -35,44 +36,65 @@ function ack_menu_permission() {
   $t_args = array('%schemes' => implode(', ', $scheme_names));
   return array(
     'ack manage menu links' => array(
-      'title' => t('Manage the menu links in assigned realms'),
+      'title' => t('Manage menu links in assigned access realms'),
       'description' => t('This permission only applies to the following access schemes: %schemes.', $t_args),
-    ),
-    'administer ack_menu' => array(
-      'title' => t('Map menu links to access realms'),
     ),
   );
 }
 
 /**
- * Implements hook_menu_alter().
+ * Access callback for adding a new menu link.
+ *
+ * @param array $menu
+ *   The array defining the menu in which the link will be created.
+ * @param object $account
+ *   (optional) The user adding the link. Defaults to currently logged-in user.
+ *
+ * @return bool
+ *   Boolean indicating whether the user has access to add a link to the menu.
  */
-function ack_menu_menu_alter(&$items) {
-  // Override access to the menu link admin pages.
-  foreach (array('edit', 'reset', 'delete') as $op) {
-    $items['admin/structure/menu/item/%menu_link/' . $op]['access callback'] = 'ack_menu_link_access';
-    $items['admin/structure/menu/item/%menu_link/' . $op]['access arguments'] = array(4, $op);
+function ack_menu_link_add_access($menu, $account = NULL) {
+  global $user;
+  if (!isset($account)) {
+    $account = $user;
   }
+
+  // The global 'administer menu' permission trumps any ACK permissions.
+  if (user_access('administer menu', $account)) {
+    return TRUE;
+  }
+
+  if (user_access('ack manage menu links')) {
+    // Find all schemes that support menu links.
+    $enabled_schemes = access_object_schemes('menu_link');
+    // @todo Filter out schemes that don't support the given $menu.
+    if (!empty($enabled_schemes)) {
+      // See if the user has menu permission in any of those schemes.
+      $scheme_list = access_user_permission_realms('ack manage menu links', $account, $enabled_schemes);
+      foreach ($scheme_list as $realms) {
+        if (!empty($realms)) {
+          // @todo Need to add a check to be sure that one of the user's realms maps to a link to be the parent for the one being created.
+          return TRUE;
+        }
+      }
+    }
+  }
+
+  return FALSE;
 }
 
 /**
- * Checks menu link access; used as the menu access callback for link admin.
+ * Access callback for editing, resetting or deleting a menu link.
  *
- * @param $menu_link
- *   A menu link object on which to perform the access check.
- * @param $op
- *   The operation to be performed.  Possible values:
- *   - "edit"
- *   - "reset"
- *   - "delete"
- * @param $account
- *   (optional) The user object on which to perform the access check operation.
- *   Defaults to the currently logged-in user.
+ * @param array $menu_link
+ *   The array defining the menu link.
+ * @param object $account
+ *   (optional) The user editing the link. Defaults to currently logged-in user.
  *
- * @return
- *   Boolean indicating whether the operation is allowed.
+ * @return bool
+ *   Boolean indicating whether the user can change the link.
  */
-function ack_menu_link_access($menu_link, $op, $account = NULL) {
+function ack_menu_link_edit_access($menu_link, $account = NULL) {
   global $user;
   if (!isset($account)) {
     $account = $user;
@@ -84,22 +106,106 @@ function ack_menu_link_access($menu_link, $op, $account = NULL) {
   }
 
   // Check realm permissions.
-  switch ($op) {
-    case 'edit':
-    case 'reset':
-    case 'delete':
-      return access_user_object_access('ack manage menu links', 'menu_link', $menu_link, $account);
-  }
+  return access_user_object_access('ack manage menu links', 'menu_link', $menu_link, $account);
+}
 
-  return FALSE;
+/**
+ * Implements hook_menu_alter().
+ */
+function ack_menu_menu_alter(&$items) {
+  // Override access to the menu link admin pages.
+  $items['admin/structure/menu/manage/%menu/add']['access callback'] = 'ack_menu_link_add_access';
+  $items['admin/structure/menu/manage/%menu/add']['access arguments'] = array(4);
+  foreach (array('edit', 'reset', 'delete') as $op) {
+    $items['admin/structure/menu/item/%menu_link/' . $op]['access callback'] = 'ack_menu_link_edit_access';
+    $items['admin/structure/menu/item/%menu_link/' . $op]['access arguments'] = array(4);
+  }
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ *
+ * Alters the menu item add/edit form.
+ */
+function ack_menu_form_menu_edit_item_alter(&$form, &$form_state, $form_id) {
+  global $user;
+  $menu_link = $form['original_item']['#value'];
+  $schemes = access_object_schemes('menu_link');
+
+  // Check whether the user has global permission to administer menu links,
+  // which trumps any of our ACK permissions.
+  $global = user_access('administer menu');
+  // Check whether we are adding a new link or editing an existing one.
+  $is_new = empty($menu_link['mlid']);
+
+  // If no global access, filter the form.
+  if (!$global) {
+    // Get the list of realms in which the user can manage menu links.
+    $realms = access_user_permission_realms('ack manage menu links', $user, $schemes);
+    // Filter the form for each applicable scheme.
+    foreach ($schemes as $scheme) {
+      $scheme_realms = $is_new ? $realms[$scheme->machine_name] : NULL;
+      $scheme->handlers['menu_link']->objectFormAlter('menu_link', $menu_link, $form, $form_state, $form_id, $scheme_realms);
+    }
+  }
+  // Add mapping settings.
+  // @todo This whole segment should be moved to the handler.
+  else {
+    foreach ($schemes as $scheme) {
+      if (get_class($scheme->handlers['menu_link']) == 'ACKMenuMap') {
+        if (empty($form['ack_menu_map'])) {
+          $form['ack_menu_map'] = array(
+            '#type' => 'fieldset',
+            '#title' => t('Access control kit'),
+            '#description' => t('This link may be associated with a realm in each of the following access schemes. Doing so will allow users with permission to manage menu links in that realm to edit this link and any of its child links.'),
+            '#tree' => TRUE,
+          );
+          $form['#submit'][] = 'ack_menu_form_menu_edit_item_submit';
+        }
+        $form['ack_menu_map'][$scheme->machine_name] = array(
+          '#type' => 'select',
+          '#title' => check_plain($scheme->name),
+          '#options' => $scheme->realms,
+          '#empty_option' => t('- Not mapped -'),
+          '#default_value' => $scheme->handlers['menu_link']->objectRealms('menu_link', $menu_link),
+        );
+      }
+    }
+  }
+}
+
+/**
+ * Additional submit function for the menu link edit form.
+ */
+function ack_menu_form_menu_edit_item_submit($form, &$form_state) {
+  // @todo This is going to be a problem when creating a new link...
+  $mlid = $form_state['values']['mlid'];
+  $map = array();
+  foreach ($form_state['values']['ack_menu_map'] as $scheme_machine_name => $value) {
+    if (!empty($value) || $value === "0" || $value === 0 || $value === 0.0) {
+      $map[$scheme_machine_name][] = $value;
+    }
+  }
+  if (empty($map)) {
+    db_delete('ack_menu_map')->condition('mlid', $mlid)->execute();
+  }
+  else {
+    db_merge('ack_menu_map')
+      ->key(array('mlid' => $mlid))
+      ->fields(array(
+        'map' => serialize($map),
+      ))
+      ->execute();
+  }
 }
 
 /**
  * Implements hook_form_BASE_FORM_ID_alter().
+ *
+ * Alters the menu options on the node form.
  */
 function ack_menu_form_node_form_alter(&$form, &$form_state, $form_id) {
-  // @todo Filter the menu parent selector.
+  // @todo Filter the menu parent selector and set access to menu options tab.
 }
 
-// @todo Still need to build the admin UI for mapping menu links.
 // @todo Need to provide management UI for accessible links, so they can be managed without access to the admin screens.
