@@ -5,6 +5,7 @@ package = Access control kit
 dependencies[] = field
 dependencies[] = options
 dependencies[] = list
+configure = admin/structure/access
 
 ; Access grant entity controller class.
 files[] = access_grant_entity_controller.inc
