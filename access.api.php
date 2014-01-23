@@ -348,7 +348,7 @@ function hook_access_grant_presave($grant) {
 function hook_access_grant_insert($grant) {
   // Notify the user whenever an access grant is added for user 1.
   if ($grant->uid == 1) {
-    drupal_set_message('An access grant has been created for the site administrator.');
+    drupal_set_message(t('An access grant has been created for the site administrator.'));
   }
 }
 
@@ -374,7 +374,7 @@ function hook_access_grant_insert($grant) {
 function hook_access_grant_update($grant) {
   // Notify the user whenever an access grant changes for user 1.
   if ($grant->uid == 1) {
-    drupal_set_message('An access grant has changed for the site administrator.');
+    drupal_set_message(t('An access grant has changed for the site administrator.'));
   }
 }
 
@@ -391,7 +391,7 @@ function hook_access_grant_update($grant) {
 function hook_access_grant_delete($grant) {
   // Notify the user whenever an access grant is removed for user 1.
   if ($grant->uid == 1) {
-    drupal_set_message('An access grant was deleted for the site administrator.');
+    drupal_set_message(t('An access grant was deleted for the site administrator.'));
   }
 }
 

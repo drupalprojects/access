@@ -14,7 +14,7 @@ class ACKNodeAuthor extends AccessControlKitHandler {
    * Overrides AccessControlKitHandler::description().
    */
   public function description() {
-    return t('Allows you to grant a user access to content authored by certain other users (i.e., User A could be granted access to all content written by Users B, C, and D).');
+    return t('Allows you to grant a user access to content authored by certain other users (for example, User A could be granted access to all content written by Users B, C, and D).');
   }
 
   /**

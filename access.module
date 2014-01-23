@@ -599,7 +599,7 @@ function _access_realm_field_name($scheme) {
  * @param array|null $instance
  *   A field instance array. May be NULL.
  * @param array|null $entity_type
- *   The type of entity; e.g. 'node' or 'user'. May be NULL.
+ *   The type of entity; for example, 'node' or 'user'. May be NULL.
  * @param object|null $entity
  *   The entity object. May be NULL.
  * @param true &$cacheable
@@ -719,7 +719,7 @@ function access_handler_info() {
  *   (SAVED_NEW) or updated (SAVED_UPDATED).
  */
 function access_handler_save($scheme, $object_type, $class, $module, $settings = array()) {
-  // The scheme and object type pairing must be unique (i.e., there cannot be
+  // The scheme and object type pairing must be unique (meaning there cannot be
   // more than one handler for a given object type attached to the scheme).
   $key = array(
     'scheme' => $scheme->machine_name,

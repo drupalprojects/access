@@ -5,6 +5,9 @@
  * Contains the access scheme entity controller.
  */
 
+/**
+ * Provides the entity controller for access schemes.
+ */
 class AccessSchemeEntityController extends DrupalDefaultEntityController {
 
   /**

@@ -399,7 +399,8 @@ class AccessSchemeFunctionTest extends AccessWebTestCase {
     // Create five access grants each for the two test schemes.
     foreach ($this->schemes as $scheme) {
       // Assert that there are no existing grants for the access scheme.
-      $this->assertEqual(0, db_query('SELECT COUNT(*) FROM {access_grant} WHERE scheme = :scheme', array(':scheme' => $scheme->machine_name))->fetchField());
+      $has_rows = (bool) db_query_range('SELECT 1 FROM {access_grant} WHERE scheme = :scheme', 0, 1, array(':scheme' => $scheme->machine_name))->fetchField();
+      $this->assertFalse($has_rows);
 
       for ($i = 0; $i < 5; $i++) {
         $this->createGrant($scheme);
@@ -414,7 +415,8 @@ class AccessSchemeFunctionTest extends AccessWebTestCase {
     access_scheme_delete($scheme->sid);
 
     // Assert that there are no grants left for the deleted scheme.
-    $this->assertEqual(0, db_query('SELECT COUNT(*) FROM {access_grant} WHERE scheme = :scheme', array(':scheme' => $scheme->machine_name))->fetchField());
+    $has_rows = (bool) db_query_range('SELECT 1 FROM {access_grant} WHERE scheme = :scheme', 0, 1, array(':scheme' => $scheme->machine_name))->fetchField();
+    $this->assertFalse($has_rows);
 
     // Assert that there are still five grants for the remaining scheme.
     $scheme = array_pop($this->schemes);

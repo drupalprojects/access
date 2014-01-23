@@ -121,7 +121,7 @@ function access_schema() {
         'default' => '',
       ),
       'object_type' => array(
-        'description' => 'The type of Drupal object (e.g. node, taxonomy_term, etc.) that this handler manages. Only one handler is permitted per object type per scheme.',
+        'description' => 'The type of Drupal object (for example, node, taxonomy_term, etc.) that this handler manages. Only one handler is permitted per object type per scheme.',
         'type' => 'varchar',
         'length' => 128,
         'not null' => TRUE,

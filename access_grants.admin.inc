@@ -211,7 +211,7 @@ function access_admin_grants_filter_form() {
       $form['filters']['available']['filters'][$key] = array(
         '#type' => 'select',
         '#options' => $filter['options'],
-        '#title' => $filter['title'],
+        '#title' => check_plain($filter['title']),
         '#default_value' => '[any]',
       );
     }
@@ -219,7 +219,7 @@ function access_admin_grants_filter_form() {
       $form['filters']['available']['filters'][$key] = array(
         '#type' => 'textfield',
         '#size' => '31',
-        '#title' => $filter['title'],
+        '#title' => check_plain($filter['title']),
       );
     }
   }

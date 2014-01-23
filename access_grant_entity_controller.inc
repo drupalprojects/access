@@ -5,6 +5,9 @@
  * Contains the access grant entity controller.
  */
 
+/**
+ * Provides the entity controller for access grants.
+ */
 class AccessGrantEntityController extends DrupalDefaultEntityController {
 
   /**
