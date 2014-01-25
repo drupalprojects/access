@@ -56,6 +56,9 @@ function access_overview_schemes() {
  * @param array $variables
  *   An associative array containing:
  *   - scheme: The access scheme.
+ *
+ * @return string
+ *   HTML representing the themed output.
  */
 function theme_access_overview_scheme_name($variables) {
   $scheme = $variables['scheme'];
@@ -89,6 +92,9 @@ function access_scheme_add_list() {
  *
  * @param array $info
  *   The scheme type definition.
+ *
+ * @return array
+ *   A form for adding a new access scheme.
  */
 function access_scheme_add($info) {
   drupal_set_title(t('Add access scheme: <em>@type</em>', array('@type' => $info['label'])), PASS_THROUGH);
@@ -101,8 +107,15 @@ function access_scheme_add($info) {
 /**
  * Form constructor for the access scheme add/edit form.
  *
+ * @param array $form
+ *   A Forms API array
+ * @param array &$form_state
+ *   An array representing the current state of the form.
  * @param object $scheme
  *   The access scheme to edit.
+ *
+ * @return array
+ *   The access scheme form.
  *
  * @see access_scheme_form_validate()
  * @see access_scheme_form_submit()

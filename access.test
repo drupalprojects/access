@@ -85,7 +85,18 @@ class AccessWebTestCase extends DrupalWebTestCase {
  */
 class AccessSchemeInterfaceTest extends AccessWebTestCase {
 
+  /**
+   * A user with administrative access.
+   *
+   * @var object
+   */
   protected $adminUser;
+
+  /**
+   * The role ID of an ACK-enabled role.
+   *
+   * @var int
+   */
   protected $ackRoleRid;
 
   /**
@@ -134,11 +145,17 @@ class AccessSchemeInterfaceTest extends AccessWebTestCase {
     $this->drupalGet('admin/structure/access');
     $this->assertText(t('@name (Machine name: @machine_name)', array('@name' => $edit['name'], '@machine_name' => $machine_name)), 'Scheme found in the scheme admin overview listing.');
 
-    // Edit the scheme.
+    // Confirm that all submitted values were saved.
     $this->clickLink(t('edit'));
+    $this->assertFieldByName('name', $edit['name'], 'The name field is correctly set to ' . $edit['name']);
+    $this->assertFieldByName('machine_name', $edit['machine_name'], 'The machine_name field is correctly set to ' . $edit['machine_name']);
     $machine_name_disabled = $this->xpath('//input[@id=:id and @disabled="disabled"]', array(':id' => 'edit-machine-name'));
     $this->assertTrue($machine_name_disabled, 'The machine name cannot be changed.');
+    $this->assertFieldByName('description', $edit['description'], 'The description field is correctly set to ' . $edit['description']);
+    $this->assertFieldChecked('edit-roles-' . $this->ackRoleRid, 'The role is correctly selected.');
     $this->assertText(t('No access-controllable objects available.'), 'Informs that no access-controllable object types have been defined.');
+
+    // Edit the scheme.
     $edit = array();
     $edit['name'] = $this->randomName();
     $this->drupalPost(NULL, $edit, t('Save access scheme'));
@@ -173,10 +190,12 @@ class AccessSchemeInterfaceTest extends AccessWebTestCase {
     $this->drupalPost('admin/structure/access/add/boolean', $edit, t('Save access scheme and continue'));
     $this->assertText(t('The machine-readable name must contain only lowercase letters, numbers, and underscores.'));
 
-    // Try to submit a disallowed machine name.
-    $edit['machine_name'] = 'add';
-    $this->drupalPost('admin/structure/access/add/boolean', $edit, t('Save access scheme and continue'));
-    $this->assertText(t('Invalid machine-readable name. Enter a name other than add.'));
+    // Try to submit some disallowed machine names.
+    foreach (array('add', '0') as $bad_name) {
+      $edit['machine_name'] = $bad_name;
+      $this->drupalPost('admin/structure/access/add/boolean', $edit, t('Save access scheme and continue'));
+      $this->assertText(t('Invalid machine-readable name. Enter a name other than @invalid.', array('@invalid' => $bad_name)));
+    }
 
     // Ensure that scheme names and descriptions are escaped properly.
     $edit = array();
@@ -301,6 +320,11 @@ class AccessSchemeInterfaceTest extends AccessWebTestCase {
  */
 class AccessSchemeFunctionTest extends AccessWebTestCase {
 
+  /**
+   * An array of access schemes.
+   *
+   * @var array
+   */
   protected $schemes;
 
   /**
@@ -454,8 +478,25 @@ class AccessSchemeFunctionTest extends AccessWebTestCase {
  */
 class AccessGrantInterfaceTest extends AccessWebTestCase {
 
+  /**
+   * A user with administrative access.
+   *
+   * @var object
+   */
   protected $adminUser;
+
+  /**
+   * An ACK-enabled role.
+   *
+   * @var object
+   */
   protected $ackRole;
+
+  /**
+   * A user to whom access will be granted during the test.
+   *
+   * @var object
+   */
   protected $ackUser;
 
   /**
@@ -755,7 +796,18 @@ class AccessGrantInterfaceTest extends AccessWebTestCase {
  */
 class AccessGrantFunctionTest extends AccessWebTestCase {
 
+  /**
+   * An access scheme.
+   *
+   * @var object
+   */
   protected $scheme;
+
+  /**
+   * An array of access grants.
+   *
+   * @var array
+   */
   protected $grants;
 
   /**
@@ -819,15 +871,17 @@ class AccessGrantFunctionTest extends AccessWebTestCase {
     $this->assertEqual($grant->gid, $gid, 'Loaded grant ID is the same as the previously invalid ID.');
 
     // Confirm that the grant can be updated.
-    $loaded_grant->$field_name = array('und' => array(array('value' => 1)));
-    $this->assertEqual(access_grant_save($loaded_grant), SAVED_UPDATED, 'Grant updated.');
+    if (!empty($grant) && is_object($grant)) {
+      $grant->$field_name = array('und' => array(array('value' => 1)));
+      $this->assertEqual(access_grant_save($grant), SAVED_UPDATED, 'Grant updated.');
 
-    // Confirm that the grant can be deleted.
-    $this->assertEqual(access_grant_delete($loaded_grant->gid), SAVED_DELETED, 'Grant deleted.');
+      // Confirm that the grant can be deleted.
+      $this->assertEqual(access_grant_delete($grant->gid), SAVED_DELETED, 'Grant deleted.');
 
-    // Confirm that the grant can be recreated.
-    unset($loaded_grant->gid);
-    $this->assertEqual(access_grant_save($loaded_grant), SAVED_NEW, 'Grant created.');
+      // Confirm that the grant can be recreated.
+      unset($grant->gid);
+      $this->assertEqual(access_grant_save($grant), SAVED_NEW, 'Grant created.');
+    }
   }
 
   /**
@@ -872,7 +926,18 @@ class AccessGrantFunctionTest extends AccessWebTestCase {
  */
 class AccessAPITest extends AccessWebTestCase {
 
+  /**
+   * An ACK-enabled role.
+   *
+   * @var object
+   */
   protected $ackRole;
+
+  /**
+   * An access scheme.
+   *
+   * @var object
+   */
   protected $scheme;
 
   /**
