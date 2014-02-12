@@ -13,18 +13,113 @@ class AccessWebTestCase extends DrupalWebTestCase {
   /**
    * Creates and returns a new access scheme with random properties.
    *
+   * @param string $type
+   *   (optional) The scheme type. Defaults to 'boolean'.
+   * @param array $settings
+   *   (optional) The scheme settings. Defaults to array().
+   *
    * @return object
    *   An access scheme.
    */
-  public function createScheme() {
+  public function createScheme($type = 'boolean', $settings = array()) {
+    $machine_name = drupal_strtolower($this->randomName());
+    $name = $this->randomName();
+    $description = $this->randomName();
     // Create a scheme.
-    $scheme = new stdClass();
-    $scheme->machine_name = drupal_strtolower($this->randomName());
-    $scheme->name = $this->randomName();
-    $scheme->type = 'boolean';
-    $scheme->description = $this->randomName();
-    access_scheme_save($scheme);
+    $scheme = entity_get_controller('access_scheme')->create(array(
+      'machine_name' => $machine_name,
+      'name' => $name,
+      'type' => $type,
+      'description' => $description,
+    ));
+    $scheme->settings = $settings;
+    $this->assertNull($scheme->sid);
+    // Save the scheme and confirm that values come back correct.
+    $this->assertIdentical(access_scheme_save($scheme), SAVED_NEW, 'New scheme saved.');
+    $this->assertNotNull($scheme->sid);
+    $this->assertIdentical($scheme->machine_name, $machine_name);
+    $this->assertIdentical($scheme->name, $name);
+    $this->assertIdentical($scheme->type, $type);
+    $this->assertIdentical($scheme->description, $description);
+    $this->assertIdentical($scheme->settings, $settings);
     return $scheme;
+  }
+
+  /**
+   * Creates a list-based scheme with generic realms.
+   *
+   * @param string $type
+   *   The list type: 'integer', 'float', or 'text'.
+   *
+   * @return object
+   *   An access scheme.
+   */
+  public function createListScheme($type) {
+    switch ($type) {
+      case 'integer':
+        $realms = array(
+          1 => '1 day',
+          7 => '1 week',
+          31 => '1 month',
+        );
+        break;
+
+      case 'float':
+        $realms = array(
+          '0' => '0',
+          '.25' => '1/4',
+          '.75' => '3/4',
+          '1' => '1',
+        );
+        break;
+
+      case 'text':
+        $realms = array(
+          'IL' => 'Illinois',
+          'IA' => 'Iowa',
+          'IN' => 'Indiana',
+        );
+        break;
+
+      default:
+        $realms = array();
+    }
+    field_create_field(array(
+      'field_name' => 'field_' . $type,
+      'type' => 'list_' . $type,
+      'settings' => array(
+        'allowed_values' => $realms,
+      ),
+    ));
+    drupal_static_reset('access_scheme_info');
+    $scheme = $this->createScheme('list_' . $type, array('field_name' => 'field_' . $type));
+    return access_scheme_load($scheme->sid);
+  }
+
+  /**
+   * Creates a taxonomy-based scheme with randomly named realms.
+   *
+   * @param string $machine_name
+   *   The vocabulary machine name.
+   *
+   * @return object
+   *   An access scheme.
+   */
+  public function createTaxonomyTermScheme($machine_name) {
+    $vocabulary = new stdClass();
+    $vocabulary->name = $this->randomName();
+    $vocabulary->machine_name = $machine_name;
+    $vocabulary->hierarchy = 0;
+    taxonomy_vocabulary_save($vocabulary);
+    for ($i = 0; $i < 3; $i++) {
+      $term = new stdClass();
+      $term->vid = $vocabulary->vid;
+      $term->name = $this->randomName();
+      taxonomy_term_save($term);
+    }
+    drupal_static_reset('access_scheme_info');
+    $scheme = $this->createScheme('taxonomy_term', array('vocabulary' => $vocabulary->machine_name));
+    return access_scheme_load($scheme->sid);
   }
 
   /**
@@ -71,10 +166,18 @@ class AccessWebTestCase extends DrupalWebTestCase {
     }
 
     // Create an access grant.
-    $grant = entity_get_controller('access_grant')->create(array('scheme' => $scheme->machine_name));
-    $grant->rid = $role->rid;
-    $grant->uid = $account->uid;
-    access_grant_save($grant);
+    $grant = entity_get_controller('access_grant')->create(array(
+      'scheme' => $scheme->machine_name,
+      'rid' => $role->rid,
+      'uid' => $account->uid,
+    ));
+    $this->assertNull($grant->gid);
+    // Save the grant and confirm that values come back correct.
+    $this->assertIdentical(access_grant_save($grant), SAVED_NEW, 'New grant saved.');
+    $this->assertNotNull($grant->gid);
+    $this->assertIdentical($grant->scheme, $scheme->machine_name);
+    $this->assertIdentical($grant->rid, $role->rid);
+    $this->assertIdentical($grant->uid, $account->uid);
     return $grant;
   }
 
@@ -348,6 +451,10 @@ class AccessSchemeFunctionTest extends AccessWebTestCase {
     $this->schemes = array();
     $this->schemes[] = $this->createScheme();
     $this->schemes[] = $this->createScheme();
+    // Attach a handler to each.
+    foreach ($this->schemes as $scheme) {
+      access_handler_save($scheme, 'node', 'ACKEntityField', 'access');
+    }
   }
 
   /**
@@ -360,10 +467,14 @@ class AccessSchemeFunctionTest extends AccessWebTestCase {
     $i = 0;
     $count = count($this->schemes);
     $names = access_scheme_names();
+    $bundles = field_info_bundles('access_grant');
     foreach ($this->schemes as $scheme) {
       $i++;
       // Find the test scheme in the name list.
       $this->assertTrue(isset($names[$scheme->machine_name]) && $names[$scheme->machine_name] == $scheme->name, "[scheme $i of $count] Found the scheme in the name list.");
+
+      // Find the test scheme in the bundle list.
+      $this->assertTrue(isset($bundles[$scheme->machine_name]), "[scheme $i of $count] Found the scheme in the bundle list.");
 
       // Confirm that the loaded scheme matches expected values.
       $loaded_scheme = $loaded_schemes[$scheme->sid];
@@ -384,7 +495,8 @@ class AccessSchemeFunctionTest extends AccessWebTestCase {
       $this->assertTrue(isset($loaded_scheme->roles) && is_array($loaded_scheme->roles), "[scheme $i of $count] Roles were attached.");
 
       // Confirm that handlers were attached.
-      $this->assertTrue(isset($loaded_scheme->handlers) && is_array($loaded_scheme->handlers), "[scheme $i of $count] Handlers were attached.");
+      $this->assertTrue(isset($loaded_scheme->handlers) && isset($loaded_scheme->handlers['node']), "[scheme $i of $count] Handlers were attached.");
+      $this->assertEqual(get_class($loaded_scheme->handlers['node']), 'ACKEntityField');
     }
 
     // Attempt to load a scheme that doesn't exist.
@@ -403,15 +515,29 @@ class AccessSchemeFunctionTest extends AccessWebTestCase {
     $this->assertEqual($scheme->sid, $loaded_scheme->sid, 'Scheme loads by machine name.');
 
     // Confirm that the scheme can be updated.
-    $loaded_scheme->name = $this->randomName();
+    $new_name = $this->randomName();
+    $loaded_scheme->name = $new_name;
     $this->assertEqual(access_scheme_save($loaded_scheme), SAVED_UPDATED, 'Scheme updated.');
+    $loaded_scheme = access_scheme_load($scheme->sid, TRUE);
+    $this->assertEqual($loaded_scheme->name, $new_name);
 
     // Confirm that the scheme can be deleted.
+    access_handler_save($loaded_scheme, 'node', 'ACKEntityField', 'access');
+    $handlers = db_query('SELECT * FROM {access_handler} WHERE scheme = :scheme', array(':scheme' => $loaded_scheme->machine_name));
+    $handler = $handlers->fetch();
+    $this->assertFalse(empty($handler), 'Handlers were attached.');
     $this->assertEqual(access_scheme_delete($loaded_scheme->sid), SAVED_DELETED, 'Scheme deleted.');
+    $this->assertFalse(access_scheme_load($loaded_scheme->sid));
+    $handlers = db_query('SELECT * FROM {access_handler} WHERE scheme = :scheme', array(':scheme' => $loaded_scheme->machine_name));
+    $this->assertFalse($handlers->fetch(), 'Handlers were detached.');
+    $this->assertNull(variable_get('access_scheme_roles_' . $loaded_scheme->machine_name), 'Role configuration was deleted.');
+    $bundles = field_info_bundles('access_grant');
+    $this->assertFalse(isset($bundles[$loaded_scheme->machine_name]), 'Bundle was deleted.');
 
     // Confirm that the scheme can be recreated.
     unset($loaded_scheme->sid);
     $this->assertEqual(access_scheme_save($loaded_scheme), SAVED_NEW, 'Scheme created.');
+    $this->assertNotNull($loaded_scheme->sid);
   }
 
   /**
@@ -539,12 +665,12 @@ class AccessGrantInterfaceTest extends AccessWebTestCase {
     $scheme = $this->createScheme();
     $this->drupalGet('admin/access/add');
     $this->assertNoLink(check_plain($scheme->name), 'The "add grant" list page is bypassed when only one scheme exists.');
-    $this->assertText(t('Grant access to @name', array('@name' => $scheme->name)));
+    $this->assertText(t('Grant access to @scheme', array('@scheme' => $scheme->name)));
     $deleted_scheme = $this->createScheme();
     $this->drupalGet('admin/access/add');
     $this->assertLink(check_plain($scheme->name), 0, 'The "add grant" list page is shown when more than one scheme exists.');
     $this->clickLink(check_plain($deleted_scheme->name));
-    $this->assertText(t('Grant access to @name', array('@name' => $deleted_scheme->name)));
+    $this->assertText(t('Grant access to @scheme', array('@scheme' => $deleted_scheme->name)));
     access_scheme_delete($deleted_scheme->sid);
     $this->drupalGet('admin/access/add');
     $this->assertNoLink(check_plain($deleted_scheme->name), 'Deleted schemes are not shown when adding a grant.');
@@ -559,7 +685,7 @@ class AccessGrantInterfaceTest extends AccessWebTestCase {
 
     // Attempt to create an access grant through the admin form for a role that
     // the test user does not yet have.
-    $this->assertText(t('Grant access to @name', array('@name' => $scheme->name)));
+    $this->assertText(t('Grant access to @scheme', array('@scheme' => $scheme->name)));
     $edit = array();
     $edit['user'] = $this->ackUser->name;
     $edit['role'] = $this->ackRole->rid;
@@ -567,6 +693,8 @@ class AccessGrantInterfaceTest extends AccessWebTestCase {
     $edit[$field_name . '[und][1]'] = TRUE;
     $this->drupalPost(NULL, $edit, t('Save'));
     $this->assertText(t('@user is not a member of the @role role.', array('@user' => $this->ackUser->name, '@role' => $this->ackRole->name)), 'Cannot add users to roles without access to administer users.');
+    $this->ackUser = user_load($this->ackUser->uid, TRUE);
+    $this->assertFalse(isset($this->ackUser->roles[$this->ackRole->rid]), 'User is not a member of the role.');
 
     // Give the admin user access to grant new roles and try again.
     $this->adminUser->original = clone $this->adminUser;
@@ -582,12 +710,32 @@ class AccessGrantInterfaceTest extends AccessWebTestCase {
       '%user' => $this->ackUser->name,
       '%role' => $this->ackRole->name,
     )), 'Grant created successfully.');
+    $this->ackUser = user_load($this->ackUser->uid, TRUE);
+    $this->assertTrue(isset($this->ackUser->roles[$this->ackRole->rid]), 'User has become a member of the role.');
     $this->drupalGet('admin/access');
     // Check that all grant fields are correctly shown in the overview.
     $this->assertText(check_plain($this->ackUser->name), 'Grant found in the grant admin overview listing.');
     $this->assertText(check_plain($this->ackRole->name));
     $this->assertText(t('True'));
     $this->assertText(check_plain($scheme->name));
+
+    // Test operations links.
+    $this->clickLink(t('edit'));
+    $this->assertRaw(t('<em>Edit @scheme for</em> @grant', array(
+      '@scheme' => $scheme->name,
+      '@grant' => t("@user's access as @role", array(
+        '@user' => $this->ackUser->name,
+        '@role' => $this->ackRole->name,
+      )),
+    )));
+    $this->clickLink(t('Cancel'));
+    $this->clickLink(t('delete'));
+    $this->assertText(t("Are you sure you want to revoke all @scheme for @user's access as @role?", array(
+      '@scheme' => $scheme->name,
+      '@user' => $this->ackUser->name,
+      '@role' => $this->ackRole->name,
+    )));
+    $this->clickLink(t('Cancel'));
 
     // View the grant.
     $this->clickLink(t('view'));
@@ -629,6 +777,11 @@ class AccessGrantInterfaceTest extends AccessWebTestCase {
       '%user' => $this->ackUser->name,
       '%role' => $this->ackRole->name,
     )), 'Duplicate access grants are not permitted.');
+
+    // Attempt to create a grant for an unknown user.
+    $edit['user'] = $this->randomName();
+    $this->drupalPost(NULL, $edit, t('Save'));
+    $this->assertRaw(t('The username %name does not exist.', array('%name' => $edit['user'])), 'Invalid user references are not permitted.');
 
     // Create a user with an unsafe username.
     $new_user = $this->drupalCreateUser();
@@ -697,6 +850,94 @@ class AccessGrantInterfaceTest extends AccessWebTestCase {
     // Check the default message for no grants.
     $this->drupalGet('admin/access');
     $this->assertText(t('No access grants available.'), 'No access grants were found.');
+  }
+
+  /**
+   * Test the grant overview filters.
+   */
+  public function testGrantOverviewFilters() {
+    // Create two schemes for testing the scheme filter.
+    $schemes = array(
+      'good' => $this->createScheme(),
+      'bad' => $this->createScheme(),
+    );
+    // Create two roles for testing the role filter.
+    $rid = $this->drupalCreateRole(array('access content'));
+    $roles = array(
+      'good' => $this->ackRole,
+      'bad' => user_role_load($rid),
+    );
+    // Enable both roles for both schemes.
+    $scheme_roles = array(
+      $roles['good']->rid => $roles['good']->name,
+      $roles['bad']->rid => $roles['bad']->name,
+    );
+    variable_set('access_scheme_roles_' . $schemes['good']->machine_name, $scheme_roles);
+    variable_set('access_scheme_roles_' . $schemes['bad']->machine_name, $scheme_roles);
+    // Create two users for testing the user filter.
+    $users = array(
+      'good' => $this->ackUser,
+      'bad' => $this->drupalCreateUser(array('access content')),
+    );
+    // Create two grants for filtering.
+    $good = $this->createGrant($schemes['good'], $roles['good'], $users['good']);
+    $bad = $this->createGrant($schemes['bad'], $roles['bad'], $users['bad']);
+
+    $this->drupalGet('admin/access');
+    foreach (array('role', 'scheme', 'username') as $filter) {
+      // Make sure that both grants are displayed on the unfiltered display.
+      $this->assertLinkByHref('admin/access/grant/' . $good->gid, 0);
+      $this->assertLinkByHref('admin/access/grant/' . $bad->gid, 0);
+      // Filter the display.
+      $edit = array();
+      $value = '';
+      switch ($filter) {
+        case 'role':
+          $edit = array('rid' => $roles['good']->rid);
+          $value = $roles['good']->name;
+          break;
+
+        case 'scheme':
+          $edit = array('scheme' => $schemes['good']->machine_name);
+          $value = $schemes['good']->name;
+          break;
+
+        case 'username':
+          $edit = array('username' => $users['good']->name);
+          $value = $users['good']->name;
+          break;
+      }
+      $this->drupalPost(NULL, $edit, 'Filter');
+      $this->assertText(t('where @filter is @value', array('@filter' => $filter, '@value' => $value)), 'Applied filter for ' . $filter . '.');
+      // Make sure that only the matching grant is displayed.
+      $this->assertLinkByHref('admin/access/grant/' . $good->gid, 0, 'Matching grants were displayed.');
+      $this->assertNoLinkByHref('admin/access/grant/' . $bad->gid, 'Non-matching grants were not displayed.');
+      // Clear the filters.
+      $this->drupalPost(NULL, array(), 'Reset');
+      $this->assertNoText(t('where @filter is @value', array('@filter' => $filter, '@value' => $value)), 'Filter text was removed on reset.');
+    }
+
+    // Test multiple filters.
+    $this->drupalPost(NULL, array('username' => $users['good']->name), 'Filter');
+    $this->drupalPost(NULL, array('scheme' => $schemes['good']->machine_name), 'Refine');
+    $this->assertText(t('where @filter is @value', array('@filter' => 'username', '@value' => $users['good']->name)), 'Applied filter for username.');
+    $this->assertText(t('and where @filter is @value', array('@filter' => 'scheme', '@value' => $schemes['good']->name)), 'Applied filter for scheme.');
+    $this->assertLinkByHref('admin/access/grant/' . $good->gid, 0, 'Matching grants were displayed.');
+    $this->assertNoLinkByHref('admin/access/grant/' . $bad->gid, 'Non-matching grants were not displayed.');
+    $this->drupalPost(NULL, array(), 'Undo');
+    $this->assertText(t('where @filter is @value', array('@filter' => 'username', '@value' => $users['good']->name)), 'Retained filter for username.');
+    $this->assertNoText(t('and where @filter is @value', array('@filter' => 'scheme', '@value' => $schemes['good']->name)), 'Removed filter for scheme.');
+    $this->assertLinkByHref('admin/access/grant/' . $good->gid, 0, 'Matching grants were displayed.');
+    $this->assertNoLinkByHref('admin/access/grant/' . $bad->gid, 'Non-matching grants were not displayed.');
+    $this->drupalPost(NULL, array('scheme' => $schemes['bad']->machine_name), 'Refine');
+    $this->assertNoLinkByHref('admin/access/grant/' . $good->gid, 'Non-matching grants were not displayed.');
+    $this->assertNoLinkByHref('admin/access/grant/' . $bad->gid, 'Non-matching grants were not displayed.');
+    $this->assertText(t('No access grants available.'));
+
+    // Clear all filters.
+    $this->drupalPost(NULL, array(), 'Reset');
+    $this->assertLinkByHref('admin/access/grant/' . $good->gid, 0);
+    $this->assertLinkByHref('admin/access/grant/' . $bad->gid, 0);
   }
 
   /**
@@ -787,6 +1028,34 @@ class AccessGrantInterfaceTest extends AccessWebTestCase {
     $this->assertFalse(access_grant_load($grant->gid, TRUE), 'Access grant is not found in the database.');
     $this->ackUser = user_load($this->ackUser->uid, TRUE);
     $this->assertFalse(isset($this->ackUser->roles[$this->ackRole->rid]), 'User was removed from the role.');
+
+    // Check multiple deletion.
+    $grant_a = $this->createGrant($scheme);
+    $grant_b = $this->createGrant($scheme);
+    $edit = array();
+    $this->drupalPost('admin/access', $edit, t('Delete selected grants'));
+    $this->assertText(t('No items selected'));
+    $key = 'grants[' . $grant_a->gid . ']';
+    $edit[$key] = TRUE;
+    $this->drupalPost('admin/access', $edit, t('Delete selected grants'));
+    $this->assertText('Are you sure you want to delete this access grant?', '[confirm deletion] Asks for confirmation.');
+    $this->assertText(access_grant_label($grant_a));
+    $this->clickLink(t('Cancel'));
+    $this->assertLinkByHref('admin/access/grant/' . $grant_a->gid);
+    $this->assertLinkByHref('admin/access/grant/' . $grant_b->gid);
+    $key = 'grants[' . $grant_b->gid . ']';
+    $edit[$key] = TRUE;
+    $this->drupalPost('admin/access', $edit, t('Delete selected grants'));
+    $this->assertText('Are you sure you want to delete these access grants?', '[confirm deletion] Asks for confirmation.');
+    $this->assertText(access_grant_label($grant_a));
+    $this->assertText(access_grant_label($grant_b));
+    $this->assertText(t('This action cannot be undone.'), '[confirm deletion] Informs that deletion is permanent.');
+    $this->drupalPost(NULL, array(), t('Delete'));
+    $this->assertText('Deleted 2 access grants.');
+    $this->assertNoLinkByHref('admin/access/grant/' . $grant_a->gid);
+    $this->assertNoLinkByHref('admin/access/grant/' . $grant_b->gid);
+    $this->assertFalse(access_grant_load($grant_a->gid, TRUE), 'Access grant is not found in the database.');
+    $this->assertFalse(access_grant_load($grant_b->gid, TRUE), 'Access grant is not found in the database.');
   }
 
 }
@@ -874,14 +1143,91 @@ class AccessGrantFunctionTest extends AccessWebTestCase {
     if (!empty($grant) && is_object($grant)) {
       $grant->$field_name = array('und' => array(array('value' => 1)));
       $this->assertEqual(access_grant_save($grant), SAVED_UPDATED, 'Grant updated.');
+      $loaded_grant = access_grant_load($grant->gid, TRUE);
+      $field = $loaded_grant->$field_name;
+      $this->assertEqual($field['und'][0]['value'], 1);
+      $realms = access_grant_realms($loaded_grant);
+      $this->assertFalse(isset($realms[0]));
+      $this->assertTrue(isset($realms[1]), 'Grant realms found.');
 
       // Confirm that the grant can be deleted.
       $this->assertEqual(access_grant_delete($grant->gid), SAVED_DELETED, 'Grant deleted.');
+      $this->assertFalse(access_grant_load($grant->gid));
 
       // Confirm that the grant can be recreated.
       unset($grant->gid);
       $this->assertEqual(access_grant_save($grant), SAVED_NEW, 'Grant created.');
     }
+
+    // Test conditional loading.
+    $scheme = $this->createListScheme('integer');
+    $field_name = $scheme->realm_field['field_name'];
+    $grant = $this->createGrant($scheme);
+    $grant->$field_name = array('und' => array(array('value' => 7)));
+    access_grant_save($grant);
+    $grant = $this->createGrant($scheme);
+    $grant->$field_name = array('und' => array(array('value' => 31)));
+    access_grant_save($grant);
+    $conditions = array(
+      // Load by scheme.
+      'scheme' => array(
+        'condition' => $scheme->machine_name,
+        'count' => 2,
+      ),
+      // Load by user.
+      'uid' => array(
+        'condition' => $grant->uid,
+        'count' => 1,
+      ),
+      // Load by role.
+      'rid' => array(
+        'condition' => $grant->rid,
+        'count' => 2,
+      ),
+    );
+    foreach ($conditions as $key => $tests) {
+      $match = TRUE;
+      $loaded_grants = access_grant_load_by_condition(array($key => $tests['condition']));
+      foreach ($loaded_grants as $loaded_grant) {
+        $match = $match && ($loaded_grant->$key == $tests['condition']);
+      }
+      $this->assertTrue($match && (count($loaded_grants) == $tests['count']), 'Loaded all grants for ' . $key . ' ' . $tests['condition']);
+    }
+    // Load by realms.
+    $conditions = array(
+      'scheme' => $scheme->machine_name,
+      'realms' => array(31),
+    );
+    $loaded_grants = access_grant_load_by_condition($conditions);
+    $loaded_grant = reset($loaded_grants);
+    $this->assertTrue((count($loaded_grants) == 1) && ($loaded_grant->gid == $grant->gid), 'Loaded only one grant with matching realms.');
+    $conditions['realms'] = array(1);
+    $loaded_grants = access_grant_load_by_condition($conditions);
+    $this->assertTrue(count($loaded_grants) == 0, 'Did not load grants with mismatching realms.');
+  }
+
+  /**
+   * Test the access grant rendering functions.
+   */
+  public function testGrantRender() {
+    $gids = array(
+      $this->grants[0]->gid,
+      $this->grants[1]->gid,
+    );
+    $loaded_grants = access_grant_load_multiple($gids);
+    $render = access_grant_view_multiple($loaded_grants, 'full', 3);
+    // Check weight and sorting.
+    $this->assertEqual($render['grants'][$gids[0]]['#weight'], 3, 'Rendered weight is correct.');
+    $this->assertEqual($render['grants'][$gids[1]]['#weight'], 4, 'Rendered weight increments.');
+    $this->assertTrue($render['grants']['#sorted'], 'Rendered grants are sorted.');
+    // Check the renderable array.
+    $this->assertEqual($render['grants'][$gids[0]]['#theme'], 'access_grant', 'Rendered grants are themed.');
+    $this->assertEqual($render['grants'][$gids[0]]['#view_mode'], 'full', 'Grants are rendered in full mode.');
+    $this->assertEqual($render['grants'][$gids[0]]['#access_grant']->gid, $gids[0], 'Grant object is included in the renderable array.');
+    // Check attached fields and pseudo-fields.
+    $this->assertEqual($render['grants'][$gids[0]]['#bundle'], $this->scheme->machine_name, 'The bundle property is attached.');
+    $this->assertTrue(isset($render['grants'][$gids[0]]['user']), 'The user property is attached.');
+    $this->assertTrue(isset($render['grants'][$gids[0]]['role']), 'The role property is attached.');
   }
 
   /**
@@ -1043,6 +1389,193 @@ class AccessAPITest extends AccessWebTestCase {
     // Check access.
     $this->assertTrue(access_user_object_access('meow', 'cat', $dummy_object, $test_user), 'User has access to an object in an assigned realm.');
     $this->assertFalse(access_user_object_access('meow', 'dog', $dummy_object, $test_user), 'User does not have access to an object in an unassigned realm.');
+  }
+
+}
+
+/**
+ * Tests the bundled scheme types and handlers.
+ */
+class AccessPluginTest extends AccessWebTestCase {
+
+  /**
+   * Implements getInfo(), required method for SimpleTest.
+   */
+  public static function getInfo() {
+    return array(
+      'name' => 'Access control kit plugins',
+      'description' => 'Tests the scheme type and handler plugins.',
+      'group' => 'Access control kit',
+    );
+  }
+
+  /**
+   * Overrides DrupalWebTestCase::setUp().
+   */
+  public function setUp() {
+    parent::setUp(array('access', 'taxonomy'));
+    // We need to start without any defined vocabularies.
+    foreach (taxonomy_vocabulary_get_names() as $vocabulary) {
+      taxonomy_vocabulary_delete($vocabulary->vid);
+    }
+  }
+
+  /**
+   * Check that scheme types are defined correctly.
+   */
+  public function testSchemeInfo() {
+    $info = access_scheme_info();
+
+    // The boolean type should always be available.
+    $this->assertTrue(isset($info['boolean']), 'The boolean scheme type is defined.');
+    $scheme = $this->createScheme('boolean');
+    $scheme = access_scheme_load($scheme->sid);
+    $realms = array(0 => t('False'), 1 => t('True'));
+    $diff_a = array_diff_assoc($scheme->realms, $realms);
+    $diff_b = array_diff_assoc($realms, $scheme->realms);
+    $this->assertTrue(empty($diff_a) && empty($diff_b), 'The boolean realms were found.');
+
+    // The user type should always be available.
+    $this->assertTrue(isset($info['user']), 'The user scheme type is defined.');
+    $scheme = $this->createScheme('user');
+    $scheme = access_scheme_load($scheme->sid);
+    $realms = db_query('SELECT uid, name FROM {users} WHERE uid > 0')->fetchAllKeyed();
+    $diff_a = array_diff_assoc($scheme->realms, $realms);
+    $diff_b = array_diff_assoc($realms, $scheme->realms);
+    $this->assertTrue(empty($diff_a) && empty($diff_b), 'The user realms were found.');
+
+    // The list types should not be available until a field exists.
+    foreach (array('integer', 'float', 'text') as $type) {
+      $list = 'list_' . $type;
+      $field_name = 'field_' . $type;
+      $this->assertFalse(isset($info[$list]), 'The ' . $list . ' scheme type is not available without a usable field.');
+      $scheme = $this->createListScheme($type);
+      $info = access_scheme_info();
+      $this->assertTrue(isset($info[$list]), 'The ' . $list . ' scheme type is available when a usable field exists.');
+      $field = field_info_field($field_name);
+      $realms = list_allowed_values($field);
+      $diff_a = array_diff_assoc($scheme->realms, $realms);
+      $diff_b = array_diff_assoc($realms, $scheme->realms);
+      $this->assertTrue(empty($diff_a) && empty($diff_b), 'The ' . $list . ' realms were found.');
+      $settings_form = call_user_func_array($scheme->info['settings callback'], array($scheme, FALSE));
+      $this->assertTrue(isset($settings_form['field_name']), 'The ' . $list . ' settings form was found.');
+      $this->assertTrue(isset($settings_form['field_name']['#options'][$field_name]), 'The usable ' . $list . ' field appears as an option.');
+    }
+
+    // The taxonomy type should not be available until a vocabulary exists.
+    $this->assertFalse(isset($info['taxonomy_term']), 'The taxonomy_term scheme type is not available without a usable vocabulary.');
+    $scheme = $this->createTaxonomyTermScheme('vocabulary_taxonomy_term');
+    $info = access_scheme_info();
+    $this->assertTrue(isset($info['taxonomy_term']), 'The taxonomy_term scheme type is available when a usable vocabulary exists.');
+    $vocabulary = taxonomy_vocabulary_machine_name_load('vocabulary_taxonomy_term');
+    $realms = db_query('SELECT tid, name FROM {taxonomy_term_data} WHERE vid = :vid', array(':vid' => $vocabulary->vid))->fetchAllKeyed();
+    $diff_a = array_diff_assoc($scheme->realms, $realms);
+    $diff_b = array_diff_assoc($realms, $scheme->realms);
+    $this->assertTrue(empty($diff_a) && empty($diff_b), 'The taxonomy_term realms were found.');
+    $settings_form = call_user_func_array($scheme->info['settings callback'], array($scheme, FALSE));
+    $this->assertTrue(isset($settings_form['vocabulary']), 'The taxonomy_term settings form was found.');
+    $this->assertTrue(isset($settings_form['vocabulary']['#options'][$vocabulary->machine_name]), 'The usable vocabulary appears as an option.');
+  }
+
+  /**
+   * Check that handlers are defined correctly.
+   */
+  public function testHanderInfo() {
+    $info = access_handler_info();
+
+    // We need schemes and a representative entity to test the handlers.
+    $scheme_list = $this->createListScheme('integer');
+    $scheme_term = $this->createTaxonomyTermScheme('vocabulary_taxonomy_term');
+    $content_type = $this->drupalCreateContentType();
+    // Add a list field to the content type.
+    $instance = array(
+      'field_name' => 'field_integer',
+      'entity_type' => 'node',
+      'bundle' => $content_type->type,
+    );
+    field_create_instance($instance);
+    // Add a term reference field to the content type.
+    $field = array(
+      'field_name' => 'field_term',
+      'type' => 'taxonomy_term_reference',
+      'settings' => array(
+        'allowed_values' => array(
+          array(
+            'vocabulary' => 'vocabulary_taxonomy_term',
+            'parent' => '0',
+          ),
+        ),
+      ),
+    );
+    field_create_field($field);
+    $instance = array(
+      'field_name' => 'field_term',
+      'entity_type' => 'node',
+      'bundle' => $content_type->type,
+      'required' => TRUE,
+    );
+    field_create_instance($instance);
+    // Create the test node.
+    $node = $this->drupalCreateNode(array('type' => $content_type->type));
+    $node = node_load($node->nid);
+    $node->field_integer[LANGUAGE_NONE][]['value'] = 7;
+    $node->field_term[LANGUAGE_NONE][]['tid'] = 3;
+    node_save($node);
+    // Get the node form for later reference.
+    $node_form_state = array();
+    $node_form_state['build_info']['args'] = array($node);
+    $node_form = drupal_build_form($node->type . '_node_form', $node_form_state);
+
+    // Test the generic field handler.
+    $this->assertTrue(isset($info['ACKEntityField']), 'Found the generic field handler.');
+    $handler = new ACKEntityField($scheme_list);
+    $description = $handler->description();
+    $this->assertIdentical($description, t('The value of %field_name will determine realm membership.', array('%field_name' => 'field_integer')), 'Generic handler has the correct description.');
+    $form = $handler->settingsForm();
+    $this->assertIdentical($form, array(), 'Generic handler has no settings.');
+    $realms = $handler->objectRealms('node', $node);
+    $this->assertIdentical($realms, array(7), 'Generic handler can find realm values on a node.');
+    // Test altering the node form.
+    $this->assertTrue(empty($node_form['field_integer'][LANGUAGE_NONE]['#disabled']), 'List field is accessible before handler is applied.');
+    $handler->objectFormAlter('node', $node, $node_form, $node_form_state, $node->type . '_node_form');
+    $this->assertTrue($node_form['field_integer'][LANGUAGE_NONE]['#disabled'], 'List field is locked after handler is applied.');
+    $this->assertTrue(isset($node_form['field_integer'][LANGUAGE_NONE]['#options']['_none']), 'List field contains the _none option.');
+    $this->assertTrue(isset($node_form['field_integer'][LANGUAGE_NONE]['#options']['1']), 'List field contains option 1.');
+    $this->assertTrue(isset($node_form['field_integer'][LANGUAGE_NONE]['#options']['7']), 'List field contains option 7.');
+    $this->assertTrue(isset($node_form['field_integer'][LANGUAGE_NONE]['#options']['31']), 'List field contains option 31.');
+    $handler->objectFormAlter('node', $node, $node_form, $node_form_state, $node->type . '_node_form', array(
+      '7',
+      '31',
+      '365',
+    ));
+    $this->assertTrue(isset($node_form['field_integer'][LANGUAGE_NONE]['#options']['_none']), 'The _none option was not removed from the list.');
+    $this->assertFalse(isset($node_form['field_integer'][LANGUAGE_NONE]['#options']['1']), 'Option 1 was removed from the the list.');
+    $this->assertTrue(isset($node_form['field_integer'][LANGUAGE_NONE]['#options']['7']), 'Option 7 remains in the list.');
+    $this->assertTrue(isset($node_form['field_integer'][LANGUAGE_NONE]['#options']['31']), 'Option 31 remains in the list.');
+    $this->assertFalse(isset($node_form['field_integer'][LANGUAGE_NONE]['#options']['365']), 'Option 365 was not added to the list.');
+
+    // Test the taxonomy term reference handler.
+    $this->assertTrue(isset($info['ACKEntityTaxonomyTermReference']), 'Found the term reference field handler.');
+    $handler = new ACKEntityTaxonomyTermReference($scheme_term, array('field_name' => 'field_term'));
+    $description = $handler->description();
+    $this->assertIdentical($description, t('The value of the selected term reference field will determine realm membership.'), 'Term handler has the correct description.');
+    $form = $handler->settingsForm();
+    $this->assertTrue(isset($form['field_name']['#default_value']), 'Term handler has settings.');
+    $this->assertIdentical($form['field_name']['#default_value'], 'field_term', 'Term handler settings default to the saved value.');
+    $realms = $handler->objectRealms('node', $node);
+    $this->assertIdentical($realms, array(3), 'Term handler can find realm values on a node.');
+    $this->assertTrue(empty($node_form['field_term'][LANGUAGE_NONE]['#disabled']), 'Term field is accessible before handler is applied.');
+    $this->assertTrue(isset($node_form['field_term'][LANGUAGE_NONE]['#options']['1']), 'Term field contains option 1.');
+    $this->assertTrue(isset($node_form['field_term'][LANGUAGE_NONE]['#options']['2']), 'Term field contains option 2.');
+    $this->assertTrue(isset($node_form['field_term'][LANGUAGE_NONE]['#options']['3']), 'Term field contains option 3.');
+    $this->assertEqual($node_form['field_term'][LANGUAGE_NONE]['#default_value'], array('3'), 'Term field defaults to the saved value.');
+    $handler->objectFormAlter('node', $node, $node_form, $node_form_state, $node->type . '_node_form', array('2'));
+    $this->assertFalse(isset($node_form['field_term'][LANGUAGE_NONE]['#options']['_none']), 'The _none option was not added to the term field.');
+    $this->assertFalse(isset($node_form['field_term'][LANGUAGE_NONE]['#options']['1']), 'Option 1 was removed from the term field.');
+    $this->assertTrue(isset($node_form['field_term'][LANGUAGE_NONE]['#options']['2']), 'Option 2 remains in the term field.');
+    $this->assertFalse(isset($node_form['field_term'][LANGUAGE_NONE]['#options']['3']), 'Option 3 was removed from the term field.');
+    $this->assertTrue($node_form['field_term'][LANGUAGE_NONE]['#disabled'], 'Term field is locked after the handler is applied.');
+    $this->assertEqual($node_form['field_term'][LANGUAGE_NONE]['#default_value'], '2', 'Only allowable term value is preselected by the handler.');
   }
 
 }

@@ -379,6 +379,9 @@ function access_grant_add_list() {
  *
  * @param object $scheme
  *   The access scheme in which to create a new grant.
+ *
+ * @return array
+ *   A form for adding a new access grant.
  */
 function access_grant_add($scheme) {
   $grant = entity_get_controller('access_grant')->create(array('scheme' => $scheme->machine_name));
@@ -390,6 +393,9 @@ function access_grant_add($scheme) {
  *
  * @param object $grant
  *   The access grant to edit.
+ *
+ * @return array
+ *   The access grant form.
  */
 function access_grant_edit($grant) {
   $scheme = access_scheme_machine_name_load($grant->scheme);

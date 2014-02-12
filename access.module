@@ -99,16 +99,19 @@ function access_grant_label($grant) {
  *   access realm field, and the values are the realm labels.
  */
 function access_grant_realms($grant) {
+  // @todo Should this be rolled into the grant controller?
   $scheme = access_scheme_machine_name_load($grant->scheme);
   $field_name = $scheme->realm_field['field_name'];
   $assigned = isset($grant->$field_name) ? $grant->$field_name : array(LANGUAGE_NONE => array());
 
   $realms = array();
-  foreach ($assigned[LANGUAGE_NONE] as $data) {
-    $key = $data['value'];
-    // Make sure that the assigned value exists in the scheme's realm list.
-    if (isset($scheme->realms[$key])) {
-      $realms[$key] = field_filter_xss($scheme->realms[$key]);
+  if (!empty($assigned[LANGUAGE_NONE])) {
+    foreach ($assigned[LANGUAGE_NONE] as $data) {
+      $key = $data['value'];
+      // Make sure that the assigned value exists in the scheme's realm list.
+      if (isset($scheme->realms[$key])) {
+        $realms[$key] = field_filter_xss($scheme->realms[$key]);
+      }
     }
   }
   return $realms;
