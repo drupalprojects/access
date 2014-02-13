@@ -87,7 +87,13 @@ function ack_node_node_access($node, $op, $account) {
 
   if (in_array($type, node_permissions_get_configured_types())) {
     if ($op == 'create' && user_access('ack create ' . $type . ' content', $account)) {
-      return NODE_ACCESS_ALLOW;
+      // The user must have the permission in at least one realm, in any scheme,
+      // in order to exercise that permission to create a node.
+      foreach (access_user_permission_realms('ack create ' . $type . ' content', $account) as $realms) {
+        if (!empty($realms)) {
+          return NODE_ACCESS_ALLOW;
+        }
+      }
     }
 
     if ($op == 'update') {

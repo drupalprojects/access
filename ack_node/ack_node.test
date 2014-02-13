@@ -1,0 +1,221 @@
+<?php
+
+/**
+ * @file
+ * Tests for the ACK node module.
+ */
+
+/**
+ * Tests the node access functions.
+ */
+class AckNodeAccessTest extends DrupalWebTestCase {
+
+  /**
+   * A user with administrative access.
+   *
+   * @var object
+   */
+  protected $adminUser;
+
+  /**
+   * An ACK-enabled role that allows editing/deleting the user's own content.
+   *
+   * @var object
+   */
+  protected $ackRoleOwn;
+
+  /**
+   * An ACK-enabled role that allows editing/deleting any content.
+   *
+   * @var object
+   */
+  protected $ackRoleAny;
+
+  /**
+   * A user to whom access will be granted during the test.
+   *
+   * @var object
+   */
+  protected $ackUser;
+
+  /**
+   * A node for testing user access.
+   *
+   * @var object
+   */
+  protected $node;
+
+  /**
+   * Implements getInfo(), required method for SimpleTest.
+   */
+  public static function getInfo() {
+    return array(
+      'name' => 'ACK node access',
+      'description' => 'Tests controlling access to nodes.',
+      'group' => 'Access control kit',
+    );
+  }
+
+  /**
+   * Overrides DrupalWebTestCase::setUp().
+   */
+  public function setUp() {
+    parent::setUp(array('ack_node'));
+    // Create and log in our admin user.
+    $this->adminUser = $this->drupalCreateUser(array(
+      'administer access schemes',
+      'administer access grants',
+      'edit any article content',
+    ));
+    $this->drupalLogin($this->adminUser);
+
+    // Create the test roles.
+    $rid = $this->drupalCreateRole(array(
+      'ack create article content',
+      'ack edit own article content',
+      'ack delete own article content',
+    ));
+    $this->ackRoleOwn = user_role_load($rid);
+    $rid = $this->drupalCreateRole(array(
+      'ack edit any article content',
+      'ack delete any article content',
+    ));
+    $this->ackRoleAny = user_role_load($rid);
+
+    // Create a user account for use in access grants.
+    $this->ackUser = $this->drupalCreateUser(array('access content'));
+    // Add the user to the test roles.
+    db_insert('users_roles')->fields(array(
+      'uid' => $this->ackUser->uid,
+      'rid' => $this->ackRoleOwn->rid,
+    ))->execute();
+    db_insert('users_roles')->fields(array(
+      'uid' => $this->ackUser->uid,
+      'rid' => $this->ackRoleAny->rid,
+    ))->execute();
+    $pass_raw = $this->ackUser->pass_raw;
+    $this->ackUser = user_load($this->ackUser->uid, TRUE);
+    $this->ackUser->pass_raw = $pass_raw;
+
+    // Create the test node.
+    $this->node = $this->drupalCreateNode(array('type' => 'article'));
+  }
+
+  /**
+   * Utility function to prepare a taxonomy-based access test.
+   *
+   * @return array
+   *   An array of available terms.
+   */
+  public function setUpTaxonomy() {
+    // Create two tags to use as realms.
+    $vocabulary = taxonomy_vocabulary_machine_name_load('tags');
+    $terms = array();
+    for ($i = 1; $i < 3; $i++) {
+      $term = new stdClass();
+      $term->vid = $vocabulary->vid;
+      $term->name = $this->randomName();
+      taxonomy_term_save($term);
+      $terms[$i] = $term;
+    }
+
+    // Tag the node.
+    $edit = array('field_tags[und]' => $terms[1]->name);
+    $this->drupalPost('node/' . $this->node->nid . '/edit', $edit, 'Save');
+    $this->node = node_load($this->node->nid, NULL, TRUE);
+
+    return $terms;
+  }
+
+  /**
+   * Test controlling access by a field value.
+   */
+  public function testFieldAccess() {
+    $this->setUpTaxonomy();
+
+    // Prepare the access scheme.
+    $name = $this->randomName();
+    $edit = array(
+      'name' => $name,
+      'machine_name' => 'test_field_access',
+      'settings[vocabulary]' => 'tags',
+      'roles[' . $this->ackRoleOwn->rid . ']' => TRUE,
+      'roles[' . $this->ackRoleAny->rid . ']' => TRUE,
+    );
+    $this->drupalPost('admin/structure/access/add/taxonomy-term', $edit, 'Save access scheme and continue');
+    $edit = array('handlers[node][handler]' => 'ACKEntityTaxonomyTermReference');
+    $this->drupalPost(NULL, $edit, 'Save access scheme');
+    $edit = array('handlers[node][settings][field_name]' => 'field_tags');
+    $this->drupalPost('admin/structure/access/test-field-access', $edit, 'Save access scheme');
+    $this->assertText('Updated access scheme ' . $name, 'Access scheme configured.');
+
+    // Test node access without any grants.
+    drupal_static_reset();
+    $this->assertFalse(node_access('create', 'article', $this->ackUser), 'User does not have access to create a node.');
+    $this->assertFalse(node_access('update', $this->node, $this->ackUser), 'User does not have access to edit the test node.');
+    $this->assertFalse(node_access('delete', $this->node, $this->ackUser), 'User does not have access to delete the test node.');
+
+    // Grant access and retest.
+    $edit = array(
+      'user' => $this->ackUser->name,
+      'role' => $this->ackRoleAny->rid,
+      'ack_test_field_access[und][1]' => TRUE,
+    );
+    $this->drupalPost('admin/access/add/test-field-access', $edit, 'Save');
+    drupal_static_reset();
+    $this->assertFalse(node_access('create', 'article', $this->ackUser), 'User does not have access to create a node.');
+    $this->assertTrue(node_access('update', $this->node, $this->ackUser), 'User has access to edit the test node.');
+    $this->assertTrue(node_access('delete', $this->node, $this->ackUser), 'User has access to delete the test node.');
+
+    // Change access and retest.
+    $edit = array(
+      'ack_test_field_access[und][1]' => FALSE,
+      'ack_test_field_access[und][2]' => TRUE,
+    );
+    $this->drupalPost('admin/access/grant/1/edit', $edit, 'Save');
+    drupal_static_reset();
+    $this->assertFalse(node_access('create', 'article', $this->ackUser), 'User does not have access to create a node.');
+    $this->assertFalse(node_access('update', $this->node, $this->ackUser), 'User does not have access to edit the test node.');
+    $this->assertFalse(node_access('delete', $this->node, $this->ackUser), 'User does not have access to delete the test node.');
+
+    // Revoke access and retest.
+    $edit = array();
+    $this->drupalPost('admin/access/grant/1/delete', $edit, 'Delete');
+    drupal_static_reset();
+    $this->assertFalse(node_access('create', 'article', $this->ackUser), 'User does not have access to create a node.');
+    $this->assertFalse(node_access('update', $this->node, $this->ackUser), 'User does not have access to edit the test node.');
+    $this->assertFalse(node_access('delete', $this->node, $this->ackUser), 'User does not have access to delete the test node.');
+
+    // Grant access through the other role and retest.
+    $edit = array(
+      'user' => $this->ackUser->name,
+      'role' => $this->ackRoleOwn->rid,
+      'ack_test_field_access[und][1]' => TRUE,
+    );
+    $this->drupalPost('admin/access/add/test-field-access', $edit, 'Save');
+    drupal_static_reset();
+    $this->assertTrue(node_access('create', 'article', $this->ackUser), 'User has access to create a node.');
+    $this->assertFalse(node_access('update', $this->node, $this->ackUser), 'User does not have access to edit the test node.');
+    $this->assertFalse(node_access('delete', $this->node, $this->ackUser), 'User does not have access to delete the test node.');
+
+    // Change the node's owner and retest.
+    $this->node->uid = $this->ackUser->uid;
+    node_save($this->node);
+    drupal_static_reset();
+    $this->assertTrue(node_access('create', 'article', $this->ackUser), 'User has access to create a node.');
+    $this->assertTrue(node_access('update', $this->node, $this->ackUser), 'User has access to edit the test node.');
+    $this->assertTrue(node_access('delete', $this->node, $this->ackUser), 'User has access to delete the test node.');
+
+    // Change access and retest.
+    $edit = array(
+      'ack_test_field_access[und][1]' => FALSE,
+      'ack_test_field_access[und][2]' => TRUE,
+    );
+    $this->drupalPost('admin/access/grant/2/edit', $edit, 'Save');
+    drupal_static_reset();
+    $this->assertTrue(node_access('create', 'article', $this->ackUser), 'User has access to create a node.');
+    $this->assertFalse(node_access('update', $this->node, $this->ackUser), 'User does not have access to edit the test node.');
+    $this->assertFalse(node_access('delete', $this->node, $this->ackUser), 'User does not have access to delete the test node.');
+  }
+
+}
