@@ -232,6 +232,52 @@ class AckNodeAccessTest extends DrupalWebTestCase {
     $disabled_field = $this->xpath('//input[@id=:id and @disabled="disabled"]', array(':id' => 'edit-field-tags-und-2'));
     $this->assertTrue($disabled_field, 'The realm field is disabled.');
     $this->assertNoFieldById('edit-field-tags-und-1', '', 'The inaccessible realm option was removed.');
+    $edit = array(
+      'title' => $this->randomName(),
+      'body[und][0][value]' => $this->randomName(),
+    );
+    $this->drupalPost(NULL, $edit, 'Save');
+    $this->assertText('Article ' . $edit['title'] . ' has been created.', 'User is able to create content in the assigned realm.');
+    $this->drupalGet('node/2/edit');
+    $this->assertTitle('Edit Article ' . $edit['title'] . ' | Drupal', 'User is able to edit own content in the assigned realm.');
+    $this->assertFieldChecked('edit-field-tags-und-2', 'The accessible realm is selected.');
+    $disabled_field = $this->xpath('//input[@id=:id and @disabled="disabled"]', array(':id' => 'edit-field-tags-und-2'));
+    $this->assertTrue($disabled_field, 'The accessible realm option is disabled.');
+    $this->assertNoFieldChecked('edit-field-tags-und-1', 'The inaccessible realm is not selected.');
+    $disabled_field = $this->xpath('//input[@id=:id and @disabled="disabled"]', array(':id' => 'edit-field-tags-und-1'));
+    $this->assertTrue($disabled_field, 'The inaccessible realm option is disabled.');
+    $edit['body[und][0][value]'] = $this->randomName();
+    $this->drupalPost(NULL, $edit, 'Save');
+    $this->assertText('Article ' . $edit['title'] . ' has been updated.', 'User is able to update content in the assigned realm.');
+
+    // Log in as a user with global node access and retest.
+    $account = $this->drupalCreateUser(array(
+      'access content',
+      'create article content',
+      'edit own article content',
+    ));
+    $this->drupalLogin($account);
+    $this->drupalGet('node/add/article');
+    $disabled_field = $this->xpath('//input[@id=:id and @disabled="disabled"]', array(':id' => 'edit-field-tags-und-2'));
+    $this->assertFalse($disabled_field, 'The realm field is not disabled.');
+    $this->assertNoFieldChecked('edit-field-tags-und-1');
+    $this->assertNoFieldChecked('edit-field-tags-und-2', 'The realm was not preselected.');
+    $edit = array(
+      'title' => $this->randomName(),
+      'body[und][0][value]' => $this->randomName(),
+      'field_tags[und][2]' => TRUE,
+    );
+    $this->drupalPost(NULL, $edit, 'Save');
+    $this->assertText('Article ' . $edit['title'] . ' has been created.', 'User is able to create content.');
+    $this->drupalGet('node/3/edit');
+    $this->assertTitle('Edit Article ' . $edit['title'] . ' | Drupal', 'User is able to edit own content.');
+    $disabled_field = $this->xpath('//input[@id=:id and @disabled="disabled"]', array(':id' => 'edit-field-tags-und-2'));
+    $this->assertFalse($disabled_field, 'The realm field is not disabled.');
+    $this->assertNoFieldChecked('edit-field-tags-und-1');
+    $this->assertFieldChecked('edit-field-tags-und-2', 'The realm is selected.');
+    $edit['body[und][0][value]'] = $this->randomName();
+    $this->drupalPost(NULL, $edit, 'Save');
+    $this->assertText('Article ' . $edit['title'] . ' has been updated.', 'User is able to update content.');
   }
 
 }
