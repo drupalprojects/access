@@ -123,28 +123,40 @@ function ack_node_form_node_form_alter(&$form, &$form_state, $form_id) {
   $node = $form_state['node'];
   $schemes = access_object_schemes('node');
 
-  // Check whether the user has global permission to create/edit this node type,
-  // which trumps any of our ACK permissions.
-  if (empty($node->nid)) {
-    $global = user_access('create ' . $node->type . ' content');
-    if (!$global) {
-      // Get the list of realms in which the user can create this type of node.
-      $realms = access_user_permission_realms('ack create ' . $node->type . ' content', $user, $schemes);
-    }
+  // Only filter the create form if the user lacks global create permission.
+  if (empty($node->nid) && !user_access('create ' . $node->type . ' content')) {
+    // Get the list of realms in which the user can create this type of node.
+    $realms = access_user_permission_realms('ack create ' . $node->type . ' content', $user, $schemes);
+    _ack_node_form_node_form_alter($form, $form_state, $form_id, $schemes, $realms);
   }
-  else {
-    $global = (user_access('edit any ' . $node->type . ' content') || (user_access('edit own ' . $node->type . ' content') && ($user->uid == $node->uid)));
+  // Only filter the edit form if the user lacks global edit any/own permission.
+  elseif (!empty($node->nid) && !(user_access('edit any ' . $node->type . ' content') || (user_access('edit own ' . $node->type . ' content') && ($user->uid == $node->uid)))) {
+    _ack_node_form_node_form_alter($form, $form_state, $form_id, $schemes);
   }
+}
 
-  // If no global access, filter the form.
-  if (!$global) {
-    foreach ($schemes as $scheme) {
-      if (empty($node->nid)) {
-        $scheme->handlers['node']->objectFormAlter('node', $node, $form, $form_state, $form_id, $realms[$scheme->machine_name]);
-      }
-      else {
-        $scheme->handlers['node']->objectFormAlter('node', $node, $form, $form_state, $form_id);
-      }
-    }
+/**
+ * Helper function for ack_node_form_node_form_alter().
+ *
+ * Applies AccessControlKitHandlerInterface::objectFormAlter() to the node form
+ * for all applicable handlers.
+ *
+ * @param array &$form
+ *   The node form.
+ * @param array &$form_state
+ *   The current form state.
+ * @param string $form_id
+ *   The form ID.
+ * @param array $schemes
+ *   An array of access schemes.
+ * @param array $realms
+ *   (optional) An array, indexed by scheme machine name, where the values are
+ *   arrays of realm values. Defaults to NULL.
+ */
+function _ack_node_form_node_form_alter(&$form, &$form_state, $form_id, $schemes, $realms = NULL) {
+  $node = $form_state['node'];
+  foreach ($schemes as $scheme) {
+    $scheme_realms = !empty($realms) ? $realms[$scheme->machine_name] : NULL;
+    $scheme->handlers['node']->objectFormAlter('node', $node, $form, $form_state, $form_id, $scheme_realms);
   }
 }

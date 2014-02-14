@@ -1524,6 +1524,7 @@ class AccessPluginTest extends AccessWebTestCase {
     // Get the node form for later reference.
     $node_form_state = array();
     $node_form_state['build_info']['args'] = array($node);
+    module_load_include('inc', 'node', 'node.pages');
     $node_form = drupal_build_form($node->type . '_node_form', $node_form_state);
 
     // Test the generic field handler.
