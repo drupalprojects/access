@@ -101,7 +101,8 @@ class ACKEntityField extends AccessControlKitHandler {
         // If only one option remains, select it for the user.
         if (count($element['#options']) == 1) {
           $element['#disabled'] = TRUE;
-          $element['#default_value'] = key($element['#options']);
+          $key = key($element['#options']);
+          $element['#default_value'] = is_array($element['#default_value']) ? array($key) : $key;
         }
       }
     }

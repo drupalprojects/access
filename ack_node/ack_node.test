@@ -119,8 +119,16 @@ class AckNodeAccessTest extends DrupalWebTestCase {
       $terms[$i] = $term;
     }
 
+    // Switch the tags field from the tagging widget to checkboxes.
+    $instance = field_info_instance('node', 'field_tags', 'article');
+    $instance['widget'] = array(
+      'type' => 'options_buttons',
+      'module' => 'options',
+    );
+    field_update_instance($instance);
+
     // Tag the node.
-    $edit = array('field_tags[und]' => $terms[1]->name);
+    $edit = array('field_tags[und][1]' => TRUE);
     $this->drupalPost('node/' . $this->node->nid . '/edit', $edit, 'Save');
     $this->node = node_load($this->node->nid, NULL, TRUE);
 
@@ -216,6 +224,14 @@ class AckNodeAccessTest extends DrupalWebTestCase {
     $this->assertTrue(node_access('create', 'article', $this->ackUser), 'User has access to create a node.');
     $this->assertFalse(node_access('update', $this->node, $this->ackUser), 'User does not have access to edit the test node.');
     $this->assertFalse(node_access('delete', $this->node, $this->ackUser), 'User does not have access to delete the test node.');
+
+    // Log in as the ACK user and test realm filtering on the node form.
+    $this->drupalLogin($this->ackUser);
+    $this->drupalGet('node/add/article');
+    $this->assertFieldChecked('edit-field-tags-und-2', 'The only available realm is preselected.');
+    $disabled_field = $this->xpath('//input[@id=:id and @disabled="disabled"]', array(':id' => 'edit-field-tags-und-2'));
+    $this->assertTrue($disabled_field, 'The realm field is disabled.');
+    $this->assertNoFieldById('edit-field-tags-und-1', '', 'The inaccessible realm option was removed.');
   }
 
 }
