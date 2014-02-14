@@ -1575,7 +1575,7 @@ class AccessPluginTest extends AccessWebTestCase {
     $this->assertTrue(isset($node_form['field_term'][LANGUAGE_NONE]['#options']['2']), 'Option 2 remains in the term field.');
     $this->assertFalse(isset($node_form['field_term'][LANGUAGE_NONE]['#options']['3']), 'Option 3 was removed from the term field.');
     $this->assertTrue($node_form['field_term'][LANGUAGE_NONE]['#disabled'], 'Term field is locked after the handler is applied.');
-    $this->assertEqual($node_form['field_term'][LANGUAGE_NONE]['#default_value'], '2', 'Only allowable term value is preselected by the handler.');
+    $this->assertEqual($node_form['field_term'][LANGUAGE_NONE]['#default_value'], array('2'), 'Only allowable term value is preselected by the handler.');
   }
 
 }
