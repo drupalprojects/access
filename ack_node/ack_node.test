@@ -104,19 +104,19 @@ class AckNodeAccessTest extends DrupalWebTestCase {
   /**
    * Utility function to prepare a taxonomy-based access test.
    *
-   * @return array
-   *   An array of available terms.
+   * @param string $scheme_machine_name
+   *   The access scheme machine name.
+   * @param string $class
+   *   The handler class name.
    */
-  public function setUpTaxonomy() {
+  public function setUpTaxonomy($scheme_machine_name, $class) {
     // Create two tags to use as realms.
     $vocabulary = taxonomy_vocabulary_machine_name_load('tags');
-    $terms = array();
-    for ($i = 1; $i < 3; $i++) {
+    for ($i = 0; $i < 2; $i++) {
       $term = new stdClass();
       $term->vid = $vocabulary->vid;
       $term->name = $this->randomName();
       taxonomy_term_save($term);
-      $terms[$i] = $term;
     }
 
     // Switch the tags field from the tagging widget to checkboxes.
@@ -132,30 +132,30 @@ class AckNodeAccessTest extends DrupalWebTestCase {
     $this->drupalPost('node/' . $this->node->nid . '/edit', $edit, 'Save');
     $this->node = node_load($this->node->nid, NULL, TRUE);
 
-    return $terms;
-  }
-
-  /**
-   * Test controlling access by a field value.
-   */
-  public function testFieldAccess() {
-    $this->setUpTaxonomy();
-
     // Prepare the access scheme.
     $name = $this->randomName();
     $edit = array(
       'name' => $name,
-      'machine_name' => 'test_field_access',
+      'machine_name' => $scheme_machine_name,
       'settings[vocabulary]' => 'tags',
       'roles[' . $this->ackRoleOwn->rid . ']' => TRUE,
       'roles[' . $this->ackRoleAny->rid . ']' => TRUE,
     );
     $this->drupalPost('admin/structure/access/add/taxonomy-term', $edit, 'Save access scheme and continue');
-    $edit = array('handlers[node][handler]' => 'ACKEntityTaxonomyTermReference');
+    $edit = array('handlers[node][handler]' => $class);
     $this->drupalPost(NULL, $edit, 'Save access scheme');
-    $edit = array('handlers[node][settings][field_name]' => 'field_tags');
-    $this->drupalPost('admin/structure/access/test-field-access', $edit, 'Save access scheme');
     $this->assertText('Updated access scheme ' . $name, 'Access scheme configured.');
+  }
+
+  /**
+   * Utility function to run taxonomy-related access tests.
+   *
+   * @param string $scheme_machine_name
+   *   The access scheme machine name.
+   */
+  public function assertTaxonomyAccess($scheme_machine_name) {
+    $scheme_field = 'ack_' . $scheme_machine_name;
+    $scheme_url = str_replace('_', '-', $scheme_machine_name);
 
     // Test node access without any grants.
     drupal_static_reset();
@@ -167,9 +167,9 @@ class AckNodeAccessTest extends DrupalWebTestCase {
     $edit = array(
       'user' => $this->ackUser->name,
       'role' => $this->ackRoleAny->rid,
-      'ack_test_field_access[und][1]' => TRUE,
+      $scheme_field . '[und][1]' => TRUE,
     );
-    $this->drupalPost('admin/access/add/test-field-access', $edit, 'Save');
+    $this->drupalPost('admin/access/add/' . $scheme_url, $edit, 'Save');
     drupal_static_reset();
     $this->assertFalse(node_access('create', 'article', $this->ackUser), 'User does not have access to create a node.');
     $this->assertTrue(node_access('update', $this->node, $this->ackUser), 'User has access to edit the test node.');
@@ -177,8 +177,8 @@ class AckNodeAccessTest extends DrupalWebTestCase {
 
     // Change access and retest.
     $edit = array(
-      'ack_test_field_access[und][1]' => FALSE,
-      'ack_test_field_access[und][2]' => TRUE,
+      $scheme_field . '[und][1]' => FALSE,
+      $scheme_field . '[und][2]' => TRUE,
     );
     $this->drupalPost('admin/access/grant/1/edit', $edit, 'Save');
     drupal_static_reset();
@@ -198,9 +198,9 @@ class AckNodeAccessTest extends DrupalWebTestCase {
     $edit = array(
       'user' => $this->ackUser->name,
       'role' => $this->ackRoleOwn->rid,
-      'ack_test_field_access[und][1]' => TRUE,
+      $scheme_field . '[und][1]' => TRUE,
     );
-    $this->drupalPost('admin/access/add/test-field-access', $edit, 'Save');
+    $this->drupalPost('admin/access/add/' . $scheme_url, $edit, 'Save');
     drupal_static_reset();
     $this->assertTrue(node_access('create', 'article', $this->ackUser), 'User has access to create a node.');
     $this->assertFalse(node_access('update', $this->node, $this->ackUser), 'User does not have access to edit the test node.');
@@ -216,8 +216,8 @@ class AckNodeAccessTest extends DrupalWebTestCase {
 
     // Change access and retest.
     $edit = array(
-      'ack_test_field_access[und][1]' => FALSE,
-      'ack_test_field_access[und][2]' => TRUE,
+      $scheme_field . '[und][1]' => FALSE,
+      $scheme_field . '[und][2]' => TRUE,
     );
     $this->drupalPost('admin/access/grant/2/edit', $edit, 'Save');
     drupal_static_reset();
@@ -278,6 +278,25 @@ class AckNodeAccessTest extends DrupalWebTestCase {
     $edit['body[und][0][value]'] = $this->randomName();
     $this->drupalPost(NULL, $edit, 'Save');
     $this->assertText('Article ' . $edit['title'] . ' has been updated.', 'User is able to update content.');
+  }
+
+  /**
+   * Test controlling access by a field value.
+   */
+  public function testFieldAccess() {
+    $this->setUpTaxonomy('test_field_access', 'ACKEntityTaxonomyTermReference');
+    $edit = array('handlers[node][settings][field_name]' => 'field_tags');
+    $this->drupalPost('admin/structure/access/test-field-access', $edit, 'Save access scheme');
+    $this->assertText('Updated access scheme', 'Handler settings saved.');
+    $this->assertTaxonomyAccess('test_field_access');
+  }
+
+  /**
+   * Test controlling access with the taxonomy index.
+   */
+  public function testTaxonomyAccess() {
+    $this->setUpTaxonomy('test_taxonomy_access', 'ACKNodeTaxonomyIndex');
+    $this->assertTaxonomyAccess('test_taxonomy_access');
   }
 
 }
