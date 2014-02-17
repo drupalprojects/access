@@ -91,6 +91,13 @@ function access_schema() {
         'not null' => TRUE,
         'default' => '',
       ),
+      'realm_field_name' => array(
+        'description' => 'The name of the field attached to grants in this scheme that determines the realm values.',
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+        'default' => '',
+      ),
       'description' => array(
         'description' => 'A brief description of this access scheme.',
         'type' => 'text',
@@ -346,4 +353,26 @@ function access_update_7106() {
     'not null' => TRUE,
     'default' => '',
   ));
+}
+
+/**
+ * Add the {access_scheme}.realm_field_name field.
+ */
+function access_update_7107() {
+  db_add_field('access_scheme', 'realm_field_name', array(
+    'description' => 'The name of the field attached to grants in this scheme that determines the realm values.',
+    'type' => 'varchar',
+    'length' => 32,
+    'not null' => TRUE,
+    'default' => '',
+  ));
+  $result = db_query('SELECT sid, machine_name FROM {access_scheme}');
+  foreach ($result as $row) {
+    db_update('access_scheme')
+      ->fields(array(
+        'realm_field_name' => 'ack_' . $row->machine_name,
+      ))
+      ->condition('sid', $row->sid)
+      ->execute();
+  }
 }

@@ -46,7 +46,7 @@ class AccessSchemeEntityController extends DrupalDefaultEntityController {
       $scheme->info = access_scheme_info($scheme->type);
 
       // Attach realm information.
-      $scheme->realm_field = field_info_field(_access_realm_field_name($scheme));
+      $scheme->realm_field = field_info_field($scheme->realm_field_name);
       if (!empty($scheme->info['realms callback']) && function_exists($scheme->info['realms callback'])) {
         $scheme->realms = call_user_func_array($scheme->info['realms callback'], array($scheme));
       }
@@ -82,6 +82,7 @@ class AccessSchemeEntityController extends DrupalDefaultEntityController {
    *   - name: The human-readable name of the scheme.
    *   - type: The type of object or value that defines the scheme's realms.
    *   - description: A description of the access scheme.
+   *   - realm_field_name: (optional) The name of the realm field.
    *   - settings: (optional) An array of additional scheme settings.
    *   - original: (optional) The original scheme object before any changes were
    *     applied. When omitted, the unchanged scheme object is loaded from the

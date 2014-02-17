@@ -444,22 +444,23 @@ function access_scheme_static_reset($ids = NULL) {
 }
 
 /**
- * Implements hook_access_scheme_insert().
+ * Implements hook_access_scheme_presave().
  */
-function access_access_scheme_insert($scheme) {
+function access_access_scheme_presave($scheme) {
+  // Prevent a blank realm_field_name property.
+  if (empty($scheme->realm_field_name)) {
+    $scheme->realm_field_name = 'ack_' . $scheme->machine_name;
+  }
   // Make sure we have the scheme type definition on the object.
   if (empty($scheme->info)) {
     $scheme->info = access_scheme_info($scheme->type);
   }
-  // Create the realm field for the scheme.
   if (!empty($scheme->info)) {
-    $field_name = _access_realm_field_name($scheme);
-
-    // Create the field.
-    $field = field_info_field($field_name);
+    // If the realm field doesn't exist, create it.
+    $field = field_info_field($scheme->realm_field_name);
     if (empty($field)) {
       $field = array(
-        'field_name' => $field_name,
+        'field_name' => $scheme->realm_field_name,
         'type' => 'list_' . $scheme->info['data_type'],
         'entity_types' => array('access_grant'),
         'cardinality' => FIELD_CARDINALITY_UNLIMITED,
@@ -471,25 +472,39 @@ function access_access_scheme_insert($scheme) {
       );
       field_create_field($field);
     }
-
-    // Create the instance.
-    $instance = field_info_instance('access_grant', $field_name, $scheme->machine_name);
-    if (empty($instance)) {
-      $instance = array(
-        'field_name' => $field_name,
-        'entity_type' => 'access_grant',
-        'bundle' => $scheme->machine_name,
-        'label' => check_plain($scheme->name),
-        'description' => filter_xss($scheme->description),
-        'required' => TRUE,
-        'widget' => array(
-          'type' => 'options_buttons',
-          'settings' => array(),
-        ),
-      );
-      field_create_instance($instance);
-    }
   }
+}
+
+/**
+ * Implements hook_access_scheme_insert().
+ */
+function access_access_scheme_insert($scheme) {
+  // Create the realm field instance.
+  $instance = field_info_instance('access_grant', $scheme->realm_field_name, $scheme->machine_name);
+  if (empty($instance)) {
+    $instance = array(
+      'field_name' => $scheme->realm_field_name,
+      'entity_type' => 'access_grant',
+      'bundle' => $scheme->machine_name,
+      'label' => check_plain($scheme->name),
+      'description' => filter_xss($scheme->description),
+      'required' => TRUE,
+      'widget' => array(
+        'type' => 'options_buttons',
+        'settings' => array(),
+      ),
+    );
+    field_create_instance($instance);
+  }
+}
+
+/**
+ * Implements hook_access_scheme_update().
+ */
+function access_access_scheme_update($scheme) {
+  // In case (for some reason) the scheme's realm field changes, make sure that
+  // the field is attached to grants in this scheme.
+  access_access_scheme_insert($scheme);
 }
 
 /**
@@ -538,24 +553,6 @@ function access_scheme_info($type = NULL) {
  */
 function access_scheme_type_load($type) {
   return access_scheme_info(str_replace('-', '_', $type));
-}
-
-/**
- * Generates the name for the realm field in an access scheme bundle.
- *
- * This function is only intended for use internally by the access scheme insert
- * and load operations.  Once a scheme has been loaded, the name of its realm
- * field can be found at $scheme->realm_field['field_name'].
- *
- * @param object $scheme
- *   An access scheme.
- *
- * @return string
- *   The name to use for the realm field.
- */
-function _access_realm_field_name($scheme) {
-  // @todo Move field name generation to the scheme controller.
-  return 'ack_' . $scheme->machine_name;
 }
 
 /**

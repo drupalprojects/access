@@ -485,7 +485,7 @@ class AccessSchemeFunctionTest extends AccessWebTestCase {
       $this->assertEqual($scheme->description, $loaded_scheme->description, "[scheme $i of $count] Description is OK.");
 
       // Confirm that the scheme's access realm field exists.
-      $this->assertTrue(isset($loaded_scheme->realm_field) && isset($loaded_scheme->realm_field['field_name']) && $loaded_scheme->realm_field['field_name'] == _access_realm_field_name($scheme), "[scheme $i of $count] Realm field exists.");
+      $this->assertTrue(isset($loaded_scheme->realm_field) && isset($loaded_scheme->realm_field['field_name']) && $loaded_scheme->realm_field['field_name'] == $scheme->realm_field_name, "[scheme $i of $count] Realm field exists.");
 
       // Confirm that scheme type and realm information were attached.
       $this->assertTrue(isset($loaded_scheme->info) && isset($loaded_scheme->info['type']) && $loaded_scheme->info['type'] == 'boolean', "[scheme $i of $count] Scheme type info was attached.");
@@ -1377,7 +1377,7 @@ class AccessAPITest extends AccessWebTestCase {
     // Create an access grant in the scheme for a test user.
     $grant = $this->createGrant($this->scheme, $this->ackRole);
     // Assign access in the TRUE realm.
-    $fieldname = _access_realm_field_name($this->scheme);
+    $fieldname = $this->scheme->realm_field_name;
     $grant->$fieldname = array(LANGUAGE_NONE => array(array('value' => TRUE)));
     access_grant_save($grant);
     // Reset grant cache.
