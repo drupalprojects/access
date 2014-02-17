@@ -1146,7 +1146,7 @@ class AccessGrantFunctionTest extends AccessWebTestCase {
       $loaded_grant = access_grant_load($grant->gid, TRUE);
       $field = $loaded_grant->$field_name;
       $this->assertEqual($field['und'][0]['value'], 1);
-      $realms = access_grant_realms($loaded_grant);
+      $realms = $loaded_grant->realms;
       $this->assertFalse(isset($realms[0]));
       $this->assertTrue(isset($realms[1]), 'Grant realms found.');
 

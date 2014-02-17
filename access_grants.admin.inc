@@ -78,7 +78,7 @@ function access_admin_grants() {
   $options = array();
   foreach ($result as $gid => $fields) {
     // Get the realms list, truncated for length.
-    $realms = implode(', ', access_grant_realms($grants[$gid]));
+    $realms = implode(', ', $grants[$gid]->realms);
     if (drupal_strlen($realms) > 30) {
       $realms = drupal_substr($realms, 0, 25) . '...';
     }
@@ -87,8 +87,8 @@ function access_admin_grants() {
     $options[$gid] = array(
       'username' => theme('username', array('account' => $fields)),
       'role' => check_plain($fields->role),
-      // We don't need to check_plain($realms) because access_grant_realms()
-      // already sanitized the realm labels.
+      // We don't need to check_plain($realms) because $grant->realms is already
+      // sanitized in AccessGrantEntityController::attachLoad().
       'realms' => $realms,
       'scheme' => check_plain($fields->scheme),
     );

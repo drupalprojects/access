@@ -29,6 +29,31 @@ class AccessGrantEntityController extends DrupalDefaultEntityController {
   }
 
   /**
+   * Overrides DrupalDefaultEntityController::attachLoad().
+   */
+  protected function attachLoad(&$grants, $revision_id = FALSE) {
+    parent::attachLoad($grants, $revision_id);
+    foreach ($grants as $grant) {
+      // Make the realm field's values available as $grant->realms, an array
+      // where the keys are the values of the grant's access realm field, and
+      // the values are the realm labels.
+      $grant->realms = array();
+      $scheme = access_scheme_machine_name_load($grant->scheme);
+      $field_name = $scheme->realm_field['field_name'];
+      $assigned = isset($grant->$field_name) ? $grant->$field_name : array(LANGUAGE_NONE => array());
+      if (!empty($assigned[LANGUAGE_NONE])) {
+        foreach ($assigned[LANGUAGE_NONE] as $data) {
+          $key = $data['value'];
+          // Make sure that the assigned value exists in the realm list.
+          if (isset($scheme->realms[$key])) {
+            $grant->realms[$key] = field_filter_xss($scheme->realms[$key]);
+          }
+        }
+      }
+    }
+  }
+
+  /**
    * Saves an access grant to the database.
    *
    * @param object $grant
