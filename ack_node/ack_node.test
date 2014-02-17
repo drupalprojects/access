@@ -299,4 +299,61 @@ class AckNodeAccessTest extends DrupalWebTestCase {
     $this->assertTaxonomyAccess('test_taxonomy_access');
   }
 
+  /**
+   * Test controlling access by author.
+   */
+  public function testAuthorAccess() {
+    // Prepare the access scheme.
+    $name = $this->randomName();
+    $edit = array(
+      'name' => $name,
+      'machine_name' => 'test_author_access',
+      'roles[' . $this->ackRoleAny->rid . ']' => TRUE,
+    );
+    $this->drupalPost('admin/structure/access/add/user', $edit, 'Save access scheme and continue');
+    $edit = array('handlers[node][handler]' => 'ACKNodeAuthor');
+    $this->drupalPost(NULL, $edit, 'Save access scheme');
+    $this->assertText('Updated access scheme ' . $name, 'Access scheme configured.');
+
+    // Test node access without any grants.
+    drupal_static_reset();
+    $this->assertFalse(node_access('update', $this->node, $this->ackUser), 'User does not have access to edit the test node.');
+    $this->assertFalse(node_access('delete', $this->node, $this->ackUser), 'User does not have access to delete the test node.');
+
+    // Grant access and retest.
+    $edit = array(
+      'user' => $this->ackUser->name,
+      'role' => $this->ackRoleAny->rid,
+      'ack_test_author_access[und][2]' => TRUE,
+    );
+    $this->drupalPost('admin/access/add/test-author-access', $edit, 'Save');
+    drupal_static_reset();
+    $this->assertTrue(node_access('update', $this->node, $this->ackUser), 'User has access to edit the test node.');
+    $this->assertTrue(node_access('delete', $this->node, $this->ackUser), 'User has access to delete the test node.');
+
+    // Change access and retest.
+    $edit = array(
+      'ack_test_author_access[und][2]' => FALSE,
+      'ack_test_author_access[und][3]' => TRUE,
+    );
+    $this->drupalPost('admin/access/grant/1/edit', $edit, 'Save');
+    drupal_static_reset();
+    $this->assertFalse(node_access('update', $this->node, $this->ackUser), 'User does not have access to edit the test node.');
+    $this->assertFalse(node_access('delete', $this->node, $this->ackUser), 'User does not have access to delete the test node.');
+
+    // Change node properties and retest.
+    $this->node->uid = 3;
+    node_save($this->node);
+    drupal_static_reset();
+    $this->assertTrue(node_access('update', $this->node, $this->ackUser), 'User has access to edit the test node.');
+    $this->assertTrue(node_access('delete', $this->node, $this->ackUser), 'User has access to delete the test node.');
+
+    // Revoke access and retest.
+    $edit = array();
+    $this->drupalPost('admin/access/grant/1/delete', $edit, 'Delete');
+    drupal_static_reset();
+    $this->assertFalse(node_access('update', $this->node, $this->ackUser), 'User does not have access to edit the test node.');
+    $this->assertFalse(node_access('delete', $this->node, $this->ackUser), 'User does not have access to delete the test node.');
+  }
+
 }
