@@ -25,6 +25,7 @@ function ack_menu_access_handler_info() {
     'scheme types' => array_keys(access_scheme_info()),
     'object types' => array('menu_link'),
   );
+  // @todo Support access to menu items based on author of the node it links to?
   return $info;
 }
 

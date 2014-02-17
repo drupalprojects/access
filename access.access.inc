@@ -76,8 +76,6 @@ function access_access_scheme_info() {
     'description' => t('A <em>user account</em> scheme controls access to ACK-supported objects based on the users associated with those objects. For example, you could grant User A access to all content authored by User B.'),
     'realms callback' => 'access_scheme_user_realms',
   );
-  // @todo Support access to nodes based on authorship.
-  // @todo Support access to menu items based on author of the node it links to?
   return $info;
 }
 
