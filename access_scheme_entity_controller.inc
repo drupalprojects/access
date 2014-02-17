@@ -112,7 +112,6 @@ class AccessSchemeEntityController extends DrupalDefaultEntityController {
       }
 
       // The machine name and type are not editable after creation.
-      // @todo Allow machine name to change by changing grants (and handlers?) to reference sid instead of machine name?  Doing so might also make the static cache in _machine_name_load() unnecessary.
       if (!empty($scheme->original)) {
         $scheme->machine_name = $scheme->original->machine_name;
         $scheme->type = $scheme->original->type;
