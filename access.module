@@ -290,27 +290,6 @@ function access_grant_build_content($grant, $view_mode = 'full') {
 }
 
 /**
- * Implements hook_access_grant_view().
- */
-function access_access_grant_view($grant) {
-  $account = user_load($grant->uid);
-  $grant->content['user'] = array(
-    '#type' => 'item',
-    '#title' => t('User:'),
-    '#markup' => theme('username', array('account' => $account)),
-    '#weight' => -5,
-  );
-
-  $role = user_role_load($grant->rid);
-  $grant->content['role'] = array(
-    '#type' => 'item',
-    '#title' => t('Role:'),
-    '#markup' => check_plain($role->name),
-    '#weight' => -4,
-  );
-}
-
-/**
  * Menu title callback for adding a grant within a scheme.
  */
 function access_grant_add_page_title($scheme) {

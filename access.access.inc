@@ -279,3 +279,24 @@ function access_access_handler_info() {
 
   return $info;
 }
+
+/**
+ * Implements hook_access_grant_view().
+ */
+function access_access_grant_view($grant) {
+  $account = user_load($grant->uid);
+  $grant->content['user'] = array(
+    '#type' => 'item',
+    '#title' => t('User:'),
+    '#markup' => theme('username', array('account' => $account)),
+    '#weight' => -5,
+  );
+
+  $role = user_role_load($grant->rid);
+  $grant->content['role'] = array(
+    '#type' => 'item',
+    '#title' => t('Role:'),
+    '#markup' => check_plain($role->name),
+    '#weight' => -4,
+  );
+}
