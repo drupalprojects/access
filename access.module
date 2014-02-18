@@ -496,15 +496,26 @@ function access_access_scheme_insert($scheme) {
     );
     field_create_instance($instance);
   }
+  // Save the roles.
+  if (empty($scheme->roles)) {
+    $scheme->roles = array();
+  }
+  variable_set('access_scheme_roles_' . $scheme->machine_name, $scheme->roles);
 }
 
 /**
  * Implements hook_access_scheme_update().
  */
 function access_access_scheme_update($scheme) {
-  // In case (for some reason) the scheme's realm field changes, make sure that
-  // the field is attached to grants in this scheme.
   access_access_scheme_insert($scheme);
+}
+
+/**
+ * Implements hook_access_scheme_delete().
+ */
+function access_access_scheme_delete($scheme) {
+  // Delete the scheme's role configuration.
+  variable_del('access_scheme_roles_' . $scheme->machine_name);
 }
 
 /**

@@ -396,10 +396,7 @@ function access_scheme_form_submit($form, &$form_state) {
   // Save the scheme.
   $status = access_scheme_save($scheme);
 
-  // @todo Should role and attached handler saves be moved to the entity controller's save()? Or to access_scheme_save()?
-  // Save the roles.
-  variable_set('access_scheme_roles_' . $scheme->machine_name, $scheme->roles);
-
+  // @todo Should attached handler saves be moved to the entity controller's save()? Or to access_scheme_save()?
   // Save the attached handlers.
   if (isset($scheme->handlers)) {
     $handler_info = access_handler_info();

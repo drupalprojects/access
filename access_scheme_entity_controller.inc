@@ -176,9 +176,6 @@ class AccessSchemeEntityController extends DrupalDefaultEntityController {
           ->condition('sid', $sid)
           ->execute();
 
-        // Delete the scheme's role configuration.
-        variable_del('access_scheme_roles_' . $scheme->machine_name);
-
         // Notify the Field API and other interested modules of the deletion.
         field_attach_delete_bundle('access_grant', $scheme->machine_name);
         module_invoke_all('access_scheme_delete', $scheme);
