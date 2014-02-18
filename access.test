@@ -453,7 +453,8 @@ class AccessSchemeFunctionTest extends AccessWebTestCase {
     $this->schemes[] = $this->createScheme();
     // Attach a handler to each.
     foreach ($this->schemes as $scheme) {
-      access_handler_save($scheme, 'node', 'ACKEntityField', 'access');
+      entity_get_controller('access_scheme')->attachHandler($scheme, 'node', 'ACKEntityField');
+      access_scheme_save($scheme);
     }
   }
 
@@ -522,7 +523,8 @@ class AccessSchemeFunctionTest extends AccessWebTestCase {
     $this->assertEqual($loaded_scheme->name, $new_name);
 
     // Confirm that the scheme can be deleted.
-    access_handler_save($loaded_scheme, 'node', 'ACKEntityField', 'access');
+    entity_get_controller('access_scheme')->attachHandler($loaded_scheme, 'node', 'ACKEntityField');
+    access_scheme_save($loaded_scheme);
     $handlers = db_query('SELECT * FROM {access_handler} WHERE scheme = :scheme', array(':scheme' => $loaded_scheme->machine_name));
     $handler = $handlers->fetch();
     $this->assertFalse(empty($handler), 'Handlers were attached.');
@@ -1369,8 +1371,9 @@ class AccessAPITest extends AccessWebTestCase {
     $dummy_object = new stdClass();
 
     // Attach the test "meow" handler for dummy "cat" and "dog" object types.
-    access_handler_save($this->scheme, 'cat', 'ACKTestMeowHandler', 'access_test');
-    access_handler_save($this->scheme, 'dog', 'ACKTestMeowHandler', 'access_test');
+    entity_get_controller('access_scheme')->attachHandler($this->scheme, 'cat', 'ACKTestMeowHandler');
+    entity_get_controller('access_scheme')->attachHandler($this->scheme, 'dog', 'ACKTestMeowHandler');
+    access_scheme_save($this->scheme);
     // Reset the scheme cache.
     $this->scheme = access_scheme_load($this->scheme->sid, TRUE);
 

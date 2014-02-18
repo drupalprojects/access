@@ -587,61 +587,6 @@ function access_handler_info() {
 }
 
 /**
- * Saves an access handler attachment to the database.
- *
- * @param object $scheme
- *   The access scheme to which the handler will be attached.
- * @param string $object_type
- *   The type of Drupal object that the handler will manage (e.g., node).
- * @param string $class
- *   The name of the access handler class.
- * @param string $module
- *   The module that provides the handler.
- * @param array $settings
- *   (optional) An array of settings to control the handler's behavior.
- *
- * @return int
- *   Status constant indicating whether the handler attachment was inserted
- *   (SAVED_NEW) or updated (SAVED_UPDATED).
- */
-function access_handler_save($scheme, $object_type, $class, $module, $settings = array()) {
-  // The scheme and object type pairing must be unique (meaning there cannot be
-  // more than one handler for a given object type attached to the scheme).
-  $key = array(
-    'scheme' => $scheme->machine_name,
-    'object_type' => $object_type,
-  );
-  $fields = array(
-    'handler' => $class,
-    'module' => $module,
-    'settings' => is_array($settings) ? $settings : array($settings),
-  );
-  $fields['settings'] = serialize($fields['settings']);
-
-  // Add/update the attachment.
-  $status = db_merge('access_handler')
-    ->key($key)
-    ->fields($fields)
-    ->execute();
-  return $status;
-}
-
-/**
- * Deletes an access handler attachment from the database.
- *
- * @param object $scheme
- *   The access scheme to which the handler is currently attached.
- * @param string $object_type
- *   The type of Drupal object that the handler manages (e.g., node).
- */
-function access_handler_delete($scheme, $object_type) {
-  db_delete('access_handler')
-    ->condition('scheme', $scheme->machine_name)
-    ->condition('object_type', $object_type)
-    ->execute();
-}
-
-/**
  * AJAX callback for access handler settings forms.
  *
  * @see access_scheme_form()

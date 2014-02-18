@@ -25,6 +25,14 @@ interface AccessControlKitHandlerInterface {
   public function __construct($scheme, array $settings = array());
 
   /**
+   * Returns the current handler settings.
+   *
+   * @return array
+   *   The handler configuration array.
+   */
+  public function getSettings();
+
+  /**
    * Returns a description of the handler.
    *
    * @return string
@@ -128,6 +136,13 @@ abstract class AccessControlKitHandler implements AccessControlKitHandlerInterfa
    */
   public function __construct($scheme, array $settings = array()) {
     $this->settings = $settings;
+  }
+
+  /**
+   * Implements AccessControlKitHandlerInterface::getSettings().
+   */
+  public function getSettings() {
+    return $this->settings;
   }
 
   /**

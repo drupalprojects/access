@@ -54,13 +54,26 @@ class AccessSchemeEntityController extends DrupalDefaultEntityController {
       $scheme->handlers = array();
       $result = db_query('SELECT * FROM {access_handler} WHERE scheme = :scheme', array(':scheme' => $scheme->machine_name));
       foreach ($result as $row) {
-        // Initialize a handler using the class and settings from the database.
-        $class = $row->handler;
-        $settings = unserialize($row->settings);
-        $scheme->handlers[$row->object_type] = new $class($scheme, $settings);
+        $this->attachHandler($scheme, $row->object_type, $row->handler, unserialize($row->settings));
       }
     }
     parent::attachLoad($schemes, $revision_id);
+  }
+
+  /**
+   * Attaches a handler to a scheme object.
+   *
+   * @param object $scheme
+   *   The access scheme to which the handler will be attached.
+   * @param string $object_type
+   *   The type of Drupal object that the handler will manage (e.g., node).
+   * @param string $class
+   *   The name of the access handler class.
+   * @param array $settings
+   *   (optional) An array of settings to control the handler's behavior.
+   */
+  public function attachHandler($scheme, $object_type, $class, $settings = array()) {
+    $scheme->handlers[$object_type] = new $class($scheme, $settings);
   }
 
   /**
@@ -79,6 +92,9 @@ class AccessSchemeEntityController extends DrupalDefaultEntityController {
    *   - original: (optional) The original scheme object before any changes were
    *     applied. When omitted, the unchanged scheme object is loaded from the
    *     database and stored in the property.
+   *   - handlers: (optional) An array of attached handler objects. If set, the
+   *     scheme's handlers will be updated to match; setting array() will detach
+   *     all handlers. If not set, the scheme's handlers are left unchanged.
    *
    * @return int
    *   Status constant indicating whether the scheme was inserted (SAVED_NEW) or
@@ -122,6 +138,41 @@ class AccessSchemeEntityController extends DrupalDefaultEntityController {
         $op = 'update';
         $status = drupal_write_record('access_scheme', $scheme, 'sid');
         access_scheme_static_reset(array($scheme->sid));
+      }
+
+      // Update attached handlers.
+      if (isset($scheme->handlers)) {
+        // Delete any handlers that were detached from the scheme.
+        if (!empty($scheme->original)) {
+          foreach (array_keys($scheme->original->handlers) as $object_type) {
+            if (empty($scheme->handlers[$object_type])) {
+              db_delete('access_handler')
+                ->condition('scheme', $scheme->machine_name)
+                ->condition('object_type', $object_type)
+                ->execute();
+            }
+          }
+        }
+        // Save current handlers.
+        $handler_info = access_handler_info();
+        foreach ($scheme->handlers as $object_type => $handler) {
+          if (!empty($handler)) {
+            $key = array(
+              'scheme' => $scheme->machine_name,
+              'object_type' => $object_type,
+            );
+            $class = get_class($handler);
+            $fields = array(
+              'handler' => $class,
+              'module' => $handler_info[$class]['module'],
+              'settings' => serialize($handler->getSettings()),
+            );
+            db_merge('access_handler')
+              ->key($key)
+              ->fields($fields)
+              ->execute();
+          }
+        }
       }
 
       module_invoke_all('access_scheme_' . $op, $scheme);

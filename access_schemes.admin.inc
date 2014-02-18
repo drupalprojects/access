@@ -382,7 +382,6 @@ function access_scheme_form_validate($form, &$form_state) {
  */
 function access_scheme_form_submit($form, &$form_state) {
   $scheme = $form_state['scheme'];
-  $original_scheme = clone $scheme;
   form_state_values_clean($form_state);
   entity_form_submit_build_entity('access_scheme', $scheme, $form, $form_state);
   unset($scheme->handler_tabs__active_tab);
@@ -393,30 +392,22 @@ function access_scheme_form_submit($form, &$form_state) {
   $scheme->roles = array_filter($scheme->roles);
   $scheme->roles = array_intersect_key($roles, $scheme->roles);
 
-  // Save the scheme.
-  $status = access_scheme_save($scheme);
-
-  // @todo Should attached handler saves be moved to the entity controller's save()? Or to access_scheme_save()?
-  // Save the attached handlers.
+  // Attach the handlers.
   if (isset($scheme->handlers)) {
-    $handler_info = access_handler_info();
     foreach ($scheme->handlers as $object_type => $handler_values) {
       // Check whether the handler element was set to the #empty_option.
       if (empty($handler_values['handler'])) {
-        // If there was a handler chosen before, we need to delete it.
-        if (!empty($original_scheme->handlers) && !empty($original_scheme->handlers[$object_type])) {
-          access_handler_delete($scheme, $object_type);
-        }
+        $scheme->handlers[$object_type] = NULL;
       }
       else {
-        // Save the handler.
-        $class = $handler_values['handler'];
-        $module = $handler_info[$class]['module'];
         $settings = isset($handler_values['settings']) ? $handler_values['settings'] : array();
-        access_handler_save($scheme, $object_type, $class, $module, $settings);
+        entity_get_controller('access_scheme')->attachHandler($scheme, $object_type, $handler_values['handler'], $settings);
       }
     }
   }
+
+  // Save the scheme.
+  $status = access_scheme_save($scheme);
 
   // Report the change.
   $t_args = array(
