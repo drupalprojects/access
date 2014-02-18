@@ -34,10 +34,6 @@ class AccessSchemeEntityController extends DrupalDefaultEntityController {
    * Overrides DrupalDefaultEntityController::attachLoad().
    */
   protected function attachLoad(&$schemes, $revision_id = FALSE) {
-    // Get all roles, excluding "anonymous users" and "authenticated users."
-    $roles = user_roles(TRUE);
-    unset($roles[DRUPAL_AUTHENTICATED_RID]);
-
     foreach ($schemes as $scheme) {
       // Make sure the settings property is an array.
       $scheme->settings = isset($scheme->settings) ? unserialize($scheme->settings) : array();
@@ -53,10 +49,6 @@ class AccessSchemeEntityController extends DrupalDefaultEntityController {
       else {
         $scheme->realms = array();
       }
-
-      // Attach role information.
-      $scheme_roles = variable_get('access_scheme_roles_' . $scheme->machine_name, array());
-      $scheme->roles = array_intersect_assoc($roles, $scheme_roles);
 
       // Attach the scheme's object access handlers.
       $scheme->handlers = array();

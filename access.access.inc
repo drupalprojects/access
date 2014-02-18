@@ -179,6 +179,20 @@ function access_scheme_user_realms($scheme) {
 }
 
 /**
+ * Implements hook_access_scheme_load().
+ */
+function access_access_scheme_load($schemes) {
+  // Get all roles, excluding "anonymous users" and "authenticated users."
+  $roles = user_roles(TRUE);
+  unset($roles[DRUPAL_AUTHENTICATED_RID]);
+  foreach ($schemes as $scheme) {
+    // Attach role information.
+    $scheme_roles = variable_get('access_scheme_roles_' . $scheme->machine_name, array());
+    $scheme->roles = array_intersect_assoc($roles, $scheme_roles);
+  }
+}
+
+/**
  * Implements hook_access_scheme_presave().
  */
 function access_access_scheme_presave($scheme) {
