@@ -375,16 +375,21 @@ function access_scheme_form_validate($form, &$form_state) {
 }
 
 /**
- * Form submission handler for access_scheme_form().
+ * Updates the form state's scheme entity by processing the submitted values.
+ *
+ * This is the default builder function for the access scheme form. It is called
+ * during the "Save" submit handler to retrieve the entity to save. This
+ * function can also be called by a "Next" button of a wizard to update the form
+ * state with the current step's values before proceeding to the next step.
+ *
+ * @return object
+ *   The updated access scheme.
  *
  * @see access_scheme_form()
- * @see access_scheme_form_validate()
  */
-function access_scheme_form_submit($form, &$form_state) {
+function access_scheme_form_submit_build_scheme($form, &$form_state) {
   $scheme = $form_state['scheme'];
-  form_state_values_clean($form_state);
   entity_form_submit_build_entity('access_scheme', $scheme, $form, $form_state);
-  unset($scheme->handler_tabs__active_tab);
 
   // Format the selected roles as rid => role_name.
   $roles = user_roles(TRUE);
@@ -406,7 +411,18 @@ function access_scheme_form_submit($form, &$form_state) {
     }
   }
 
+  return $scheme;
+}
+
+/**
+ * Form submission handler for access_scheme_form().
+ *
+ * @see access_scheme_form()
+ * @see access_scheme_form_validate()
+ */
+function access_scheme_form_submit($form, &$form_state) {
   // Save the scheme.
+  $scheme = access_scheme_form_submit_build_scheme($form, $form_state);
   $status = access_scheme_save($scheme);
 
   // Report the change.
