@@ -587,25 +587,6 @@ function access_handler_info() {
 }
 
 /**
- * AJAX callback for access handler settings forms.
- *
- * @see access_scheme_form()
- */
-function access_handler_form_ajax($form, $form_state) {
-  // The triggering element should be the handler selector, which should have
-  // #parents like so:
-  //
-  // [0] => 'handlers',
-  // [1] => a string indicating the object type that this handler manages,
-  // [2] => 'handler',
-  //
-  // Thus, we can use the second element in the array to determine which handler
-  // settings form needs to be rebuilt.
-  $object_type = $form_state['triggering_element']['#parents'][1];
-  return $form['handlers'][$object_type]['settings'];
-}
-
-/**
  * Returns information on all available access-controlled object types.
  *
  * @return array

@@ -53,7 +53,7 @@ class ACKEntityTaxonomyTermReference extends ACKEntityField {
     }
 
     $form['field_name'] = array(
-      '#title' => t('Term reference field'),
+      '#title' => t('The term reference field'),
       '#type' => 'select',
       '#options' => $options,
       '#default_value' => $this->fieldName,

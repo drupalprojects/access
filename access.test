@@ -1337,18 +1337,25 @@ class AccessAPITest extends AccessWebTestCase {
     // Check that the access-controllable object types and handlers were
     // successfully registered and altered.
     $this->drupalGet('admin/structure/access/' . $this->scheme->machine_name);
-    $this->assertText(t('@object_type access realms are determined by', array('@object_type' => t('Cat'))), 'hook_access_info(): The object type was registered.');
+    $this->assertText(t('Cat'), 'hook_access_info(): The object type was registered.');
     $this->assertNoText(t('Kitten'), 'hook_access_info_alter(): The access-controllable object type info was changed.');
-    $this->assertRaw('<option value="ACKTestMeowHandler">', 'hook_access_handler_info(): The handler was registered.');
-    $this->assertText(t('@object_type access realms are determined by', array('@object_type' => t('Dog'))), 'hook_access_handler_info_alter(): The supported object types for the handler were changed.');
+    $this->assertFieldChecked('edit-handlers-cat-handler');
+    $this->assertNoFieldChecked('edit-handlers-cat-handler--2');
+    $this->assertFieldByName('handlers[cat][handler]', 'ACKTestMeowHandler', 'hook_access_handler_info(): The handler was registered.');
+    $this->assertText(t('Dog'), 'hook_access_info(): The object type was registered.');
+    $this->assertFieldChecked('edit-handlers-dog-handler');
+    $this->assertNoFieldChecked('edit-handlers-dog-handler--2');
+    $this->assertFieldByName('handlers[dog][handler]', 'ACKTestMeowHandler', 'hook_access_handler_info_alter(): The supported object types for the handler were changed.');
     $this->assertText(t('No object access handlers are available to manage @object_type objects in a @scheme_type scheme.', array('@object_type' => t('Bird'), '@scheme_type' => t('Yes or no'))), 'The handler UI notifies the user when there are no available handlers.');
 
     // Attach the handler and confirm that the attachment was saved.
     $edit = array('handlers[cat][handler]' => 'ACKTestMeowHandler');
     $this->drupalPost(NULL, $edit, t('Save access scheme'));
     $this->clickLink(t('edit'));
-    $this->assertOptionSelected('edit-handlers-cat-handler', 'ACKTestMeowHandler', 'The handler was attached to the correct object type.');
-    $this->assertNoOptionSelected('edit-handlers-dog-handler', 'ACKTestMeowHandler', 'The handler was not attached to the incorrect object type.');
+    $this->assertNoFieldChecked('edit-handlers-cat-handler');
+    $this->assertFieldChecked('edit-handlers-cat-handler--2', 'The handler was attached to the correct object type.');
+    $this->assertFieldChecked('edit-handlers-dog-handler');
+    $this->assertNoFieldChecked('edit-handlers-dog-handler--2', 'The handler was not attached to the incorrect object type.');
     $this->assertText(t('The meow handler assigns the boolean TRUE realm to cats and the boolean FALSE realm to everything else.'), 'The handler description was displayed.');
     $this->assertText(t('Meow handler settings would go here.'), 'The handler settings method was called.');
 
@@ -1356,7 +1363,8 @@ class AccessAPITest extends AccessWebTestCase {
     $edit = array('handlers[cat][handler]' => '');
     $this->drupalPost(NULL, $edit, t('Save access scheme'));
     $this->clickLink(t('edit'));
-    $this->assertNoOptionSelected('edit-handlers-cat-handler', 'ACKTestMeowHandler', 'The handler was detached.');
+    $this->assertFieldChecked('edit-handlers-cat-handler');
+    $this->assertNoFieldChecked('edit-handlers-cat-handler--2', 'The handler was detached.');
 
     // Check that the scheme settings form changes when grants are present.
     $this->createGrant($this->scheme, $this->ackRole);

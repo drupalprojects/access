@@ -212,113 +212,60 @@ function access_scheme_form($form, &$form_state, $scheme) {
 
   // Handler settings only become available after the scheme has been saved, and
   // only if we have access-controllable object types defined.
-  if (!$is_new && $access_info = access_info()) {
-    $form['handler_tabs'] = array(
-      '#type' => 'vertical_tabs',
-      '#prefix' => '<h2>' . t('Object access handlers') . '</h2>',
-      '#attached' => array(
-        'js' => array(drupal_get_path('module', 'access') . '/access_schemes.js'),
-      ),
-    );
-
-    // Add a tab for each access-controllable object type.
-    $handler_info = access_handler_info();
-    $form['handlers'] = array('#tree' => TRUE);
-    foreach ($access_info as $object_type => $object_info) {
-      $fieldset = array(
-        '#type' => 'fieldset',
-        '#title' => check_plain($object_info['label']),
-        '#group' => 'handler_tabs',
+  if (!$is_new) {
+    $access_info = access_info();
+    if (empty($access_info)) {
+      $form['handlers_empty'] = array(
+        '#markup' => t('No access-controllable objects available. In order to control access to content, menu links, or other Drupal objects, you must first <a href="@link">enable one or more modules</a> that provide Access Control Kit compatibility for those objects, such as the ACK node module.', array('@link' => url('admin/modules'))),
       );
-
-      // Find handlers that support this scheme type and object type.
-      $handler_options = array();
-      foreach ($object_info['handlers'] as $handler_class) {
-        if (isset($handler_info[$handler_class]) && in_array($scheme->type, $handler_info[$handler_class]['scheme types'])) {
-          $handler_options[$handler_class] = $handler_info[$handler_class]['label'];
-        }
-      }
-
-      if (empty($handler_options)) {
-        $fieldset['#description'] = t('No handlers available.');
-        $fieldset['empty'] = array(
-          '#markup' => t('No object access handlers are available to manage @object_type objects in a @scheme_type scheme.', array('@object_type' => $object_info['label'], '@scheme_type' => $scheme->info['label'])),
-        );
-      }
-      else {
-        // Create an HTML ID for this object type's handler settings wrapper.
-        // We use drupal_html_class() to sanitize, rather than drupal_html_id(),
-        // so that the ID doesn't increment on each AJAX rebuild.
-        $wrapper_id = drupal_html_class('access-handler-' . $object_type . '-settings');
-
-        // Select box for choosing the handler.
-        $fieldset['handler'] = array(
-          '#type' => 'select',
-          '#title' => t('@object_type access realms are determined by', array('@object_type' => $object_info['label'])),
-          '#options' => $handler_options,
-          '#default_value' => isset($scheme->handlers[$object_type]) ? get_class($scheme->handlers[$object_type]) : '',
-          '#empty_option' => t('- No handler selected -'),
-          '#ajax' => array(
-            'callback' => 'access_handler_form_ajax',
-            'wrapper' => $wrapper_id,
-            'effect' => 'fade',
-          ),
-        );
-
-        // Container for handler settings.
-        $fieldset['settings'] = array(
-          '#type' => 'container',
-          '#prefix' => '<div id="' . $wrapper_id . '">',
-          '#suffix' => '</div>',
-        );
-
-        // Try to determine which handler, if any, is currently selected above.
-        $handler = NULL;
-        if (isset($form_state['values']['handlers'][$object_type])) {
-          $handler_values = $form_state['values']['handlers'][$object_type];
-
-          // The handler selection may be empty if the #empty_option was chosen.
-          if (!empty($handler_values['handler'])) {
-            $class = $handler_values['handler'];
-
-            // See if the handler is the same as the one saved on the scheme.
-            if (isset($scheme->handlers[$object_type]) && get_class($scheme->handlers[$object_type]) == $class) {
-              // If so, keep the same handler object.
-              $handler = $scheme->handlers[$object_type];
-            }
-            // Otherwise, make sure the handler class exists and is registered.
-            elseif (class_exists($class) && isset($handler_info[$class])) {
-              // Instantiate a new handler object.
-              $settings = isset($handler_values['settings']) ? $handler_values['settings'] : array();
-              $handler = new $class($scheme, $settings);
-            }
-          }
-        }
-        // If there was nothing in the form state, fall back to the saved value.
-        elseif (isset($scheme->handlers[$object_type])) {
-          $handler = $scheme->handlers[$object_type];
-        }
-
-        // If we found the selected handler, add its description and settings.
-        if (isset($handler)) {
-          $fieldset['settings'] += $handler->settingsForm();
-          if (!isset($fieldset['settings']['description'])) {
-            $fieldset['settings']['description'] = array(
-              '#markup' => $handler->description(),
-            );
-          }
-        }
-      }
-
-      $form['handlers'][$object_type] = $fieldset;
     }
-  }
-  // If this is an existing scheme and no access-controllable object types were
-  // found above, display an explanation for why there are no handlers showing.
-  elseif (!$is_new) {
-    $form['handlers_empty'] = array(
-      '#markup' => t('No access-controllable objects available. In order to control access to content, menu links, or other Drupal objects, you must first <a href="@link">enable one or more modules</a> that provide Access Control Kit compatibility for those objects, such as the ACK node module.', array('@link' => url('admin/modules'))),
-    );
+    else {
+      $handler_info = access_handler_info();
+      $form['handler_tabs'] = array(
+        '#type' => 'vertical_tabs',
+        '#prefix' => '<h2>' . t('Object access handlers') . '</h2>',
+        '#attached' => array(
+          'js' => array(drupal_get_path('module', 'access') . '/access_schemes.js'),
+        ),
+      );
+      // Add a tab for each access-controllable object type.
+      $form['handlers'] = array('#tree' => TRUE);
+      foreach ($access_info as $object_type => $object_info) {
+        $form['handlers'][$object_type] = array(
+          '#type' => 'fieldset',
+          '#title' => check_plain($object_info['label']),
+          '#group' => 'handler_tabs',
+        );
+        // Add elements for each usable handler.
+        $handlers = array();
+        foreach ($object_info['handlers'] as $handler_class) {
+          // Make sure that the handler supports this scheme type.
+          if (isset($handler_info[$handler_class]) && in_array($scheme->type, $handler_info[$handler_class]['scheme types'])) {
+            $handlers[$handler_class] = access_scheme_form_handler_element($scheme, $object_type, $handler_class);
+          }
+        }
+        if (empty($handlers)) {
+          $form['handlers'][$object_type]['#description'] = t('No handlers available.');
+          $form['handlers'][$object_type]['empty'] = array(
+            '#markup' => t('No object access handlers are available to manage @object_type objects in a @scheme_type scheme.', array('@object_type' => $object_info['label'], '@scheme_type' => $scheme->info['label'])),
+          );
+        }
+        else {
+          $form['handlers'][$object_type]['empty'] = array(
+            '#type' => 'container',
+            'handler' => array(
+              '#type' => 'radio',
+              '#title' => t('Not managed'),
+              '#return_value' => '',
+              '#default_value' => isset($scheme->handlers[$object_type]) ? FALSE : '',
+              '#description' => t('Objects of this type will not be managed by the access scheme.'),
+              '#parents' => array('handlers', $object_type, 'handler'),
+            ),
+          );
+          $form['handlers'][$object_type] += $handlers;
+        }
+      }
+    }
   }
 
   $form['actions'] = array('#type' => 'actions');
@@ -335,6 +282,61 @@ function access_scheme_form($form, &$form_state, $scheme) {
   }
 
   return $form;
+}
+
+/**
+ * Form element builder for enabling and configuring a handler on a scheme form.
+ *
+ * @param object $scheme
+ *   The access scheme.
+ * @param string $type
+ *   The access-controlled object type.
+ * @param string $class
+ *   The handler class name.
+ *
+ * @return array
+ *   The form elements for the handler.
+ *
+ * @see access_scheme_form()
+ */
+function access_scheme_form_handler_element($scheme, $type, $class) {
+  // See if this handler is already attached to the scheme.
+  if (isset($scheme->handlers[$type]) && get_class($scheme->handlers[$type]) == $class) {
+    $handler = $scheme->handlers[$type];
+    $chosen = TRUE;
+  }
+  // Otherwise, use an unconfigured handler object.
+  else {
+    $handler = new $class($scheme);
+    $chosen = FALSE;
+  }
+
+  $info = access_handler_info();
+  $elements = array('#type' => 'container');
+  $elements['handler'] = array(
+    '#type' => 'radio',
+    '#title' => check_plain($info[$class]['label']),
+    '#return_value' => $class,
+    '#default_value' => $chosen,
+    '#description' => $handler->description(),
+    '#parents' => array('handlers', $type, 'handler'),
+  );
+  $settings = $handler->settingsForm();
+  if (!empty($settings)) {
+    $elements['settings'] = array(
+      '#parents' => array('handlers', $type, $class),
+      '#tree' => TRUE,
+      '#title' => t('Additional settings'),
+      '#type' => 'fieldset',
+      '#states' => array(
+        'visible' => array(
+          ':input[name="handlers[' . $type . '][handler]"]' => array('value' => $class),
+        ),
+      ),
+    );
+    $elements['settings'] += $settings;
+  }
+  return $elements;
 }
 
 /**
@@ -370,8 +372,6 @@ function access_scheme_form_validate($form, &$form_state) {
   if ((empty($scheme->name) || $scheme->name != $name) && in_array($name, access_scheme_names())) {
     form_set_error('name', t('The name %name is already in use.', array('%name' => $name)));
   }
-
-  // @todo Validate attached handlers using similar logic as above for grabbing handlers from the form state.
 }
 
 /**
@@ -400,13 +400,14 @@ function access_scheme_form_submit_build_scheme($form, &$form_state) {
   // Attach the handlers.
   if (isset($scheme->handlers)) {
     foreach ($scheme->handlers as $object_type => $handler_values) {
-      // Check whether the handler element was set to the #empty_option.
+      // Check whether the handler element was set to "not managed."
       if (empty($handler_values['handler'])) {
         $scheme->handlers[$object_type] = NULL;
       }
       else {
-        $settings = isset($handler_values['settings']) ? $handler_values['settings'] : array();
-        entity_get_controller('access_scheme')->attachHandler($scheme, $object_type, $handler_values['handler'], $settings);
+        $handler = $handler_values['handler'];
+        $settings = isset($handler_values[$handler]) ? $handler_values[$handler] : array();
+        entity_get_controller('access_scheme')->attachHandler($scheme, $object_type, $handler, $settings);
       }
     }
   }

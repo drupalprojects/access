@@ -285,7 +285,7 @@ class AckNodeAccessTest extends DrupalWebTestCase {
    */
   public function testFieldAccess() {
     $this->setUpTaxonomy('test_field_access', 'ACKEntityTaxonomyTermReference');
-    $edit = array('handlers[node][settings][field_name]' => 'field_tags');
+    $edit = array('handlers[node][ACKEntityTaxonomyTermReference][field_name]' => 'field_tags');
     $this->drupalPost('admin/structure/access/test-field-access', $edit, 'Save access scheme');
     $this->assertText('Updated access scheme', 'Handler settings saved.');
     $this->assertTaxonomyAccess('test_field_access');

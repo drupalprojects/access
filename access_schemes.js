@@ -12,13 +12,14 @@ Drupal.behaviors.accessHandlerTabSummaries = {
       // The fieldset id will be of the form "edit-handlers-OBJECT_TYPE"; thus,
       // if we tokenize the id by "-", the object type will be the third token.
       var tokens = context.id.split('-');
-      var handler = $('select[name="handlers[' + tokens[2] + '][handler]"] option:selected', context);
-      if (handler.val() == '') {
-        return Drupal.t('Not managed');
+      var handler = $('input[name="handlers[' + tokens[2] + '][handler]"]:checked', context);
+      if (handler.length) {
+        var label = $('label[for="' + handler.attr('id') + '"]');
+        if (label.length) {
+          return Drupal.checkPlain(label.text());
+        }
       }
-      else {
-        return Drupal.checkPlain(handler.text());
-      }
+      return '';
     });
   }
 };
