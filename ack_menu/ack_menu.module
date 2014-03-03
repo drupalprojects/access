@@ -276,3 +276,12 @@ function ack_menu_menu_link_delete($link) {
     ->condition('mlid', $link['mlid'])
     ->execute();
 }
+
+/**
+ * Implements hook_access_scheme_delete().
+ */
+function ack_menu_access_scheme_delete($scheme) {
+  db_delete('ack_menu_map')
+    ->condition('scheme', $scheme->machine_name)
+    ->execute();
+}
