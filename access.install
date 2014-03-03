@@ -180,7 +180,6 @@ function access_uninstall() {
     variable_del('access_scheme_roles_' . $scheme);
   }
 }
-// @todo Clean up attached handlers when responsible module is uninstalled.
 
 /**
  * Make the list of available roles a scheme-level setting.

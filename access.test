@@ -1402,6 +1402,38 @@ class AccessAPITest extends AccessWebTestCase {
     $this->assertFalse(access_user_object_access('meow', 'dog', $dummy_object, $test_user), 'User does not have access to an object in an unassigned realm.');
   }
 
+  /**
+   * Test clean-up functions.
+   */
+  public function testHandlerCleanup() {
+    // Attach a handler provided by the access_test module.
+    entity_get_controller('access_scheme')->attachHandler($this->scheme, 'cat', 'ACKTestMeowHandler');
+    access_scheme_save($this->scheme);
+    $this->scheme = access_scheme_load($this->scheme->sid, TRUE);
+    // Create and log in an admin user.
+    $admin_user = $this->drupalCreateUser(array('administer access schemes'));
+    $this->drupalLogin($admin_user);
+    // Confirm that the handler is attached.
+    $this->drupalGet('admin/structure/access/' . $this->scheme->machine_name);
+    $this->assertFieldChecked('edit-handlers-cat-handler--2', 'The handler is attached.');
+
+    // Disable the access_test module.
+    module_disable(array('access_test'), FALSE);
+    drupal_flush_all_caches();
+    $this->scheme = access_scheme_load($this->scheme->sid, TRUE);
+    $this->drupalGet('admin/structure/access/' . $this->scheme->machine_name);
+    $this->assertNoText('Meow', 'The handler is not listed.');
+
+    // Uninstall the access_test module, then re-enable and check handlers.
+    drupal_uninstall_modules(array('access_test'), FALSE);
+    drupal_flush_all_caches();
+    module_enable(array('access_test'), FALSE);
+    drupal_flush_all_caches();
+    $this->scheme = access_scheme_load($this->scheme->sid, TRUE);
+    $this->drupalGet('admin/structure/access/' . $this->scheme->machine_name);
+    $this->assertNoFieldChecked('edit-handlers-cat-handler--2', 'The handler did not reattach after uninstall.');
+  }
+
 }
 
 /**

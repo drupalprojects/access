@@ -1008,6 +1008,15 @@ function access_theme() {
 }
 
 /**
+ * Implements hook_modules_uninstalled().
+ */
+function access_modules_uninstalled($modules) {
+  foreach ($modules as $module) {
+    db_delete('access_handler')->condition('module', $module)->execute();
+  }
+}
+
+/**
  * Implements hook_hook_info().
  */
 function access_hook_info() {
