@@ -9,10 +9,13 @@
 Drupal.behaviors.accessHandlerTabSummaries = {
   attach: function (context) {
     $('fieldset[id^="edit-handlers-"]', context).drupalSetSummary(function(context) {
-      // The fieldset id will be of the form "edit-handlers-OBJECT_TYPE"; thus,
-      // if we tokenize the id by "-", the object type will be the third token.
+      // The fieldset id will be in the form "edit-handlers-OBJECT-TYPE"; thus,
+      // if we tokenize the id by "-", the type will begin at the third token.
       var tokens = context.id.split('-');
-      var handler = $('input[name="handlers[' + tokens[2] + '][handler]"]:checked', context);
+      tokens.splice(0, 2);
+      // The object type uses underscores instead of hyphens on form elements.
+      var object_type = tokens.join('_');
+      var handler = $('input[name="handlers[' + object_type + '][handler]"]:checked', context);
       if (handler.length) {
         var label = $('label[for="' + handler.attr('id') + '"]');
         if (label.length) {

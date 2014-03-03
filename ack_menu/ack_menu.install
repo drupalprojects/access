@@ -10,30 +10,44 @@
  */
 function ack_menu_schema() {
   $schema['ack_menu_map'] = array(
-    'description' => 'Maps menu links to access realms.',
+    'description' => 'Maps menu trees to access realms.',
     'fields' => array(
       'mlid' => array(
         'type' => 'int',
         'unsigned' => TRUE,
         'not null' => TRUE,
         'default' => 0,
-        'description' => 'The {menu_links}.mlid that identifies the link.',
+        'description' => 'The {menu_links}.mlid that identifies the top link of the realm menu tree.',
       ),
-      'map' => array(
-        'description' => 'Serialized data containing an array of schemes and realms to which the menu link belongs.',
-        'type' => 'blob',
-        'size' => 'big',
+      'scheme' => array(
+        'type' => 'varchar',
+        'length' => 28,
         'not null' => TRUE,
-        'serialize' => TRUE,
+        'default' => '',
+        'description' => 'The {access_scheme}.machine_name of the scheme that contains the realm.',
       ),
+      'realm' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+        'default' => 0,
+        'description' => 'The realm value.',
+      ),
+    ),
+    'primary key' => array('mlid', 'scheme'),
+    'indexes' => array(
+      'realm' => array(array('scheme', 4), 'realm'),
     ),
     'foreign keys' => array(
       'menu_link' => array(
         'table' => 'menu_links',
         'columns' => array('mlid' => 'mlid'),
       ),
+      'scheme_machine_name' => array(
+        'table' => 'access_scheme',
+        'columns' => array('scheme' => 'machine_name'),
+      ),
     ),
-    'primary key' => array('mlid'),
   );
   return $schema;
 }

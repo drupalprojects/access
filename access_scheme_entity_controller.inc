@@ -73,7 +73,9 @@ class AccessSchemeEntityController extends DrupalDefaultEntityController {
    *   (optional) An array of settings to control the handler's behavior.
    */
   public function attachHandler($scheme, $object_type, $class, $settings = array()) {
-    $scheme->handlers[$object_type] = new $class($scheme, $settings);
+    if (class_exists($class)) {
+      $scheme->handlers[$object_type] = new $class($scheme, $settings);
+    }
   }
 
   /**

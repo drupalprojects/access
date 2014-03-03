@@ -92,6 +92,11 @@ interface AccessControlKitHandlerInterface {
    * hidden, so as to prevent non-admins from moving the node to a different
    * realm in the access scheme. See the ack_node module for a complete example.
    *
+   * This method can also be used in combination with the objectFormValidate()
+   * and objectFormSubmit() methods to take additional actions when the object
+   * form is submitted. See the ACKMenuMap handler in the ack_menu module for an
+   * example of how this can be used to update data related to the object.
+   *
    * In addition to this method, the handler module is responsible for enforcing
    * access to the delete button (if one exists) on the object's form. This is
    * typically done by setting '#access' => FALSE on the button when the user
@@ -115,8 +120,51 @@ interface AccessControlKitHandlerInterface {
    *   the object, and the parameter is omitted when editing an existing object.
    *   If omitted, form elements that correspond to realms in the scheme will be
    *   locked (either '#disabled' => TRUE or '#access' => FALSE).
+   *
+   * @see AccessControlKitHandlerInterface::objectFormValidate()
+   * @see AccessControlKitHandlerInterface::objectFormSubmit()
    */
   public function objectFormAlter($object_type, $object, &$form, &$form_state, $form_id, $realms = NULL);
+
+  /**
+   * Performs additional validation on an access-controlled object's form.
+   *
+   * It is up to the handler module to invoke this method as needed by adding an
+   * additional validation function to the form (using hook_form_alter()).
+   *
+   * @param string $object_type
+   *   A string indicating the type of $object (e.g., node, menu_link).
+   * @param mixed $object
+   *   The access-controllable object represented by this form.
+   * @param array $form
+   *   The form structure. This can be a full form structure, or a sub-element
+   *   of a larger form.
+   * @param array &$form_state
+   *   An associative array containing the current state of the form.
+   *
+   * @see AccessControlKitHandlerInterface::objectFormAlter()
+   */
+  public function objectFormValidate($object_type, $object, $form, &$form_state);
+
+  /**
+   * Performs handler-specific actions when an object's form is submitted.
+   *
+   * It is up to the handler module to invoke this method as needed by adding an
+   * additional submission function to the form (using hook_form_alter()).
+   *
+   * @param string $object_type
+   *   A string indicating the type of $object (e.g., node, menu_link).
+   * @param mixed $object
+   *   The access-controllable object represented by this form.
+   * @param array $form
+   *   The form structure. This can be a full form structure, or a sub-element
+   *   of a larger form.
+   * @param array &$form_state
+   *   An associative array containing the current state of the form.
+   *
+   * @see AccessControlKitHandlerInterface::objectFormAlter()
+   */
+  public function objectFormSubmit($object_type, $object, $form, &$form_state);
 }
 
 /**
@@ -171,5 +219,19 @@ abstract class AccessControlKitHandler implements AccessControlKitHandlerInterfa
    */
   public function objectFormAlter($object_type, $object, &$form, &$form_state, $form_id, $realms = NULL) {
     // No filtering needed in the abstract class.
+  }
+
+  /**
+   * Implements AccessControlKitHandlerInterface::objectFormValidate().
+   */
+  public function objectFormValidate($object_type, $object, $form, &$form_state) {
+    // No validation needed in the abstract class.
+  }
+
+  /**
+   * Implements AccessControlKitHandlerInterface::objectFormSubmit().
+   */
+  public function objectFormSubmit($object_type, $object, $form, &$form_state) {
+    // No submit actions needed in the abstract class.
   }
 }

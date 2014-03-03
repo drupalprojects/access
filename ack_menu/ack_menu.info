@@ -6,4 +6,5 @@ dependencies[] = access
 dependencies[] = menu
 
 ; Handlers
+files[] = ack_menu_handler.inc
 files[] = handlers/ack_menu_map.inc
