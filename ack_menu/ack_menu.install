@@ -51,3 +51,31 @@ function ack_menu_schema() {
   );
   return $schema;
 }
+
+/**
+ * Implements hook_install().
+ */
+function ack_menu_install() {
+  // Make sure that this module's hooks execute after the menu module's.
+  $weight = db_query('SELECT weight FROM {system} WHERE name = :name', array(':name' => 'menu'))->fetchField();
+  db_update('system')
+    ->fields(array(
+      'weight' => $weight + 1,
+    ))
+    ->condition('name', 'ack_menu')
+    ->execute();
+}
+
+/**
+ * Fix module weight relative to the menu module.
+ */
+function ack_menu_update_7100() {
+  // Make sure that this module's hooks execute after the menu module's.
+  $weight = db_query('SELECT weight FROM {system} WHERE name = :name', array(':name' => 'menu'))->fetchField();
+  db_update('system')
+    ->fields(array(
+      'weight' => $weight + 1,
+    ))
+    ->condition('name', 'ack_menu')
+    ->execute();
+}

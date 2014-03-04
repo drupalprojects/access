@@ -191,43 +191,8 @@ function ack_menu_link_access($menu_link, $account = NULL) {
  * Alters the menu item add/edit form.
  */
 function ack_menu_form_menu_edit_item_alter(&$form, &$form_state, $form_id) {
-  $menu_link = $form['original_item']['#value'];
-
-  if (!isset($form_state['ack_menu'])) {
-    $form_state['ack_menu'] = array(
-      'schemes' => access_object_schemes('menu_link'),
-      'realms' => access_user_permission_realms('ack manage menu links'),
-    );
-  }
-  $schemes = $form_state['ack_menu']['schemes'];
-  $realms = $form_state['ack_menu']['realms'];
-
-  // Tell the handler whether the user has global 'administer menu' permission.
-  $form_state['ack_menu']['admin'] = user_access('administer menu');
-
-  // Apply AckMenuHandlerInterface::objectFormAlter() for all schemes.
-  foreach ($schemes as $scheme) {
-    if (empty($menu_link['mlid'])) {
-      // A new link can be added to any allowed realm.
-      $scheme_realms = isset($realms[$scheme->machine_name]) ? $realms[$scheme->machine_name] : array();
-    }
-    else {
-      // An existing link must stay in its current realm.
-      $scheme_realms = NULL;
-    }
-    $scheme->handlers['menu_link']->objectFormAlter('menu_link', $menu_link, $form, $form_state, $form_id, $scheme_realms);
-  }
-
-  // If this link's current parent is not manageable by the user, then the user
-  // should not be able to change this link's position, since that would
-  // effectively be rearranging the parent's menu tree.
-  if (!empty($menu_link['mlid']) && !empty($menu_link['plid'])) {
-    $parent = menu_link_load($menu_link['plid']);
-    if (!empty($parent)) {
-      $form['weight']['#access'] = ack_menu_link_access($parent);
-    }
-  }
-
+  $item = $form['original_item']['#value'];
+  _ack_menu_form_alter($form, $form_state, $form_id, $item);
   $form['#validate'][] = 'ack_menu_form_menu_edit_item_validate';
   $form['#submit'][] = 'ack_menu_form_menu_edit_item_submit';
 }
@@ -265,7 +230,93 @@ function ack_menu_form_menu_edit_item_submit($form, &$form_state) {
  * Alters the menu options on the node form.
  */
 function ack_menu_form_node_form_alter(&$form, &$form_state, $form_id) {
-  // @todo Filter the menu parent selector and set access to menu options tab.
+  // Only alter the menu options on the node if the user would not have access
+  // normally, but may have access through ACK.
+  if (!empty($form['menu']) && !$form['menu']['#access'] && user_access('ack manage menu links')) {
+    $link = $form['#node']->menu;
+    // If the link exists, see if the user is allowed to manage it.
+    if (!empty($link['mlid'])) {
+      $access = ack_menu_link_access($link);
+    }
+    else {
+      // Check for realm-level access to create a link.
+      $access = FALSE;
+      $realms = access_user_permission_realms('ack manage menu links');
+      $schemes = array_keys($realms);
+      while (!$access && $scheme_machine_name = array_pop($schemes)) {
+        $scheme = access_scheme_machine_name_load($scheme_machine_name);
+        if (!empty($scheme)) {
+          while (!$access && $realm = array_pop($realms[$scheme_machine_name])) {
+            $access = ack_menu_access($scheme, $realm);
+          }
+        }
+      }
+    }
+    // If the user was granted access above, filter the parent link options.
+    if ($access) {
+      _ack_menu_form_alter($form['menu']['link'], $form_state, $form_id, $link);
+      // If, after filtering, there are no eligible parent items, this indicates
+      // that the user's manageable menu links are not in any of the menus that
+      // the content type is configured to allow. Thus, we deny access.
+      $form['menu']['#access'] = $access && !empty($form['menu']['link']['parent']['#options']);
+    }
+  }
+}
+
+/**
+ * Helper function for altering the menu item and node forms.
+ *
+ * @param array &$form
+ *   A form structure representing a menu item. Must have 'parent' and 'weight'
+ *   element children.
+ * @param array &$form_state
+ *   The form state. If 'ack_menu' is already defined in the array, it must
+ *   contain 'schemes' and 'realms' values, defining (respectively) the schemes
+ *   that can manage the link and the realms that the user can assign to it.
+ * @param string $form_id
+ *   The form identifier.
+ * @param array $link
+ *   The menu link represented by the form.
+ *
+ * @see ack_menu_form_menu_edit_item_alter()
+ * @see ack_menu_form_node_form_alter()
+ */
+function _ack_menu_form_alter(&$form, &$form_state, $form_id, $link) {
+  // Place ack_menu values in the form state for use by the handlers.
+  if (!isset($form_state['ack_menu'])) {
+    $form_state['ack_menu'] = array(
+      'schemes' => access_object_schemes('menu_link'),
+      'realms' => access_user_permission_realms('ack manage menu links'),
+    );
+  }
+  $schemes = $form_state['ack_menu']['schemes'];
+  $realms = $form_state['ack_menu']['realms'];
+
+  // Tell the handler whether the user has global 'administer menu' permission.
+  $form_state['ack_menu']['admin'] = user_access('administer menu');
+
+  // Apply AckMenuHandlerInterface::objectFormAlter() for all schemes.
+  foreach ($schemes as $scheme) {
+    if (empty($link['mlid'])) {
+      // A new link can be added to any allowed realm.
+      $scheme_realms = isset($realms[$scheme->machine_name]) ? $realms[$scheme->machine_name] : array();
+    }
+    else {
+      // An existing link must stay in its current realm.
+      $scheme_realms = NULL;
+    }
+    $scheme->handlers['menu_link']->objectFormAlter('menu_link', $link, $form, $form_state, $form_id, $scheme_realms);
+  }
+
+  // If this link's current parent is not manageable by the user, then the user
+  // should not be able to change this link's position, since that would
+  // effectively be rearranging the parent's menu tree.
+  if (!empty($link['mlid']) && !empty($link['plid'])) {
+    $parent = menu_link_load($link['plid']);
+    if (!empty($parent)) {
+      $form['weight']['#disabled'] = !ack_menu_link_access($parent);
+    }
+  }
 }
 
 /**

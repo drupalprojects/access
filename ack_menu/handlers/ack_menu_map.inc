@@ -127,8 +127,10 @@ class AckMenuMap extends AccessControlKitHandler implements AckMenuHandlerInterf
    * Overrides AccessControlKitHandler::objectFormAlter().
    */
   public function objectFormAlter($object_type, $menu_link, &$form, &$form_state, $form_id, $realms = NULL) {
+    $admin = !empty($form_state['ack_menu']['admin']);
+
     // If the user isn't an admin, then we need to filter the parent options.
-    if (empty($form_state['ack_menu']['admin'])) {
+    if (!$admin) {
       // If a realm list wasn't provided, get the link's current realm.
       if (!isset($realms) && !empty($menu_link['mlid'])) {
         $realms = $this->objectRealms($object_type, $menu_link);
@@ -136,13 +138,12 @@ class AckMenuMap extends AccessControlKitHandler implements AckMenuHandlerInterf
       // Only filter if we were able to identify a realm. Links without a realm
       // are skipped, so as not to remove options needed by other schemes.
       if (!empty($realms)) {
-        // A link can be mapped to one and only one realm in the scheme.
-        $realm = reset($realms);
-
-        // Get the form option keys for all eligible parents.
         $allowed = array();
-        foreach ($this->realmLinks($realm) as $link) {
-          $allowed[$link['menu_name'] . ':' . $link['mlid']] = TRUE;
+        foreach ($realms as $realm) {
+          // Get the form option keys for all eligible parents.
+          foreach ($this->realmLinks($realm) as $link) {
+            $allowed[$link['menu_name'] . ':' . $link['mlid']] = TRUE;
+          }
         }
         // For an existing link, we need to keep the default value as an option.
         $default = $form['parent']['#default_value'];
@@ -162,8 +163,9 @@ class AckMenuMap extends AccessControlKitHandler implements AckMenuHandlerInterf
         }
       }
     }
-    else {
-      // Menu administrators can map the link to a realm.
+
+    // Menu administrators can map the link to a realm from the menu item form.
+    if ($admin && $form_id == 'menu_edit_item') {
       if (!isset($form['AckMenuMap'])) {
         $form['AckMenuMap'] = array(
           '#type' => 'fieldset',
