@@ -41,6 +41,11 @@ class AccessSchemeEntityController extends DrupalDefaultEntityController {
       // Attach scheme type definition.
       $scheme->info = access_scheme_info($scheme->type);
 
+      // Load the callbacks' include file, if one exists.
+      if (!empty($scheme->info['include file'])) {
+        require_once DRUPAL_ROOT . '/' . $scheme->info['include file'];
+      }
+
       // Attach realm information.
       $scheme->realm_field = field_info_field($scheme->realm_field_name);
       if (!empty($scheme->info['realms callback']) && function_exists($scheme->info['realms callback'])) {

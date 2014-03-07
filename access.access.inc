@@ -14,6 +14,7 @@ function access_access_scheme_info() {
     'data_type' => 'boolean',
     'description' => t('A <em>boolean</em> scheme controls access based on a true/false value (or yes/no, checked/unchecked, etc.). For example, you could grant access to content based on the "sticky" property, or to user profiles based on the value of a boolean field provided by the list module.'),
     'realms callback' => 'access_scheme_boolean_realms',
+    'file' => 'callbacks/access.boolean.inc',
   );
 
   foreach (array('integer', 'float', 'text') as $data_type) {
@@ -31,6 +32,7 @@ function access_access_scheme_info() {
         'data_type' => $data_type,
         'realms callback' => 'access_scheme_list_field_realms',
         'settings callback' => 'access_scheme_list_field_settings',
+        'file' => 'callbacks/access.list.inc',
       );
       switch ($data_type) {
         case 'integer':
@@ -66,6 +68,7 @@ function access_access_scheme_info() {
         'description' => t('A <em>taxonomy</em> scheme controls access based on the terms of a selected vocabulary. You will be able to grant access to any ACK-supported fieldable entity based on the terms associated with that entity through a taxonomy term reference field. ACK modules that support non-fieldable objects (such as the ACK menu module, for menu links) may also provide the ability to map those objects to a term.'),
         'realms callback' => 'access_scheme_taxonomy_term_realms',
         'settings callback' => 'access_scheme_taxonomy_term_settings',
+        'file' => 'callbacks/access.taxonomy.inc',
       );
     }
   }
@@ -75,107 +78,9 @@ function access_access_scheme_info() {
     'data_type' => 'integer',
     'description' => t('A <em>user account</em> scheme controls access to ACK-supported objects based on the users associated with those objects. For example, you could grant User A access to all content authored by User B.'),
     'realms callback' => 'access_scheme_user_realms',
+    'file' => 'callbacks/access.user.inc',
   );
   return $info;
-}
-
-/**
- * Realms callback for the boolean scheme type.
- *
- * @see access_access_scheme_info()
- */
-function access_scheme_boolean_realms($scheme) {
-  return array(0 => t('False'), 1 => t('True'));
-}
-
-/**
- * Realms callback for the list field scheme types.
- *
- * @see access_access_scheme_info()
- */
-function access_scheme_list_field_realms($scheme) {
-  if (!empty($scheme->settings['field_name']) && $field = field_info_field($scheme->settings['field_name'])) {
-    return list_allowed_values($field);
-  }
-  return array();
-}
-
-/**
- * Settings callback for the list field scheme types.
- *
- * @see access_access_scheme_info()
- */
-function access_scheme_list_field_settings($scheme, $has_data) {
-  // Find all available fields of the given type.
-  $fields = field_read_fields(array('type' => $scheme->type));
-  // Exclude other realm fields from the list.
-  foreach ($fields as $field_name => $field) {
-    if (!empty($field['settings']['allowed_values_function']) && $field['settings']['allowed_values_function'] == '_access_field_allowed_values') {
-      unset($fields[$field_name]);
-    }
-  }
-
-  // Build the form.
-  $form = array();
-  if (!empty($fields)) {
-    $options = drupal_map_assoc(array_keys($fields));
-    $form['field_name'] = array(
-      '#type' => 'select',
-      '#title' => t('List field'),
-      '#description' => t('The allowed values list from this field will become the access realms for the scheme.'),
-      '#default_value' => isset($scheme->settings['field_name']) ? $scheme->settings['field_name'] : NULL,
-      '#options' => $options,
-      '#required' => TRUE,
-      '#disabled' => $has_data,
-    );
-  }
-  return $form;
-}
-
-/**
- * Realms callback for the taxonomy term scheme type.
- *
- * @see access_access_scheme_info()
- */
-function access_scheme_taxonomy_term_realms($scheme) {
-  if (!empty($scheme->settings['vocabulary'])) {
-    // Re-use the allowed values function for term reference fields.
-    $field = array();
-    $field['settings']['allowed_values'][] = array('vocabulary' => $scheme->settings['vocabulary'], 'parent' => 0);
-    return taxonomy_allowed_values($field);
-  }
-  return array();
-}
-
-/**
- * Settings callback for the taxonomy term scheme type.
- *
- * @see access_access_scheme_info()
- */
-function access_scheme_taxonomy_term_settings($scheme, $has_data) {
-  $options = array();
-  foreach (taxonomy_get_vocabularies() as $vocabulary) {
-    $options[$vocabulary->machine_name] = $vocabulary->name;
-  }
-  $form['vocabulary'] = array(
-    '#type' => 'select',
-    '#title' => t('Vocabulary'),
-    '#description' => t('The terms in this vocabulary will become the access realms for the scheme.'),
-    '#default_value' => isset($scheme->settings['vocabulary']) ? $scheme->settings['vocabulary'] : NULL,
-    '#options' => $options,
-    '#required' => TRUE,
-    '#disabled' => $has_data,
-  );
-  return $form;
-}
-
-/**
- * Realms callback for the user scheme type.
- *
- * @see access_access_scheme_info()
- */
-function access_scheme_user_realms($scheme) {
-  return db_query('SELECT uid, name FROM {users} WHERE uid > 0')->fetchAllKeyed();
 }
 
 /**

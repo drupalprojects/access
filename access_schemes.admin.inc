@@ -169,6 +169,11 @@ function access_scheme_form($form, &$form_state, $scheme) {
     '#disabled' => !$is_new,
   );
 
+  // Load the callbacks' include file, if one exists.
+  if (!empty($scheme->info['include file'])) {
+    require_once DRUPAL_ROOT . '/' . $scheme->info['include file'];
+  }
+
   // Add any additional settings defined for this scheme type.
   if (!empty($scheme->info['settings callback']) && function_exists($scheme->info['settings callback'])) {
     $form['settings'] = call_user_func_array($scheme->info['settings callback'], array($scheme, $has_data));

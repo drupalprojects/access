@@ -198,6 +198,13 @@ function hook_access_handler_info_alter(&$info) {
  *   - realms callback: The name of the function that provides the realm list.
  *   - settings callback: (optional) The name of the function that provides the
  *     scheme type's settings form.
+ *   - file: (optional) A file that will be included before the callbacks are
+ *     executed; this allows the callback functions to be in a separate file.
+ *     The file should be relative to the implementing module's directory unless
+ *     otherwise specified by the "file path" option.
+ *   - file path: (optional) The path to the directory containing the file
+ *     specified in "file". This defaults to the path to the module implementing
+ *     the hook.
  *
  * @see access_scheme_info()
  * @see hook_access_scheme_info_alter()
@@ -212,6 +219,7 @@ function hook_access_scheme_info() {
     'description' => t('A <em>taxonomy</em> scheme controls access based on the terms of a selected vocabulary.'),
     'realms callback' => 'access_scheme_taxonomy_term_realms',
     'settings callback' => 'access_scheme_taxonomy_term_settings',
+    'file' => 'callbacks/access.taxonomy.inc',
   );
   return $info;
 }

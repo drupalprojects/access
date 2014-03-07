@@ -426,35 +426,81 @@ function access_scheme_static_reset($ids = NULL) {
  * Returns information on available access scheme types.
  *
  * @param string $type
- *   (optional) A scheme type string.
+ *   (optional) A scheme type.
  *
  * @return array|false
  *   The information array for the requested $type, or FALSE if not found.
- *   If $type is omitted, returns information for all available types.
+ *   If $type is omitted, returns information for all available types in an
+ *   array indexed by type. Type information is returned as an associative array
+ *   with the following keys:
+ *   - label: The human-readable name of the scheme type.
+ *   - data_type: The data type of the realm values. Valid data types are
+ *     'boolean', 'integer', 'float' and 'text'.
+ *   - description: (optional) A translated string describing the scheme type.
+ *   - realms callback: The name of the function that provides the realm list.
+ *   - settings callback: (optional) The name of the function that provides the
+ *     scheme type's settings form.
+ *   - type: The scheme type.
+ *   - module: The module that provides the scheme type.
+ *   - include file: (optional) The full pathname of a file that should be
+ *     included before executing the callback functions.
  *
  * @see hook_access_scheme_info()
+ * @see hook_access_scheme_info_alter()
  */
 function access_scheme_info($type = NULL) {
-  $types = &drupal_static(__FUNCTION__);
-  if (!isset($types)) {
-    $types = array();
-    foreach (module_implements('access_scheme_info') as $module) {
-      foreach (module_invoke($module, 'access_scheme_info') as $type_name => $type_info) {
-        if (!isset($type_info['description'])) {
-          $type_info['description'] = '';
-        }
-        $type_info['module'] = $module;
-        $type_info['type'] = $type_name;
-
-        $types[$type_name] = $type_info;
-      }
+  $info = &drupal_static(__FUNCTION__, array());
+  if (empty($info)) {
+    $cache = cache_get('access_scheme_info');
+    if ($cache) {
+      $info = $cache->data;
     }
-    drupal_alter('access_scheme_info', $types);
+    else {
+      foreach (module_implements('access_scheme_info') as $module) {
+        $module_info = module_invoke($module, 'access_scheme_info');
+        if ($module_info) {
+          foreach ($module_info as $type_name => $type_info) {
+            // Merge in default values.
+            $type_info += array(
+              'label' => '',
+              'data_type' => '',
+              'description' => '',
+              'realms callback' => '',
+              'settings callback' => '',
+              'file' => '',
+              'file path' => '',
+            );
+            // Set inferred values.
+            $type_info['type'] = $type_name;
+            $type_info['module'] = $module;
+
+            $info[$type_name] = $type_info;
+          }
+        }
+      }
+
+      drupal_alter('access_scheme_info', $info);
+
+      // Calculate the include file paths for the callbacks, if needed.
+      foreach ($info as $type_name => $type_info) {
+        if (!empty($type_info['file'])) {
+          $file_path = empty($type_info['file path']) ? drupal_get_path('module', $type_info['module']) : $type_info['file path'];
+          $info[$type_name]['include file'] = $file_path . '/' . $type_info['file'];
+        }
+        else {
+          $info[$type_name]['include file'] = '';
+        }
+        unset($info[$type_name]['file']);
+        unset($info[$type_name]['file path']);
+      }
+
+      cache_set('access_scheme_info', $info);
+    }
   }
   if (isset($type)) {
-    return isset($types[$type]) ? $types[$type] : FALSE;
+    return isset($info[$type]) ? $info[$type] : FALSE;
   }
-  return $types;
+  return $info;
 }
 
 /**
@@ -535,11 +581,16 @@ function access_field_extra_fields() {
 }
 
 /**
- * Returns information on all available object access handlers.
+ * Returns information on available object access handlers.
  *
- * @return array
- *   An array indexed by handler name where each value is an associative array
- *   with the following keys:
+ * @param string $handler
+ *   (optional) The name of a handler class.
+ *
+ * @return array|false
+ *   The information array for the requested $handler, or FALSE if not found.
+ *   If $handler is omitted, returns information for all available handlers in
+ *   an array indexed by handler name. Handler information is returned as an
+ *   associative array with the following keys:
  *   - label: The human-readable name of this handler.
  *   - scheme types: An array listing the scheme types that this handler
  *     supports, as defined in hook_access_scheme_info().
@@ -553,8 +604,7 @@ function access_field_extra_fields() {
  * @see hook_access_handler_info()
  * @see hook_access_handler_info_alter()
  */
-function access_handler_info() {
-  // @todo Make all of the _info() functions consistent.
+function access_handler_info($handler = NULL) {
   $info = &drupal_static(__FUNCTION__, array());
   if (empty($info)) {
     $cache = cache_get('access_handler_info');
@@ -567,31 +617,40 @@ function access_handler_info() {
         if ($module_info) {
           foreach ($module_info as $handler_name => $handler_info) {
             // Merge in default values.
-            $module_info[$handler_name] += array(
+            $handler_info += array(
               'label' => '',
               'scheme types' => array(),
               'object types' => array(),
             );
             // Set inferred values.
-            $module_info[$handler_name]['class'] = $handler_name;
-            $module_info[$handler_name]['module'] = $module;
+            $handler_info['class'] = $handler_name;
+            $handler_info['module'] = $module;
+
+            $info[$handler_name] = $handler_info;
           }
-          $info += $module_info;
         }
       }
       drupal_alter('access_handler_info', $info);
       cache_set('access_handler_info', $info);
     }
   }
+  if (isset($handler)) {
+    return isset($info[$handler]) ? $info[$handler] : FALSE;
+  }
   return $info;
 }
 
 /**
- * Returns information on all available access-controlled object types.
+ * Returns information on available access-controlled object types.
  *
- * @return array
- *   An array indexed by object type (e.g., node, menu_link) where each value is
- *   an associative array with the following keys:
+ * @param string $type
+ *   (optional) An object type, such as 'node' or 'menu_link'.
+ *
+ * @return array|false
+ *   The information array for the requested $type, or FALSE if not found.
+ *   If $type is omitted, returns information for all available object types in
+ *   an array indexed by object type. Type information is returned as an
+ *   associative array with the following keys:
  *   - label: The human-readable name of this object type (e.g., "Content",
  *     "Menu link").
  *   - type: The machine name of this object type (e.g., node, menu_link).
@@ -604,7 +663,7 @@ function access_handler_info() {
  * @see hook_access_info()
  * @see hook_access_info_alter()
  */
-function access_info() {
+function access_info($type = NULL) {
   $info = &drupal_static(__FUNCTION__, array());
   if (empty($info)) {
     $cache = cache_get('access_info');
@@ -612,37 +671,61 @@ function access_info() {
       $info = $cache->data;
     }
     else {
-      $handlers = access_handler_info();
       foreach (module_implements('access_info') as $module) {
         $module_info = module_invoke($module, 'access_info');
         if ($module_info) {
           foreach ($module_info as $object_type => $object_info) {
-            $info[$object_type]['label'] = $object_info['label'];
-            $info[$object_type]['type'] = $object_type;
-            $info[$object_type]['module'] = $module;
-
+            // Merge in default values.
+            $object_info += array(
+              'label' => '',
+            );
+            // Set inferred values.
+            $object_info['type'] = $object_type;
+            $object_info['module'] = $module;
+            $object_info['handlers'] = array();
             // Check whether the object is a fieldable entity.
             $entity_info = entity_get_info($object_type);
-            $info[$object_type]['fieldable'] = empty($entity_info) ? FALSE : $entity_info['fieldable'];
+            $object_info['fieldable'] = empty($entity_info) ? FALSE : $entity_info['fieldable'];
 
-            // Find handlers that support this object type.
-            $info[$object_type]['handlers'] = array();
-            foreach ($handlers as $handler_name => $handler_info) {
-              // If the object is a fieldable entity and the handler supports
-              // fieldable entities, or if the handler explicitly supports this
-              // object type, add the handler to the list.
-              if (($info[$object_type]['fieldable'] && in_array('fieldable entity', $handler_info['object types'])) || in_array($object_type, $handler_info['object types'])) {
-                $info[$object_type]['handlers'][] = $handler_name;
-              }
-            }
+            $info[$object_type] = $object_info;
           }
         }
       }
       drupal_alter('access_info', $info);
       cache_set('access_info', $info);
     }
+
+    // Find handlers that support this object type. This information is already
+    // cached in access_handler_info(), so we only include this in the static
+    // variable, not in the cache_set() above.
+    $handlers = access_handler_info();
+    foreach ($info as $object_type => $object_info) {
+      foreach ($handlers as $handler_name => $handler_info) {
+        // If the object is a fieldable entity and the handler supports
+        // fieldable entities, or if the handler explicitly supports this
+        // object type, add the handler to the list.
+        if (($object_info['fieldable'] && in_array('fieldable entity', $handler_info['object types'])) || in_array($object_type, $handler_info['object types'])) {
+          $info[$object_type]['handlers'][] = $handler_name;
+        }
+      }
+    }
+  }
+  if (isset($type)) {
+    return isset($info[$type]) ? $info[$type] : FALSE;
   }
   return $info;
+}
+
+/**
+ * Clears cached ACK API information.
+ */
+function access_info_cache_clear() {
+  cache_clear_all('access_scheme_info', 'cache');
+  drupal_static_reset('access_scheme_info');
+  cache_clear_all('access_handler_info', 'cache');
+  drupal_static_reset('access_handler_info');
+  cache_clear_all('access_info', 'cache');
+  drupal_static_reset('access_info');
 }
 
 /**
@@ -1014,6 +1097,48 @@ function access_modules_uninstalled($modules) {
   foreach ($modules as $module) {
     db_delete('access_handler')->condition('module', $module)->execute();
   }
+}
+
+/**
+ * Implements hook_field_create_field().
+ */
+function access_field_create_field($field) {
+  access_info_cache_clear();
+}
+
+/**
+ * Implements hook_field_update_field().
+ */
+function access_field_update_field($field, $prior_field, $has_data) {
+  access_info_cache_clear();
+}
+
+/**
+ * Implements hook_field_delete_field().
+ */
+function access_field_delete_field($field) {
+  access_info_cache_clear();
+}
+
+/**
+ * Implements hook_taxonomy_vocabulary_insert().
+ */
+function access_taxonomy_vocabulary_insert($vocabulary) {
+  access_info_cache_clear();
+}
+
+/**
+ * Implements hook_taxonomy_vocabulary_update().
+ */
+function access_taxonomy_vocabulary_update($vocabulary) {
+  access_info_cache_clear();
+}
+
+/**
+ * Implements hook_taxonomy_vocabulary_delete().
+ */
+function access_taxonomy_vocabulary_delete($vocabulary) {
+  access_info_cache_clear();
 }
 
 /**

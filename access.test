@@ -91,7 +91,6 @@ class AccessWebTestCase extends DrupalWebTestCase {
         'allowed_values' => $realms,
       ),
     ));
-    drupal_static_reset('access_scheme_info');
     $scheme = $this->createScheme('list_' . $type, array('field_name' => 'field_' . $type));
     return access_scheme_load($scheme->sid);
   }
@@ -117,7 +116,6 @@ class AccessWebTestCase extends DrupalWebTestCase {
       $term->name = $this->randomName();
       taxonomy_term_save($term);
     }
-    drupal_static_reset('access_scheme_info');
     $scheme = $this->createScheme('taxonomy_term', array('vocabulary' => $vocabulary->machine_name));
     return access_scheme_load($scheme->sid);
   }
