@@ -8,3 +8,6 @@ dependencies[] = menu
 ; Handlers
 files[] = ack_menu_handler.inc
 files[] = handlers/ack_menu_map.inc
+
+; Test cases.
+files[] = ack_menu.test

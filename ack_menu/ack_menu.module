@@ -195,6 +195,9 @@ function ack_menu_form_menu_edit_item_alter(&$form, &$form_state, $form_id) {
   _ack_menu_form_alter($form, $form_state, $form_id, $item);
   $form['#validate'][] = 'ack_menu_form_menu_edit_item_validate';
   $form['#submit'][] = 'ack_menu_form_menu_edit_item_submit';
+  if (isset($form['actions']['delete'])) {
+    $form['actions']['delete']['#submit'] = array('ack_menu_item_delete_submit');
+  }
 }
 
 /**
@@ -222,6 +225,21 @@ function ack_menu_form_menu_edit_item_submit($form, &$form_state) {
   if (isset($form_state['ack_menu']['destination'])) {
     $form_state['redirect'] = $form_state['ack_menu']['destination'];
   }
+}
+
+/**
+ * Submit handler for the delete button on the altered menu item form.
+ *
+ * @see ack_menu_form_menu_edit_item_alter()
+ * @see menu_item_delete_submit()
+ */
+function ack_menu_item_delete_submit($form, &$form_state) {
+  $destination = array();
+  if (isset($_GET['destination'])) {
+    $destination = drupal_get_destination();
+    unset($_GET['destination']);
+  }
+  $form_state['redirect'] = array('admin/structure/menu/item/' . $form_state['values']['mlid'] . '/delete', array('query' => $destination));
 }
 
 /**
