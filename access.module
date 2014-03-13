@@ -1172,5 +1172,41 @@ function access_hook_info() {
  * Implements hook_help().
  */
 function access_help($path, $arg) {
-  // @todo Need some helpful instructions on the add scheme list page.
+  $output = '';
+  switch ($path) {
+    // The main help page.
+    case 'admin/help#access':
+      $output .= '<h3>' . t('About') . '</h3>';
+      $output .= '<p>' . t('The Access Control Kit module allows you to give users access to manage parts of your site. To control access, you define <em>access schemes</em> to divide the site into <em>access realms</em>, and then assign ACK-enabled roles to users within those realms.') . '</p>';
+      $output .= '<h3>' . t('How to use') . '</h3>';
+      $output .= '<h4>' . t('Creating access schemes') . '</h4>';
+      $output .= '<p>' . t('Users with sufficient <a href="@perm">permissions</a> can create access schemes through the <a href="@admin">access schemes page</a>. The Access Control Kit module includes the ability to create schemes based on taxonomy vocabularies, list fields, user accounts, and boolean values. Other modules may define additional scheme types through the ACK API. The type of scheme you create determines the access realms for your site. For example, in a taxonomy-based scheme, the vocabulary terms are the realms. In a list-based scheme, the allowed values of the list field are the realms.', array(
+          '@perm' => url('admin/people/permissions', array('fragment' => 'module-access')),
+          '@admin' => url('admin/structure/access'),
+        )) . '</p>';
+      $output .= '<h4>' . t('Assigning realms to objects') . '</h4>';
+      $output .= '<p>' . t("To control access to an object in your site, the scheme needs to be configured to relate its realms to the object. For example, a taxonomy-based scheme might use the value of a term reference field; objects tagged with a term become members of that term's realm. Access Control Kit includes two modules for managing objects:") . '</p>';
+      $output .= '<dl><dt>ACK Node</dt><dd>Can manage access to content through field values (for taxonomy- and list-based schemes), the "sticky" property (for boolean schemes), or the content author (for user-based schemes).</dd><dt>ACK Menu</dt><dd>Can manage access to menus by assigning a link and its sublinks to a realm in a taxonomy or list (integer) scheme.</dd></dl>';
+      $output .= '<p>' . t('Other modules may provide support for additional object types through the ACK API.') . '</p>';
+      $output .= '<h4>' . t('Creating ACK-enabled roles') . '</h4>';
+      $output .= '<p>' . t('Modules that manage object types also provide realm-aware permissions for those objects. For example, the ACK Node module provides permissions to create, edit own, edit any, delete own, and delete any content in assigned realms; users with these permissions will only be able to affect content in the realms that have been assigned to them. To create an ACK-enabled role, assign these permissions to the role on the <a href="@perm">permissions page</a> as normal, then edit your access scheme and enable the role.', array('@perm' => url('admin/people/permissions'))) . '</p>';
+      $output .= '<h4>' . t('Assigning users to realms') . '</h4>';
+      $output .= '<p>' . t('Users with sufficient <a href="@perm">permissions</a> can create <em>access grants</em> through the <a href="@admin">access page</a>. Access grants allow users to exercise their ACK-enabled roles on the member objects of a realm.', array(
+          '@perm' => url('admin/people/permissions', array('fragment' => 'module-access')),
+          '@admin' => url('admin/access'),
+        )) . '</p>';
+      $output .= '<h3>' . t('Extending the Access Control Kit module') . '</h3>';
+      $output .= '<p>' . t("The file access.api.php (in the access module directory) contains information for developers interested in extending the capabilities of ACK or integrating ACK with their own modules. In addition, the ACK Node and ACK Menu modules serve as good examples of how to implement the API and override Drupal's regular access controls.") . '</p>';
+      break;
+
+    // The access scheme overview page.
+    case 'admin/structure/access':
+      $output .= '<p>' . t('Access schemes group together the components of your site (such as content and menu links) for the purpose of giving users access to manage them. Each grouping within the scheme is called an <em>access realm</em>.') . '</p>';
+      $output .= '<p>' . t('An access scheme can use a taxonomy vocabulary, a list field, or some other source for its realm list. For example, in a vocabulary-based scheme, the terms in that vocabulary will become access realms. If the scheme is configured to manage content, then a user could be given access to only edit content tagged with a certain term.') . '</p>';
+      break;
+
+    default:
+      $output = NULL;
+  }
+  return $output;
 }
