@@ -243,15 +243,15 @@ class AckMenuAccessTest extends DrupalWebTestCase {
       $this->assertLink(t('Edit the parent link'), $i);
       if (!$i) {
         // With only one link, the parent link header should not be shown.
-        $this->assertNoRaw('<legend><span class="fieldset-legend"><a href="/node" title="">' . $edit[$i]['link_title'] . '</a></span></legend>');
+        $this->assertNoRaw('<legend><span class="fieldset-legend"><a href="' . url('node') . '" title="">' . $edit[$i]['link_title'] . '</a></span></legend>');
       }
       else {
         // With more than one, we need a header for each.
-        $this->assertRaw('<legend><span class="fieldset-legend"><a href="/node" title="">' . $edit[$i]['link_title'] . '</a></span></legend>');
+        $this->assertRaw('<legend><span class="fieldset-legend"><a href="' . url('node') . '" title="">' . $edit[$i]['link_title'] . '</a></span></legend>');
       }
     }
     // Make sure both headers are present.
-    $this->assertRaw('<legend><span class="fieldset-legend"><a href="/node" title="">' . $edit[0]['link_title'] . '</a></span></legend>');
+    $this->assertRaw('<legend><span class="fieldset-legend"><a href="' . url('node') . '" title="">' . $edit[0]['link_title'] . '</a></span></legend>');
     // Check access to menu items.
     $this->clickLink(t('Edit the parent link'));
     $this->assertText(t('Edit menu link'), 'The link can be edited.');

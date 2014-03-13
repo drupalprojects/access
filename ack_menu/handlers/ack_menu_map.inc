@@ -156,6 +156,7 @@ class AckMenuMap extends AccessControlKitHandler implements AckMenuHandlerInterf
           if (empty($allowed[$option])) {
             unset($form['parent']['#options'][$option]);
           }
+          // @todo What about child links/trees owned by an inaccessible realm?
         }
         // If the default value was filtered out, set a new default.
         if (!isset($form['parent']['#options'][$default])) {
