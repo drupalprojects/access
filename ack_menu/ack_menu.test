@@ -302,7 +302,7 @@ class AckMenuAccessTest extends DrupalWebTestCase {
     $this->drupalLogin($this->ackUser);
     $this->clickLink(t('Manage menu links'));
     // Without a grant, the menu manager should be empty.
-    $this->assertNoLinkByHref($ack_menu_url, 0, 'No realms are listed.');
+    $this->assertNoLinkByHref($ack_menu_url, 'No realms are listed.');
     $this->assertText(t('You have not been granted access to any menu trees.'));
     // Check the access callbacks.
     $this->drupalGet($ack_menu_url . $this->ackUser->uid);
