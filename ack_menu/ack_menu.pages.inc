@@ -6,39 +6,53 @@
  */
 
 /**
+ * Menu page callback which shows an overview of all accessible menus.
+ *
+ * @see menu_overview_page()
+ */
+function ack_menu_admin_page() {
+  $result = db_query("SELECT * FROM {menu_custom} ORDER BY title", array(), array('fetch' => PDO::FETCH_ASSOC));
+  $header = array(
+    t('Title'),
+    array(
+      'data' => t('Operations'),
+      'colspan' => '3',
+    ),
+  );
+  $rows = array();
+  foreach ($result as $menu) {
+    if (ack_menu_menu_access($menu)) {
+      $row = array(theme('menu_admin_overview', array(
+        'title' => $menu['title'],
+        'name' => $menu['menu_name'],
+        'description' => $menu['description'],
+      )));
+      $row[] = array('data' => l(t('list links'), 'admin/structure/menu/manage/' . $menu['menu_name']));
+      $row[] = array('data' => l(t('edit menu'), 'admin/structure/menu/manage/' . $menu['menu_name'] . '/edit'));
+      $row[] = array('data' => l(t('add link'), 'admin/structure/menu/manage/' . $menu['menu_name'] . '/add'));
+      $rows[] = $row;
+    }
+  }
+
+  return theme('table', array('header' => $header, 'rows' => $rows));
+}
+
+/**
  * Menu page callback to list the realms wherein the user may manage menu links.
  *
  * @return array
  *   A renderable array.
  */
 function ack_menu_overview_page() {
-  $schemes = access_object_schemes('menu_link');
-  $realms = array();
-  // Global menu administrators can see all realms.
-  if (user_access('administer menu')) {
-    foreach ($schemes as $scheme) {
-      $realms[$scheme->machine_name] = array_keys($scheme->realms);
-    }
-  }
-  else {
-    // Everyone else sees only the realms they are allowed to manage.
-    $scheme_realms = access_user_permission_realms('ack manage menu links', NULL, $schemes);
-    foreach ($schemes as $scheme) {
-      foreach ($scheme_realms[$scheme->machine_name] as $realm) {
-        if (ack_menu_access($scheme, $realm)) {
-          $realms[$scheme->machine_name][] = $realm;
-        }
-      }
-    }
-  }
-
-  $number_of_user_schemes = count($realms);
+  $scheme_realms = _ack_menu_user_realms();
+  $number_of_user_schemes = count($scheme_realms);
   $render = array();
-  foreach ($schemes as $scheme) {
-    if (!empty($realms[$scheme->machine_name])) {
+  foreach ($scheme_realms as $scheme_machine_name => $realms) {
+    if (!empty($realms)) {
+      $scheme = access_scheme_machine_name_load($scheme_machine_name);
       $label = check_plain($scheme->name);
       if ($number_of_user_schemes > 1) {
-        $render[$scheme->machine_name]['header'] = array(
+        $render[$scheme_machine_name]['header'] = array(
           '#type' => 'markup',
           '#markup' => '<h2>' . $label . '</h2>',
         );
@@ -51,14 +65,14 @@ function ack_menu_overview_page() {
         ),
       );
       $rows = array();
-      foreach ($realms[$scheme->machine_name] as $realm) {
+      foreach ($realms as $realm) {
         $row = array();
         $row[] = check_plain($scheme->realms[$realm]);
-        $row[] = array('data' => l(t('list links'), 'ack_menu/manage/' . $scheme->machine_name . '/' . $realm));
-        $row[] = array('data' => l(t('add link'), 'ack_menu/manage/' . $scheme->machine_name . '/' . $realm . '/add'));
+        $row[] = array('data' => l(t('list links'), 'ack_menu/manage/' . $scheme_machine_name . '/' . $realm));
+        $row[] = array('data' => l(t('add link'), 'ack_menu/manage/' . $scheme_machine_name . '/' . $realm . '/add'));
         $rows[] = $row;
       }
-      $render[$scheme->machine_name]['table'] = array(
+      $render[$scheme_machine_name]['table'] = array(
         '#theme' => 'table',
         '#header' => $header,
         '#rows' => $rows,
@@ -67,8 +81,8 @@ function ack_menu_overview_page() {
   }
 
   if (empty($render)) {
-    if (user_access('administer menu')) {
-      $empty = t('No access schemes have been configured to manage menu links. To configure the menu, use the <a href="@url">menu administration page</a>.', array('@url' => url('admin/structure/menu')));
+    if (ack_menu_admin_access()) {
+      $empty = t('No access schemes have been configured to manage menu links.');
       if (user_access('administer access schemes')) {
         $empty .= ' ' . t('To configure an access scheme to manage the menu, use the <a href="@url">access scheme administration page</a> to add a menu access handler to a scheme.', array('@url' => url('admin/structure/access')));
       }
@@ -108,8 +122,7 @@ function ack_menu_overview_form($form, &$form_state, $scheme, $realm) {
   $form_state['realm'] = $realm;
 
   if (isset($scheme->handlers['menu_link'])) {
-    $handler = $scheme->handlers['menu_link'];
-    $links = $handler->realmLinks($realm);
+    $links = ack_menu_realm_links($scheme, $realm);
     if (!empty($links)) {
       $tree = menu_tree_data($links);
       $count = count($tree);
@@ -155,7 +168,7 @@ function ack_menu_overview_form($form, &$form_state, $scheme, $realm) {
               if (isset($element['subtree'][$key]['#item'])) {
                 $element['subtree'][$key]['#item']['depth'] -= $item['depth'];
               }
-              // Set the redirect destination on the edit/delete/reset links.
+              // Set the redirect destination on the edit/delete links.
               foreach (element_children($element['subtree'][$key]['operations']) as $op) {
                 $element['subtree'][$key]['operations'][$op]['#options']['query'] = $destination;
               }

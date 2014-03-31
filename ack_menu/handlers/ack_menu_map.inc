@@ -89,7 +89,7 @@ class AckMenuMap extends AccessControlKitHandler implements AckMenuHandlerInterf
    * Overrides AccessControlKitHandler::description().
    */
   public function description() {
-    return t('A menu link will be considered a part of an access realm if an administrator has assigned it&mdash;or one of its parent links&mdash;to that realm on the link edit form.');
+    return t('Users with the <em>administer menus for all schemes</em> permission will be able to edit links in the allowed menus and assign realm memberships to them. Users who have been granted the <em>manage menu links in assigned access realms</em> permission for those realms will then be able to manage these links and their descendents.');
   }
 
   /**
@@ -128,9 +128,10 @@ class AckMenuMap extends AccessControlKitHandler implements AckMenuHandlerInterf
    */
   public function objectFormAlter($object_type, $menu_link, &$form, &$form_state, $form_id, $realms = NULL) {
     $admin = !empty($form_state['ack_menu']['admin']);
+    $global = !empty($form_state['ack_menu']['global admin']);
 
-    // If the user isn't an admin, then we need to filter the parent options.
-    if (!$admin) {
+    // If the user isn't a global admin, we need to filter the parent options.
+    if (!$global) {
       // If a realm list wasn't provided, get the link's current realm.
       if (!isset($realms) && !empty($menu_link['mlid'])) {
         $realms = $this->objectRealms($object_type, $menu_link);
@@ -138,17 +139,23 @@ class AckMenuMap extends AccessControlKitHandler implements AckMenuHandlerInterf
       // Only filter if we were able to identify a realm. Links without a realm
       // are skipped, so as not to remove options needed by other schemes.
       if (!empty($realms)) {
-        $allowed = array();
-        foreach ($realms as $realm) {
-          // Get the form option keys for all eligible parents.
-          foreach ($this->realmLinks($realm) as $link) {
-            $allowed[$link['menu_name'] . ':' . $link['mlid']] = TRUE;
+        // Realm menu admins can place the link anywhere in the managed menus.
+        if ($admin) {
+          $menus = $this->managedMenus();
+          $allowed = empty($menus) ? array() : menu_parent_options($menus, $menu_link);
+        }
+        else {
+          // For non-admins, get the form option keys for all eligible parents.
+          $allowed = array();
+          foreach ($realms as $realm) {
+            foreach ($this->realmLinks($realm) as $link) {
+              $allowed[$link['menu_name'] . ':' . $link['mlid']] = TRUE;
+            }
           }
         }
         // For an existing link, we need to keep the default value as an option.
-        $default = $form['parent']['#default_value'];
         if (!empty($menu_link['mlid'])) {
-          $allowed[$default] = TRUE;
+          $allowed[$form['parent']['#default_value']] = TRUE;
         }
 
         // Remove options that aren't in our list.
@@ -158,14 +165,24 @@ class AckMenuMap extends AccessControlKitHandler implements AckMenuHandlerInterf
           }
           // @todo What about child links/trees owned by an inaccessible realm?
         }
-        // If the default value was filtered out, set a new default.
-        if (!isset($form['parent']['#options'][$default])) {
-          $form['parent']['#default_value'] = key($form['parent']['#options']);
+
+        // For new links, set the first available mapped link as the default;
+        // if none is found, use the first allowed parent option.
+        if (empty($menu_link['mlid'])) {
+          $default = NULL;
+          reset($realms);
+          while (empty($default) && $realm = next($realms)) {
+            $mapped_links = $this->mappedLinks($realm);
+            while (empty($default) && $mlid = array_pop($mapped_links)) {
+              $default = menu_link_load($mlid);
+            }
+          }
+          $form['parent']['#default_value'] = empty($default) ? key($allowed) : $default['menu_name'] . ':' . $default['mlid'];
         }
       }
     }
 
-    // Menu administrators can map the link to a realm from the menu item form.
+    // Realm menu admins can map the link to a realm from the menu item form.
     if ($admin && $form_id == 'menu_edit_item') {
       if (!isset($form['AckMenuMap'])) {
         $form['AckMenuMap'] = array(
@@ -276,6 +293,18 @@ class AckMenuMap extends AccessControlKitHandler implements AckMenuHandlerInterf
       $link = empty($mlid) ? NULL : menu_link_load($mlid);
     } while (isset($mlid) && empty($link));
     return empty($link) ? reset($this->menus) : $link['menu_name'];
+  }
+
+  /**
+   * Implements AckMenuHandlerInterface::managedMenus().
+   */
+  public function managedMenus() {
+    $names = menu_get_menus();
+    $managed = array();
+    foreach ($this->menus as $menu) {
+      $managed[$menu] = $names[$menu];
+    }
+    return $managed;
   }
 
 }

@@ -11,11 +11,18 @@
 class AckMenuAccessTest extends DrupalWebTestCase {
 
   /**
-   * A user with administrative access.
+   * A user with administrative control over all menus.
    *
    * @var object
    */
-  protected $adminUser;
+  protected $menuAdmin;
+
+  /**
+   * A user with administrative control over scheme menus.
+   *
+   * @var object
+   */
+  protected $ackAdmin;
 
   /**
    * An ACK-enabled role that allows managing menu items.
@@ -68,16 +75,15 @@ class AckMenuAccessTest extends DrupalWebTestCase {
    */
   public function setUp() {
     parent::setUp(array('ack_menu'));
-    // Create and log in our admin user.
-    $this->adminUser = $this->drupalCreateUser(array(
+    // Create and log in our scheme menu admin.
+    $this->ackAdmin = $this->drupalCreateUser(array(
       'administer access schemes',
       'administer access grants',
-      'administer menu',
-      'ack manage menu links',
+      'administer ack_menu',
       'create article content',
       'edit own article content',
     ));
-    $this->drupalLogin($this->adminUser);
+    $this->drupalLogin($this->ackAdmin);
 
     // Create the test role.
     $rid = $this->drupalCreateRole(array(
@@ -101,6 +107,15 @@ class AckMenuAccessTest extends DrupalWebTestCase {
     // Create a user with no menu access.
     $this->noAccessUser = $this->drupalCreateUser(array(
       'access content',
+      'create article content',
+      'edit own article content',
+    ));
+
+    // Create a menu administrator.
+    $this->menuAdmin = $this->drupalCreateUser(array(
+      'access content',
+      'administer menu',
+      'administer permissions',
       'create article content',
       'edit own article content',
     ));
@@ -177,7 +192,7 @@ class AckMenuAccessTest extends DrupalWebTestCase {
     $element = 'AckMenuMap[' . $this->schemeMachineName . ']';
     $edit = array($element => $this->ackUser->uid);
     $this->drupalPost('admin/structure/menu/item/' . $this->items['mapped top link']['mlid'] . '/edit', $edit, 'Save');
-    $edit = array($element => $this->adminUser->uid);
+    $edit = array($element => $this->ackAdmin->uid);
     $this->drupalPost('admin/structure/menu/item/' . $this->items['mapped child link']['mlid'] . '/edit', $edit, 'Save');
     $this->drupalPost('admin/structure/menu/item/' . $this->items['mapped child link with no access parent']['mlid'] . '/edit', $edit, 'Save');
     $edit = array($element => $this->noAccessUser->uid);
@@ -192,8 +207,8 @@ class AckMenuAccessTest extends DrupalWebTestCase {
     // Check that administrators are notified when no schemes are available.
     $this->clickLink(t('Manage menu links'));
     $this->assertText(t('No access schemes have been configured to manage menu links.'));
-    $this->assertLink(t('menu administration page'));
     $this->clickLink(t('access scheme administration page'));
+    $this->assertLink(t('Add access scheme'));
 
     // Finish building the test environment.
     $this->setUpMenu();
@@ -214,11 +229,11 @@ class AckMenuAccessTest extends DrupalWebTestCase {
     $ack_menu_url = 'ack_menu/manage/' . $this->schemeMachineName . '/';
     $ack_link_url = 'admin/structure/menu/item/';
 
-    // Test as the admin user.
+    // Test as the scheme menu admin.
     $this->clickLink(t('Manage menu links'));
-    // A menu admin should see all realms.
+    // A scheme menu admin should see all realms.
     $this->assertLinkByHref($ack_menu_url . '1', 0, 'The user 1 realm is listed.');
-    $this->assertLinkByHref($ack_menu_url . $this->adminUser->uid, 0, 'The admin user realm is listed.');
+    $this->assertLinkByHref($ack_menu_url . $this->ackAdmin->uid, 0, 'The admin user realm is listed.');
     $this->assertLinkByHref($ack_menu_url . $this->ackUser->uid, 0, 'The ACK user realm is listed.');
     $this->assertLinkByHref($ack_menu_url . $this->noAccessUser->uid, 0, 'The no access user realm is listed.');
     // Test a realm with no mappings.
@@ -234,7 +249,8 @@ class AckMenuAccessTest extends DrupalWebTestCase {
       $this->assertTrue($selector, 'The mapping element is disabled.');
       $this->assertOptionSelected('edit-ackmenumap-' . $this->schemeMachineName, 1, 'The realm mapping is selected.');
       $this->assertOptionSelected('edit-parent', 'navigation:0', 'The parent menu is selected.');
-      $this->assertNoOptionSelected('edit-parent', 'main-menu:0', 'The parent menu options were not filtered.');
+      $this->assertFieldByXPath('//option[@value="navigation:' . $this->items['mapped top link']['mlid'] . '"]', TRUE, 'Links in managed menus from other realms are not filtered.');
+      $this->assertNoFieldByXPath('//option[@value="main-menu:0"]', TRUE, 'Unmanaged menus are not available as parent options.');
       $edit[$i] = array(
         'link_title' => $this->randomName(),
         'link_path' => 'node',
@@ -243,11 +259,11 @@ class AckMenuAccessTest extends DrupalWebTestCase {
       $this->assertLink(t('Edit the parent link'), $i);
       if (!$i) {
         // With only one link, the parent link header should not be shown.
-        $this->assertNoRaw('<legend><span class="fieldset-legend"><a href="' . url('node') . '" title="">' . $edit[$i]['link_title'] . '</a></span></legend>');
+        $this->assertNoRaw('<legend><span class="fieldset-legend"><a href="' . url('node') . '" title="">' . $edit[$i]['link_title'] . '</a></span></legend>', 'Parent link header is not displayed when only one parent is present.');
       }
       else {
         // With more than one, we need a header for each.
-        $this->assertRaw('<legend><span class="fieldset-legend"><a href="' . url('node') . '" title="">' . $edit[$i]['link_title'] . '</a></span></legend>');
+        $this->assertRaw('<legend><span class="fieldset-legend"><a href="' . url('node') . '" title="">' . $edit[$i]['link_title'] . '</a></span></legend>', 'Parent link headers are displayed when there are two parents available.');
       }
     }
     // Make sure both headers are present.
@@ -260,6 +276,27 @@ class AckMenuAccessTest extends DrupalWebTestCase {
     $this->assertOptionSelected('edit-ackmenumap-' . $this->schemeMachineName, 1, 'The realm mapping is selected.');
     $this->drupalPost(NULL, array(), 'Delete');
     $this->assertText(t('Are you sure you want to delete the custom menu link'), 'The link can be deleted.');
+    // Check the access callbacks.
+    $this->drupalGet($ack_menu_url . 'a');
+    $this->assertResponse(403, 'Access is denied to an invalid realm.');
+    $this->drupalGet('admin/structure/menu/settings');
+    $this->assertResponse(403, 'Access is denied to the menu settings page.');
+    $this->drupalGet('admin/structure/menu/manage/main-menu');
+    $this->assertResponse(403, 'Access is denied to an unmanaged menu list.');
+    $this->drupalGet('admin/structure/menu/manage/main-menu/add');
+    $this->assertResponse(403, 'Access is denied to add a link to an unmanaged menu.');
+    $this->drupalGet('admin/structure/menu/manage/navigation');
+    $this->assertResponse(200, 'Access is granted to a managed menu list.');
+    $this->drupalGet('admin/structure/menu/manage/navigation/add');
+    $this->assertResponse(200, 'Access is granted to add a link to a managed menu.');
+    $this->drupalGet('admin/structure/menu');
+    $this->assertResponse(200, 'Access is granted to the menu admin page.');
+    // Check that the menu overview page is properly filtered.
+    $this->assertNoLinkByHref('admin/structure/menu/manage/main-menu');
+    $this->assertNoLinkByHref('admin/structure/menu/manage/management');
+    $this->assertLinkByHref('admin/structure/menu/manage/navigation');
+    $this->assertNoLinkByHref('admin/structure/menu/manage/user-menu');
+    $this->assertNoLinkByHref('admin/structure/menu/settings');
 
     // Test as the test user, without an access grant.
     $this->drupalLogin($this->ackUser);
@@ -270,6 +307,8 @@ class AckMenuAccessTest extends DrupalWebTestCase {
     // Check the access callbacks.
     $this->drupalGet($ack_menu_url . $this->ackUser->uid);
     $this->assertResponse(403, 'Access is denied to a menu tree.');
+    $this->drupalGet($ack_menu_url . 'a');
+    $this->assertResponse(403, 'Access is denied to an invalid realm.');
     $this->drupalGet($ack_menu_url . $this->ackUser->uid . '/add');
     $this->assertResponse(403, 'Access is denied to add a link.');
     $this->drupalGet($ack_link_url . $this->items['mapped top link']['mlid'] . '/edit');
@@ -280,15 +319,28 @@ class AckMenuAccessTest extends DrupalWebTestCase {
     $this->assertResponse(403, 'Access is denied to edit an unmapped link.');
     $this->drupalGet($ack_link_url . $this->items['not mapped']['mlid'] . '/delete');
     $this->assertResponse(403, 'Access is denied to delete an unmapped link.');
+    $this->drupalGet('admin/structure/menu');
+    $this->assertResponse(403, 'Access is denied to the menu admin page.');
+    $this->drupalGet('admin/structure/menu/settings');
+    $this->assertResponse(403, 'Access is denied to the menu settings page.');
+    $this->drupalGet('admin/structure/menu/manage/main-menu');
+    $this->assertResponse(403, 'Access is denied to an unmanaged menu list.');
+    $this->drupalGet('admin/structure/menu/manage/main-menu/add');
+    $this->assertResponse(403, 'Access is denied to add a link to an unmanaged menu.');
+    $this->drupalGet('admin/structure/menu/manage/navigation');
+    $this->assertResponse(403, 'Access is denied to a managed menu list.');
+    $this->drupalGet('admin/structure/menu/manage/navigation/add');
+    $this->assertResponse(403, 'Access is denied to add a link to a managed menu.');
 
     // Grant access to the test user.
-    $this->drupalLogin($this->adminUser);
+    $this->drupalLogin($this->ackAdmin);
     $field = 'ack_' . $this->schemeMachineName . '[und]';
     $edit = array(
       'user' => $this->ackUser->name,
       'role' => $this->ackRole->rid,
       $field . '[' . $this->ackUser->uid . ']' => TRUE,
-      $field . '[' . $this->adminUser->uid . ']' => TRUE,
+      $field . '[' . $this->ackAdmin->uid . ']' => TRUE,
+      $field . '[' . $this->menuAdmin->uid . ']' => TRUE,
     );
     $this->drupalPost('admin/access/add/' . $this->schemeMachineName, $edit, 'Save');
 
@@ -297,12 +349,17 @@ class AckMenuAccessTest extends DrupalWebTestCase {
     $this->clickLink(t('Manage menu links'));
     // With a grant, the menu manager should only list the assigned realms.
     $this->assertNoLinkByHref($ack_menu_url . '1', 'The user 1 realm is not listed.');
-    $this->assertLinkByHref($ack_menu_url . $this->adminUser->uid, 0, 'The admin user realm is listed.');
+    $this->assertLinkByHref($ack_menu_url . $this->ackAdmin->uid, 0, 'The admin user realm is listed.');
+    $this->assertNoLinkByHref($ack_menu_url . $this->menuAdmin->uid, 'The global admin user realm is not listed.');
     $this->assertLinkByHref($ack_menu_url . $this->ackUser->uid, 0, 'The ACK user realm is listed.');
     $this->assertNoLinkByHref($ack_menu_url . $this->noAccessUser->uid, 'The no access user realm is not listed.');
     // Check the access callbacks.
+    $this->drupalGet($ack_menu_url . $this->menuAdmin->uid);
+    $this->assertResponse(403, 'Access is denied to a realm menu tree with no mapped links.');
     $this->drupalGet($ack_menu_url . $this->noAccessUser->uid);
     $this->assertResponse(403, 'Access is denied to the no access menu tree.');
+    $this->drupalGet($ack_menu_url . 'a');
+    $this->assertResponse(403, 'Access is denied to an invalid realm.');
     $this->drupalGet($ack_menu_url . $this->noAccessUser->uid . '/add');
     $this->assertResponse(403, 'Access is denied to add a link to the no access realm.');
     $this->drupalGet($ack_link_url . $this->items['no access top link']['mlid'] . '/edit');
@@ -321,6 +378,18 @@ class AckMenuAccessTest extends DrupalWebTestCase {
     $this->assertResponse(403, 'Access is denied to edit an unmapped link.');
     $this->drupalGet($ack_link_url . $this->items['not mapped']['mlid'] . '/delete');
     $this->assertResponse(403, 'Access is denied to delete an unmapped link.');
+    $this->drupalGet('admin/structure/menu');
+    $this->assertResponse(403, 'Access is denied to the menu admin page.');
+    $this->drupalGet('admin/structure/menu/settings');
+    $this->assertResponse(403, 'Access is denied to the menu settings page.');
+    $this->drupalGet('admin/structure/menu/manage/main-menu');
+    $this->assertResponse(403, 'Access is denied to an unmanaged menu list.');
+    $this->drupalGet('admin/structure/menu/manage/main-menu/add');
+    $this->assertResponse(403, 'Access is denied to add a link to an unmanaged menu.');
+    $this->drupalGet('admin/structure/menu/manage/navigation');
+    $this->assertResponse(403, 'Access is denied to a managed menu list.');
+    $this->drupalGet('admin/structure/menu/manage/navigation/add');
+    $this->assertResponse(403, 'Access is denied to add a link to a managed menu.');
 
     // Test editing the subtree for a realm with a top-level mapping.
     $this->drupalGet($ack_menu_url . $this->ackUser->uid);
@@ -341,7 +410,9 @@ class AckMenuAccessTest extends DrupalWebTestCase {
     $this->clickLink(t('Add realm link'));
     $this->assertOptionSelected('edit-parent', 'navigation:' . $plid, 'The parent link is selected.');
     $this->assertFieldByXPath('//option[@value="navigation:' . $mlid . '"]', TRUE, 'The child link is an option.');
-    $this->assertNoFieldByXPath('//option[@value="main-menu:0"]', TRUE, 'The parent menu options were filtered.');
+    $this->assertNoFieldByXPath('//option[@value="navigation:' . $this->items['no access top link']['mlid'] . '"]', TRUE, 'The parent link options were filtered.');
+    $this->assertNoFieldByXPath('//option[@value="navigation:0"]', TRUE, 'The parent menu options were filtered.');
+    $this->assertNoFieldByXPath('//option[@value="main-menu:0"]', TRUE, 'Unmanaged menus are not available as parent options.');
     $title = $this->randomName();
     $edit = array(
       'link_title' => $title,
@@ -359,6 +430,9 @@ class AckMenuAccessTest extends DrupalWebTestCase {
     $this->drupalGet($ack_link_url . $mlid . '/edit', $options);
     $this->assertOptionSelected('edit-parent', 'navigation:' . $plid, 'The parent link is selected.');
     $this->assertNoOptionSelected('edit-parent', 'navigation:' . $this->items['mapped child link with no access parent']['mlid'], 'The other potential parent option is available, but not selected.');
+    $this->assertNoFieldByXPath('//option[@value="navigation:' . $this->items['no access top link']['mlid'] . '"]', TRUE, 'The parent link options were filtered.');
+    $this->assertNoFieldByXPath('//option[@value="navigation:0"]', TRUE, 'The parent menu options were filtered.');
+    $this->assertNoFieldByXPath('//option[@value="main-menu:0"]', TRUE, 'Unmanaged menus are not available as parent options.');
     $selector = $this->xpath('//select[@name=:name and @disabled="disabled"]', array(':name' => 'weight'));
     $this->assertFalse($selector, 'The weight element is not disabled.');
     $this->drupalPost(NULL, array('enabled' => TRUE), 'Save');
@@ -366,7 +440,7 @@ class AckMenuAccessTest extends DrupalWebTestCase {
     $this->assertFieldChecked($item_id . '-hidden', 'The ACK user can edit a link.');
 
     // Test editing the subtree for a realm with child-level mappings.
-    $this->drupalGet($ack_menu_url . $this->adminUser->uid);
+    $this->drupalGet($ack_menu_url . $this->ackAdmin->uid);
     $this->assertNoLinkByHref($ack_link_url . $this->items['no access top link']['mlid'] . '/edit', 'The inaccessible parent link is not listed.');
     $this->assertLink($title, 0, 'The child link appears in the subtree.');
     $this->assertLinkByHref($ack_link_url . $this->items['mapped child link']['mlid'] . '/edit', 0, 'The link with the accessible parent is available.');
@@ -376,7 +450,7 @@ class AckMenuAccessTest extends DrupalWebTestCase {
     // Delete the link with the accessible parent.
     $options = array(
       'query' => array(
-        'destination' => $ack_menu_url . $this->adminUser->uid,
+        'destination' => $ack_menu_url . $this->ackAdmin->uid,
       ),
     );
     $this->drupalPost($ack_link_url . $mlid . '/delete', array(), 'Confirm', $options);
@@ -387,6 +461,7 @@ class AckMenuAccessTest extends DrupalWebTestCase {
     // Test editing an item with an inaccessible parent.
     $this->clickLink(t('Edit the parent link'));
     $this->assertOptionSelected('edit-parent', 'navigation:' . $this->items['no access top link']['mlid'], 'The parent is selected.');
+    $this->assertNoFieldByXPath('//option[@value="navigation:' . $plid . '"]', TRUE, 'The parent link options were filtered.');
     $selector = $this->xpath('//select[@name=:name and @disabled="disabled"]', array(':name' => 'weight'));
     $this->assertTrue($selector, 'The weight element is disabled.');
 
@@ -398,6 +473,8 @@ class AckMenuAccessTest extends DrupalWebTestCase {
     $this->assertResponse(403, 'Access is denied to the menu manager.');
     $this->drupalGet($ack_menu_url . $this->ackUser->uid);
     $this->assertResponse(403, 'Access is denied to a menu tree.');
+    $this->drupalGet($ack_menu_url . 'a');
+    $this->assertResponse(403, 'Access is denied to an invalid realm.');
     $this->drupalGet($ack_menu_url . $this->ackUser->uid . '/add');
     $this->assertResponse(403, 'Access is denied to add a link.');
     $this->drupalGet($ack_link_url . $this->items['mapped top link']['mlid'] . '/edit');
@@ -408,6 +485,67 @@ class AckMenuAccessTest extends DrupalWebTestCase {
     $this->assertResponse(403, 'Access is denied to edit an unmapped link.');
     $this->drupalGet($ack_link_url . $this->items['not mapped']['mlid'] . '/delete');
     $this->assertResponse(403, 'Access is denied to delete an unmapped link.');
+    $this->drupalGet('admin/structure/menu');
+    $this->assertResponse(403, 'Access is denied to the menu admin page.');
+    $this->drupalGet('admin/structure/menu/settings');
+    $this->assertResponse(403, 'Access is denied to the menu settings page.');
+    $this->drupalGet('admin/structure/menu/manage/main-menu');
+    $this->assertResponse(403, 'Access is denied to an unmanaged menu list.');
+    $this->drupalGet('admin/structure/menu/manage/main-menu/add');
+    $this->assertResponse(403, 'Access is denied to add a link to an unmanaged menu.');
+    $this->drupalGet('admin/structure/menu/manage/navigation');
+    $this->assertResponse(403, 'Access is denied to a managed menu list.');
+    $this->drupalGet('admin/structure/menu/manage/navigation/add');
+    $this->assertResponse(403, 'Access is denied to add a link to a managed menu.');
+
+    // Test as the menu administrator.
+    $this->drupalLogin($this->menuAdmin);
+    $this->clickLink(t('Manage menu links'));
+    // A menu admin should see all realms.
+    $this->assertLinkByHref($ack_menu_url . '1', 0, 'The user 1 realm is listed.');
+    $this->assertLinkByHref($ack_menu_url . $this->ackAdmin->uid, 0, 'The admin user realm is listed.');
+    $this->assertLinkByHref($ack_menu_url . $this->ackUser->uid, 0, 'The ACK user realm is listed.');
+    $this->assertLinkByHref($ack_menu_url . $this->noAccessUser->uid, 0, 'The no access user realm is listed.');
+    // Check the access callbacks.
+    $this->assertResponse(200, 'Access is granted to the menu manager.');
+    $this->drupalGet($ack_menu_url . $this->ackUser->uid);
+    $this->assertResponse(200, 'Access is granted to a menu tree.');
+    $this->drupalGet($ack_menu_url . 'a');
+    $this->assertResponse(403, 'Access is denied to an invalid realm.');
+    $this->drupalGet($ack_menu_url . $this->ackUser->uid . '/add');
+    $this->assertResponse(200, 'Access is granted to add a link.');
+    $this->drupalGet($ack_link_url . $this->items['mapped top link']['mlid'] . '/edit');
+    $this->assertResponse(200, 'Access is granted to edit a mapped link.');
+    $this->drupalGet($ack_link_url . $this->items['mapped top link']['mlid'] . '/delete');
+    $this->assertResponse(200, 'Access is granted to delete a mapped link.');
+    $this->drupalGet($ack_link_url . $this->items['not mapped']['mlid'] . '/edit');
+    $this->assertResponse(200, 'Access is granted to edit an unmapped link.');
+    $this->drupalGet($ack_link_url . $this->items['not mapped']['mlid'] . '/delete');
+    $this->assertResponse(200, 'Access is granted to delete an unmapped link.');
+    $this->drupalGet('admin/structure/menu/settings');
+    $this->assertResponse(200, 'Access is granted to the menu settings page.');
+    $this->drupalGet('admin/structure/menu/manage/main-menu');
+    $this->assertResponse(200, 'Access is granted to an unmanaged menu list.');
+    $this->drupalGet('admin/structure/menu/manage/main-menu/add');
+    $this->assertResponse(200, 'Access is granted to add a link to an unmanaged menu.');
+    $this->drupalGet('admin/structure/menu/manage/navigation');
+    $this->assertResponse(200, 'Access is granted to a managed menu list.');
+    $this->drupalGet('admin/structure/menu/manage/navigation/add');
+    $this->assertResponse(200, 'Access is granted to add a link to a managed menu.');
+    $this->drupalGet('admin/structure/menu');
+    $this->assertResponse(200, 'Access is granted to the menu admin page.');
+    // Check that the menu overview page is not filtered.
+    $this->assertLinkByHref('admin/structure/menu/manage/main-menu');
+    $this->assertLinkByHref('admin/structure/menu/manage/management');
+    $this->assertLinkByHref('admin/structure/menu/manage/navigation');
+    $this->assertLinkByHref('admin/structure/menu/manage/user-menu');
+    $this->assertLinkByHref('admin/structure/menu/settings');
+
+    // Check the permission descriptions.
+    $this->drupalGet('admin/people/permissions');
+    $this->assertText(t('Manage the links in the following access scheme-controlled menus: @menus.', array('@menus' => 'Navigation')), 'Permissions page lists manageable menus.');
+    $scheme = access_scheme_machine_name_load($this->schemeMachineName);
+    $this->assertText(t('This permission only applies to the following access schemes: @schemes.', array('@schemes' => $scheme->name)), 'Permissions page lists applicable schemes.');
   }
 
   /**
@@ -416,9 +554,20 @@ class AckMenuAccessTest extends DrupalWebTestCase {
   public function testNodeMenuUI() {
     $this->setUpMenu();
 
-    // Test as the admin user.
+    // Test as the scheme menu admin, but with no usable menus on the node.
+    $this->drupalGet('node/add/article');
+    $this->assertNoText(t('Provide a menu link'));
+    variable_set('menu_options_article', array('main-menu', 'management'));
+    $this->drupalGet('node/add/article');
+    $this->assertNoText(t('Provide a menu link'));
+
+    // Add the node's menu to the scheme and retest.
+    $edit = array('handlers[menu_link][AckMenuMap][menus][main-menu]' => TRUE);
+    $this->drupalPost('admin/structure/access/' . $this->schemeMachineName, $edit, 'Save access scheme');
+    $this->assertText(t('Updated access scheme'), 'Access scheme configured.');
     $this->drupalGet('node/add/article');
     $this->assertText(t('Provide a menu link'));
+    $this->assertNoFieldByXPath('//option[@value="management:0"]', TRUE, 'Removed parent option: management');
     $edit = array(
       'title' => $this->randomName(),
       'menu[enabled]' => TRUE,
@@ -426,7 +575,7 @@ class AckMenuAccessTest extends DrupalWebTestCase {
       'menu[parent]' => 'main-menu:0',
     );
     $this->drupalPost(NULL, $edit, 'Save');
-    $this->assertLink($edit['menu[link_title]'], 0, 'The admin user can create a link from the node form.');
+    $this->assertLink($edit['menu[link_title]'], 0, 'The scheme menu admin can create a link from the node form.');
     $this->clickLink(t('Edit'));
     $this->assertFieldChecked('edit-menu-enabled');
     $this->assertOptionSelected('edit-menu-parent', 'main-menu:0');
@@ -440,25 +589,26 @@ class AckMenuAccessTest extends DrupalWebTestCase {
     $this->assertNoText(t('Provide a menu link'), 'The ACK user cannot create a link from the node form without a grant.');
 
     // Grant access to the test user.
-    $this->drupalLogin($this->adminUser);
+    $this->drupalLogin($this->ackAdmin);
     $field = 'ack_' . $this->schemeMachineName . '[und]';
     $edit = array(
       'user' => $this->ackUser->name,
       'role' => $this->ackRole->rid,
       $field . '[' . $this->ackUser->uid . ']' => TRUE,
-      $field . '[' . $this->adminUser->uid . ']' => TRUE,
+      $field . '[' . $this->ackAdmin->uid . ']' => TRUE,
     );
     $this->drupalPost('admin/access/add/' . $this->schemeMachineName, $edit, 'Save');
 
-    // Retest as the test user.
+    // Retest as the test user, but with no usable menus on the node.
     $this->drupalLogin($this->ackUser);
+    variable_set('menu_options_article', array('main-menu'));
     $this->drupalGet('node/add/article');
     $this->assertNoText(t('Provide a menu link'));
     $this->drupalPost(NULL, array('title' => $this->randomName()), 'Save');
     $this->clickLink(t('Edit'));
     $this->assertNoText(t('Provide a menu link'), 'The ACK user cannot create a link from the node form without a usable menu.');
 
-    // Change the content type's usable menus and retest.
+    // Retest with a usable menu.
     variable_set('menu_options_article', array('main-menu', 'navigation'));
     $this->drupalGet('node/add/article');
     $this->assertText(t('Provide a menu link'));
@@ -481,6 +631,7 @@ class AckMenuAccessTest extends DrupalWebTestCase {
         $this->assertNoFieldByXPath($xpath, TRUE, 'Removed parent option: ' . $key);
       }
     }
+    $this->assertNoFieldByXPath('//option[@value="navigation:0"]', TRUE, 'Removed parent option: navigation');
     $this->assertNoFieldByXPath('//option[@value="main-menu:0"]', TRUE, 'Removed parent option: main menu');
     // Check parent option filtering after save.
     $parent = 'navigation:' . $this->items['mapped top link']['mlid'];
@@ -507,10 +658,11 @@ class AckMenuAccessTest extends DrupalWebTestCase {
         $this->assertNoFieldByXPath($xpath, TRUE, 'Removed parent option: ' . $key);
       }
     }
+    $this->assertNoFieldByXPath('//option[@value="navigation:0"]', TRUE, 'Removed parent option: navigation');
     $this->assertNoFieldByXPath('//option[@value="main-menu:0"]', TRUE, 'Removed parent option: main menu');
 
     // Test a node with an inaccessible link.
-    $this->drupalLogin($this->adminUser);
+    $this->drupalLogin($this->ackAdmin);
     $node = $this->drupalCreateNode(array(
       'type' => 'article',
       'uid' => $this->ackUser->uid,
@@ -532,6 +684,24 @@ class AckMenuAccessTest extends DrupalWebTestCase {
     $this->drupalPost(NULL, array('title' => $this->randomName()), 'Save');
     $this->clickLink(t('Edit'));
     $this->assertNoText(t('Provide a menu link'), 'A user with no menu-related access cannot create a link from the node form.');
+
+    // Test as the menu administrator.
+    $this->drupalLogin($this->menuAdmin);
+    $this->drupalGet('node/add/article');
+    $this->assertText(t('Provide a menu link'));
+    $this->assertFieldByXPath('//option[@value="navigation:0"]', TRUE, 'Allowed parent option: navigation');
+    $this->assertFieldByXPath('//option[@value="main-menu:0"]', TRUE, 'Allowed parent option: main menu');
+    $edit = array(
+      'title' => $this->randomName(),
+      'menu[enabled]' => TRUE,
+      'menu[link_title]' => $this->randomName(),
+      'menu[parent]' => 'main-menu:0',
+    );
+    $this->drupalPost(NULL, $edit, 'Save');
+    $this->assertLink($edit['menu[link_title]'], 0, 'The menu admin can create a link from the node form.');
+    $this->clickLink(t('Edit'));
+    $this->assertFieldChecked('edit-menu-enabled');
+    $this->assertOptionSelected('edit-menu-parent', 'main-menu:0');
   }
 
   /**

@@ -35,4 +35,13 @@ interface AckMenuHandlerInterface extends AccessControlKitHandlerInterface {
    */
   public function realmMenu($realm);
 
+  /**
+   * Returns the list of menus managed by this handler.
+   *
+   * @return array
+   *   An array with the machine-readable names as the keys, and human-readable
+   *   titles as the values.
+   */
+  public function managedMenus();
+
 }
