@@ -124,7 +124,7 @@ function ack_menu_overview_form($form, &$form_state, $scheme, $realm) {
   if (isset($scheme->handlers['menu_link'])) {
     $links = ack_menu_realm_links($scheme, $realm);
     if (!empty($links)) {
-      $tree = menu_tree_data($links);
+      $tree = ack_menu_tree_data($links);
       $count = count($tree);
 
       // Loop through the links at the top level of the tree.
@@ -167,6 +167,10 @@ function ack_menu_overview_form($form, &$form_state, $scheme, $realm) {
               // Adjust depth so links cannot be moved above the subtree parent.
               if (isset($element['subtree'][$key]['#item'])) {
                 $element['subtree'][$key]['#item']['depth'] -= $item['depth'];
+                // Remove the edit/delete links for inaccessible branches.
+                if (!ack_menu_link_access($element['subtree'][$key]['#item'])) {
+                  $element['subtree'][$key]['operations'] = array();
+                }
               }
               // Set the redirect destination on the edit/delete links.
               foreach (element_children($element['subtree'][$key]['operations']) as $op) {
@@ -200,6 +204,54 @@ function ack_menu_overview_form($form, &$form_state, $scheme, $realm) {
     );
   }
   return $form;
+}
+
+/**
+ * Sorts and returns a realm's links as a menu tree.
+ *
+ * @param array $links
+ *   A flat array of menu links, as returned by ack_menu_realm_links().
+ *
+ * @return array
+ *   An array of menu links in the form of a tree. Each item in the tree is an
+ *   associative array containing:
+ *   - link: The menu link item from $links.
+ *   - below: An array containing the subtree of this item, where each element
+ *     is a tree item array with 'link' and 'below' elements. This array will be
+ *     empty if the menu item has no accessible items in its subtree.
+ */
+function ack_menu_tree_data(array $links) {
+  // Reverse the array so we can use the more efficient array_pop() function.
+  $links = array_reverse($links);
+  return _ack_menu_tree_data($links);
+}
+
+/**
+ * Helper function for ack_menu_tree_data() to build a realm menu tree.
+ */
+function _ack_menu_tree_data(&$links, $plid = 0) {
+  $tree = array();
+  while ($item = array_pop($links)) {
+    $tree[$item['mlid']] = array(
+      'link' => $item,
+      'below' => array(),
+    );
+    // If the next link is a child of the current link, start a subtree.
+    $next = end($links);
+    if ($next && $next['plid'] == $item['mlid']) {
+      $subtree = _ack_menu_tree_data($links, $item['mlid']);
+      if (ack_menu_link_access($item)) {
+        $tree[$item['mlid']]['below'] = $subtree;
+      }
+      $next = end($links);
+    }
+    // If this is a subtree ($plid > 0) and the next link is not in the subtree,
+    // then we need to exit the loop and return.
+    if (!$next || ($plid && $next['plid'] != $plid)) {
+      break;
+    }
+  }
+  return $tree;
 }
 
 /**

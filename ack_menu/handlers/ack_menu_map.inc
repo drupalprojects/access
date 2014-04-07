@@ -139,17 +139,24 @@ class AckMenuMap extends AccessControlKitHandler implements AckMenuHandlerInterf
       // Only filter if we were able to identify a realm. Links without a realm
       // are skipped, so as not to remove options needed by other schemes.
       if (!empty($realms)) {
+        $menus = $this->managedMenus();
+
         // Realm menu admins can place the link anywhere in the managed menus.
         if ($admin) {
-          $menus = $this->managedMenus();
           $allowed = empty($menus) ? array() : menu_parent_options($menus, $menu_link);
         }
         else {
           // For non-admins, get the form option keys for all eligible parents.
           $allowed = array();
           foreach ($realms as $realm) {
-            foreach ($this->realmLinks($realm) as $link) {
-              $allowed[$link['menu_name'] . ':' . $link['mlid']] = TRUE;
+            foreach (array_keys($menus) as $menu_name) {
+              foreach ($this->realmLinks($realm, $menu_name) as $link) {
+                // Exclude links that are mapped to other realms.
+                $link_realms = $this->objectRealms('menu_link', $link);
+                if (in_array($realm, $link_realms)) {
+                  $allowed[$link['menu_name'] . ':' . $link['mlid']] = TRUE;
+                }
+              }
             }
           }
         }
@@ -163,7 +170,6 @@ class AckMenuMap extends AccessControlKitHandler implements AckMenuHandlerInterf
           if (empty($allowed[$option])) {
             unset($form['parent']['#options'][$option]);
           }
-          // @todo What about child links/trees owned by an inaccessible realm?
         }
 
         // For new links, set the first available mapped link as the default;
@@ -243,13 +249,14 @@ class AckMenuMap extends AccessControlKitHandler implements AckMenuHandlerInterf
   /**
    * Implements AckMenuHandlerInterface::realmLinks().
    */
-  public function realmLinks($realm) {
+  public function realmLinks($realm, $menu_name) {
     $mapped_links = $this->mappedLinks($realm);
-    if (!empty($mapped_links) && !empty($this->menus)) {
-      $options = array('fetch' => PDO::FETCH_ASSOC);
-      $query = db_select('menu_links', 'ml', $options);
-      $query->join('menu_router', 'm', 'm.path = ml.router_path');
-      // This is the same field list as in menu_overview_form().
+    if (!empty($mapped_links) && !empty($this->menus) && in_array($menu_name, $this->menus)) {
+      // This is similar to menu_overview_form() and _menu_build_tree().
+      $query = db_select('menu_links', 'ml', array('fetch' => PDO::FETCH_ASSOC));
+      $query->addTag('translatable');
+      $query->leftJoin('menu_router', 'm', 'm.path = ml.router_path');
+      $query->fields('ml');
       $query->fields('m', array(
         'load_functions',
         'to_arg_functions',
@@ -258,23 +265,24 @@ class AckMenuMap extends AccessControlKitHandler implements AckMenuHandlerInterf
         'page_callback',
         'page_arguments',
         'delivery_callback',
+        'tab_parent',
+        'tab_root',
         'title',
         'title_callback',
         'title_arguments',
+        'theme_callback',
+        'theme_arguments',
         'type',
         'description',
       ));
-      $query->fields('ml');
-      // Limit the query to this handler's menus.
-      $query->condition('ml.menu_name', $this->menus, 'IN');
+      $query->condition('ml.menu_name', $menu_name);
       // Fetch the mapped links and their descendants, sorted by depth.
       $or = db_or();
-      for ($i = 1; $i < MENU_MAX_DEPTH; $i++) {
+      for ($i = 1; $i <= MENU_MAX_DEPTH; $i++) {
         $p = 'ml.p' . $i;
         $query->orderBy($p, 'ASC');
         $or->condition($p, $mapped_links, 'IN');
       }
-      $query->orderBy('ml.p' . MENU_MAX_DEPTH, 'ASC');
       $query->condition($or);
       return $query->execute()->fetchAll();
     }

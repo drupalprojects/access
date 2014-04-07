@@ -433,27 +433,48 @@ function ack_menu_access_scheme_delete($scheme) {
  *   An access scheme.
  * @param int $realm
  *   A realm value.
+ * @param string $menu_name
+ *   (optional) Limit the returned links to the given menu. If omitted, links
+ *   from all menus will be included. Defaults to NULL.
  * @param bool $reset
- *   (optional) Whether to reset the internal cache.  Defaults to FALSE.
+ *   (optional) Whether to reset the internal cache. Defaults to FALSE.
  *
  * @return array
- *   The realm's menu links, sorted by depth. Each value is an array defining
- *   a link, similar to what would be returned by menu_link_load().
+ *   The realm's menu links, sorted by menu and depth. Each value is an array
+ *   defining a link, similar to what would be returned by menu_link_load().
  */
-function ack_menu_realm_links($scheme, $realm, $reset = FALSE) {
-  $links = &drupal_static(__FUNCTION__, array(), $reset);
-  if (!isset($links[$scheme->sid][$realm])) {
+function ack_menu_realm_links($scheme, $realm, $menu_name = NULL, $reset = FALSE) {
+  $links = &drupal_static(__FUNCTION__, array());
+  if (!isset($links[$scheme->sid][$realm]) || $reset) {
     $realm_links = array();
     // Validate the scheme.
     if (isset($scheme->handlers['menu_link'])) {
       // Validate the realm value.
       if (is_numeric($realm) && isset($scheme->realms[$realm])) {
-        $realm_links = $scheme->handlers['menu_link']->realmLinks($realm);
+        $managed = $scheme->handlers['menu_link']->managedMenus();
+        ksort($managed);
+        foreach (array_keys($managed) as $menu) {
+          $realm_links[$menu] = $scheme->handlers['menu_link']->realmLinks($realm, $menu);
+        }
       }
     }
     $links[$scheme->sid][$realm] = $realm_links;
   }
-  return $links[$scheme->sid][$realm];
+
+  $list = array();
+  if (isset($menu_name)) {
+    if (isset($links[$scheme->sid][$realm][$menu_name])) {
+      $list = $links[$scheme->sid][$realm][$menu_name];
+    }
+  }
+  else {
+    foreach ($links[$scheme->sid][$realm] as $menu_links) {
+      if (!empty($menu_links)) {
+        $list = array_merge($list, $menu_links);
+      }
+    }
+  }
+  return $list;
 }
 
 /**
@@ -464,19 +485,31 @@ function ack_menu_realm_links($scheme, $realm, $reset = FALSE) {
  * @param int $realm
  *   A realm value.
  * @param bool $reset
- *   (optional) Whether to reset the internal cache.  Defaults to FALSE.
+ *   (optional) Whether to reset the internal cache. Defaults to FALSE.
  *
  * @return array()
  *   An array of menu names.
  */
 function ack_menu_realm_menus($scheme, $realm, $reset = FALSE) {
-  $menus = &drupal_static(__FUNCTION__, array(), $reset);
-  if (!isset($menus[$scheme->sid][$realm])) {
+  $menus = &drupal_static(__FUNCTION__, array());
+  if (!isset($menus[$scheme->sid][$realm]) || $reset) {
     $realm_menus = array();
-    foreach (ack_menu_realm_links($scheme, $realm, $reset) as $link) {
-      $realm_menus[$link['menu_name']] = TRUE;
+    if (isset($scheme->handlers['menu_link'])) {
+      // If we're resetting the cache, clear the realm links cache once here, so
+      // we don't do it repeatedly in the foreach statement below.
+      if ($reset) {
+        ack_menu_realm_links($scheme, $realm, NULL, TRUE);
+      }
+      // Find all managed menus that contain links.
+      $managed = $scheme->handlers['menu_link']->managedMenus();
+      foreach (array_keys($managed) as $menu_name) {
+        $menu_links = ack_menu_realm_links($scheme, $realm, $menu_name);
+        if (!empty($menu_links)) {
+          $realm_menus[] = $menu_name;
+        }
+      }
     }
-    $menus[$scheme->sid][$realm] = array_keys($realm_menus);
+    $menus[$scheme->sid][$realm] = $realm_menus;
   }
   return $menus[$scheme->sid][$realm];
 }

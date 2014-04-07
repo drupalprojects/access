@@ -155,6 +155,7 @@ class AckMenuAccessTest extends DrupalWebTestCase {
       'not mapped',
       'mapped top link',
       'mapped child link',
+      'not mapped child link',
       'no access child link',
       'no access grandchild link',
       'no access top link',
@@ -168,6 +169,7 @@ class AckMenuAccessTest extends DrupalWebTestCase {
       );
       switch ($key) {
         case 'mapped child link':
+        case 'not mapped child link':
         case 'no access child link':
           $item['plid'] = $this->items['mapped top link']['mlid'];
           break;
@@ -349,10 +351,10 @@ class AckMenuAccessTest extends DrupalWebTestCase {
     $this->clickLink(t('Manage menu links'));
     // With a grant, the menu manager should only list the assigned realms.
     $this->assertNoLinkByHref($ack_menu_url . '1', 'The user 1 realm is not listed.');
-    $this->assertLinkByHref($ack_menu_url . $this->ackAdmin->uid, 0, 'The admin user realm is listed.');
-    $this->assertNoLinkByHref($ack_menu_url . $this->menuAdmin->uid, 'The global admin user realm is not listed.');
-    $this->assertLinkByHref($ack_menu_url . $this->ackUser->uid, 0, 'The ACK user realm is listed.');
-    $this->assertNoLinkByHref($ack_menu_url . $this->noAccessUser->uid, 'The no access user realm is not listed.');
+    $this->assertLinkByHref($ack_menu_url . $this->ackAdmin->uid, 0, 'The admin user realm is listed: ' . $this->ackAdmin->name);
+    $this->assertNoLinkByHref($ack_menu_url . $this->menuAdmin->uid, 'The global admin user realm is not listed: ' . $this->menuAdmin->name);
+    $this->assertLinkByHref($ack_menu_url . $this->ackUser->uid, 0, 'The ACK user realm is listed: ' . $this->ackUser->name);
+    $this->assertNoLinkByHref($ack_menu_url . $this->noAccessUser->uid, 'The no access user realm is not listed: ' . $this->noAccessUser->name);
     // Check the access callbacks.
     $this->drupalGet($ack_menu_url . $this->menuAdmin->uid);
     $this->assertResponse(403, 'Access is denied to a realm menu tree with no mapped links.');
@@ -391,77 +393,151 @@ class AckMenuAccessTest extends DrupalWebTestCase {
     $this->drupalGet('admin/structure/menu/manage/navigation/add');
     $this->assertResponse(403, 'Access is denied to add a link to a managed menu.');
 
-    // Test editing the subtree for a realm with a top-level mapping.
+    // Put the links we'll be testing into a more easily referenced format.
+    // The parent link for the user's realm.
+    $parent = new stdClass();
+    $parent->mlid = $this->items['mapped top link']['mlid'];
+    $parent->plid = $this->items['mapped top link']['plid'];
+    $parent->title = $this->items['mapped top link']['title'];
+    $parent->field_name = $parent->plid . '[subtree][mlid:' . $parent->mlid . ']';
+    $parent->edit = $ack_link_url . $parent->mlid . '/edit';
+    $parent->delete = $ack_link_url . $parent->mlid . '/delete';
+    // A normal child link of $parent.
+    $child = new stdClass();
+    $child->mlid = $this->items['not mapped child link']['mlid'];
+    $child->title = $this->items['not mapped child link']['title'];
+    $child->field_name = $parent->mlid . '[subtree][mlid:' . $child->mlid . ']';
+    $child->edit = $ack_link_url . $child->mlid . '/edit';
+    $child->delete = $ack_link_url . $child->mlid . '/delete';
+    // A child link of $parent explicitly mapped to an accessible foreign realm.
+    $foreign_child = new stdClass();
+    $foreign_child->mlid = $this->items['mapped child link']['mlid'];
+    $foreign_child->title = $this->items['mapped child link']['title'];
+    $foreign_child->field_name = $parent->mlid . '[subtree][mlid:' . $foreign_child->mlid . ']';
+    $foreign_child->field_id = 'edit-' . $parent->mlid . '-subtree-mlid' . $foreign_child->mlid;
+    $foreign_child->edit = $ack_link_url . $foreign_child->mlid . '/edit';
+    $foreign_child->delete = $ack_link_url . $foreign_child->mlid . '/delete';
+    // A child link of $parent explicitly mapped to an inaccessible realm.
+    $no_access_child = new stdClass();
+    $no_access_child->mlid = $this->items['no access child link']['mlid'];
+    $no_access_child->title = $this->items['no access child link']['title'];
+    $no_access_child->field_name = $parent->mlid . '[subtree][mlid:' . $no_access_child->mlid . ']';
+    $no_access_child->edit = $ack_link_url . $no_access_child->mlid . '/edit';
+    $no_access_child->delete = $ack_link_url . $no_access_child->mlid . '/delete';
+    // A child link of $no_access_child.
+    $no_access_grandchild = new stdClass();
+    $no_access_grandchild->mlid = $this->items['no access grandchild link']['mlid'];
+    $no_access_grandchild->title = $this->items['no access grandchild link']['title'];
+    $no_access_grandchild->field_name = $no_access_child->mlid . '[subtree][mlid:' . $no_access_grandchild->mlid . ']';
+
+    // Test the subtree for a realm with a top-level mapping.
     $this->drupalGet($ack_menu_url . $this->ackUser->uid);
-    $mlid = $this->items['mapped child link']['mlid'];
-    $plid = $this->items['mapped top link']['mlid'];
-    $item_name = $plid . '[subtree][mlid:' . $mlid . ']';
-    $item_id = 'edit-' . $plid . '-subtree-mlid' . $mlid;
-    $this->assertFieldByName($item_name . '[plid]', $plid);
-    $this->assertFieldChecked($item_id . '-hidden', 'The child link is enabled.');
-    $this->assertLinkByHref($ack_link_url . $mlid . '/edit');
-    $this->assertLinkByHref($ack_link_url . $mlid . '/delete', 0, 'The child link appears in the subtree table.');
-    $this->assertLinkByHref($ack_link_url . $plid . '/edit', 0, 'The parent link is available.');
-    $this->assertNoLinkByHref($ack_link_url . $plid . '/delete', 'The parent link does not appear in the the subtree table.');
-    $edit = array($item_name . '[hidden]' => FALSE);
+    // The parent link.
+    $this->assertNoFieldByName($parent->field_name . '[plid]', $parent->plid, 'The parent link does not appear in the subtree: ' . $parent->title);
+    $this->assertLinkByHref($parent->edit, 0, 'The parent link shows the edit operation.');
+    $this->assertNoLinkByHref($parent->delete, 'The parent link does not show the delete operation.');
+    // The normal child link.
+    $this->assertFieldByName($child->field_name . '[plid]', $parent->mlid, 'The child link appears in the subtree: ' . $child->title);
+    $this->assertLinkByHref($child->edit, 0, 'The child link shows the edit operation.');
+    $this->assertLinkByHref($child->delete, 0, 'The child link shows the delete operation.');
+    // The accessible foreign child link.
+    $this->assertFieldByName($foreign_child->field_name . '[plid]', $parent->mlid, 'The foreign child link appears in the subtree: ' . $foreign_child->title);
+    $this->assertLinkByHref($foreign_child->edit, 0, 'The foreign child link shows the edit operation.');
+    $this->assertLinkByHref($foreign_child->delete, 0, 'The foreign child link shows the delete operation.');
+    $this->assertFieldChecked($foreign_child->field_id . '-hidden', 'The foreign child link is enabled.');
+    // The inaccessible foreign child link.
+    $this->assertFieldByName($no_access_child->field_name . '[plid]', $parent->mlid, 'The inaccessible child link appears in the subtree: ' . $no_access_child->title);
+    $this->assertNoLinkByHref($no_access_child->edit, 'The inaccessible child link does not show the edit operation.');
+    $this->assertNoLinkByHref($no_access_child->delete, 'The inaccessible child link does not show the delete operation.');
+    // The inaccessible grandchild link.
+    $this->assertNoFieldByName($no_access_grandchild->field_name . '[plid]', $parent->mlid, 'The inaccessible grandchild link does not appear in the subtree: ' . $no_access_grandchild->title);
+    $this->assertNoLink($no_access_grandchild->title);
+
+    // Test editing a link.
+    $edit = array($foreign_child->field_name . '[hidden]' => FALSE);
     $this->drupalPost(NULL, $edit, 'Save configuration');
-    $this->assertNoFieldChecked($item_id . '-hidden', 'The child link is disabled.');
+    $this->assertNoFieldChecked($foreign_child->field_id . '-hidden', 'The foreign child link is disabled: ' . $foreign_child->title);
+
     // Add a link to the realm.
     $this->clickLink(t('Add realm link'));
-    $this->assertOptionSelected('edit-parent', 'navigation:' . $plid, 'The parent link is selected.');
-    $this->assertFieldByXPath('//option[@value="navigation:' . $mlid . '"]', TRUE, 'The child link is an option.');
-    $this->assertNoFieldByXPath('//option[@value="navigation:' . $this->items['no access top link']['mlid'] . '"]', TRUE, 'The parent link options were filtered.');
+    $this->assertOptionSelected('edit-parent', 'navigation:' . $parent->mlid, 'The parent link is selected: ' . $parent->title);
+    $this->assertFieldByXPath('//option[@value="navigation:' . $child->mlid . '"]', TRUE, 'The child link is an option: ' . $child->title);
+    $this->assertNoFieldByXPath('//option[@value="navigation:' . $foreign_child->mlid . '"]', TRUE, 'The foreign child link is not an option: ' . $foreign_child->title);
+    $this->assertNoFieldByXPath('//option[@value="navigation:' . $no_access_child->mlid . '"]', TRUE, 'The inaccessible child link is not an option: ' . $no_access_child->title);
+    $this->assertNoFieldByXPath('//option[@value="navigation:' . $no_access_grandchild->mlid . '"]', TRUE, 'The inaccessible grandchild link is not an option: ' . $no_access_grandchild->title);
     $this->assertNoFieldByXPath('//option[@value="navigation:0"]', TRUE, 'The parent menu options were filtered.');
     $this->assertNoFieldByXPath('//option[@value="main-menu:0"]', TRUE, 'Unmanaged menus are not available as parent options.');
-    $title = $this->randomName();
     $edit = array(
-      'link_title' => $title,
+      'link_title' => $this->randomName(),
       'link_path' => 'node',
-      'parent' => 'navigation:' . $mlid,
+      'parent' => 'navigation:' . $child->mlid,
     );
     $this->drupalPost(NULL, $edit, 'Save');
     $this->assertText(t('Your configuration has been saved.'));
-    $this->assertLink($title, 0, 'The ACK user can create a link.');
+    $this->assertLink($edit['link_title'], 0, 'The ACK user can create a link.');
+
+    // A few more links for the next set of tests.
+    // The parent link of the inaccessible realm.
+    $no_access = new stdClass();
+    $no_access->mlid = $this->items['no access top link']['mlid'];
+    $no_access->title = $this->items['no access top link']['title'];
+    $no_access->edit = $ack_link_url . $no_access->mlid . '/edit';
+    $no_access->delete = $ack_link_url . $no_access->mlid . '/delete';
+    // A link mapped to this realm, but a child of an inaccessible link.
+    $child_of_no_access = new stdClass();
+    $child_of_no_access->mlid = $this->items['mapped child link with no access parent']['mlid'];
+    $child_of_no_access->title = $this->items['mapped child link with no access parent']['title'];
+    $child_of_no_access->field_name = $no_access->mlid . '[subtree][mlid:' . $child_of_no_access->mlid . ']';
+    $child_of_no_access->edit = $ack_link_url . $child_of_no_access->mlid . '/edit';
+    $child_of_no_access->delete = $ack_link_url . $child_of_no_access->mlid . '/delete';
+
+    // Edit the accessible foreign child link.
     $options = array(
       'query' => array(
         'destination' => $ack_menu_url . $this->ackUser->uid,
       ),
     );
-    $this->drupalGet($ack_link_url . $mlid . '/edit', $options);
-    $this->assertOptionSelected('edit-parent', 'navigation:' . $plid, 'The parent link is selected.');
-    $this->assertNoOptionSelected('edit-parent', 'navigation:' . $this->items['mapped child link with no access parent']['mlid'], 'The other potential parent option is available, but not selected.');
-    $this->assertNoFieldByXPath('//option[@value="navigation:' . $this->items['no access top link']['mlid'] . '"]', TRUE, 'The parent link options were filtered.');
+    $this->drupalGet($foreign_child->edit, $options);
+    $this->assertOptionSelected('edit-parent', 'navigation:' . $parent->mlid, 'The parent link is selected: ' . $parent->title);
+    $this->assertNoOptionSelected('edit-parent', 'navigation:' . $child_of_no_access->mlid, 'The other potential parent option is available, but not selected: ' . $child_of_no_access->title);
+    $this->assertNoFieldByXPath('//option[@value="navigation:' . $no_access->mlid . '"]', TRUE, 'The "no access" realm parent link is not available as a parent option: ' . $no_access->title);
     $this->assertNoFieldByXPath('//option[@value="navigation:0"]', TRUE, 'The parent menu options were filtered.');
     $this->assertNoFieldByXPath('//option[@value="main-menu:0"]', TRUE, 'Unmanaged menus are not available as parent options.');
     $selector = $this->xpath('//select[@name=:name and @disabled="disabled"]', array(':name' => 'weight'));
     $this->assertFalse($selector, 'The weight element is not disabled.');
     $this->drupalPost(NULL, array('enabled' => TRUE), 'Save');
     $this->assertText(t('Your configuration has been saved.'));
-    $this->assertFieldChecked($item_id . '-hidden', 'The ACK user can edit a link.');
+    $this->assertFieldChecked($foreign_child->field_id . '-hidden', 'The ACK user can edit a link.');
 
-    // Test editing the subtree for a realm with child-level mappings.
+    // Test the subtrees for a realm with child-level mappings.
     $this->drupalGet($ack_menu_url . $this->ackAdmin->uid);
-    $this->assertNoLinkByHref($ack_link_url . $this->items['no access top link']['mlid'] . '/edit', 'The inaccessible parent link is not listed.');
-    $this->assertLink($title, 0, 'The child link appears in the subtree.');
-    $this->assertLinkByHref($ack_link_url . $this->items['mapped child link']['mlid'] . '/edit', 0, 'The link with the accessible parent is available.');
-    $this->assertNoLinkByHref($ack_link_url . $this->items['mapped child link']['mlid'] . '/delete', 'The link with the accessible parent is not in the subtree.');
-    $this->assertLinkByHref($ack_link_url . $this->items['mapped child link with no access parent']['mlid'] . '/edit', 0, 'The link with the inaccessible parent is available.');
-    $this->assertNoLinkByHref($ack_link_url . $this->items['mapped child link with no access parent']['mlid'] . '/delete', 'The link with the inaccessible parent is not in the subtree.');
+    $this->assertNoLinkByHref($no_access->edit, 'The "no access" realm parent link is not listed.');
+    $this->assertNoFieldByName($foreign_child->field_name . '[plid]', $parent->mlid, 'The link with the accessible parent does not appear in the subtree: ' . $foreign_child->title);
+    $this->assertLink($foreign_child->title);
+    $this->assertLinkByHref($foreign_child->edit, 0, 'The link with the accessible parent shows the edit operation.');
+    $this->assertNoLinkByHref($foreign_child->delete, 'The link with the accessible parent does not show the delete operation.');
+    $this->assertNoFieldByName($child_of_no_access->field_name . '[plid]', $no_access->mlid, 'The link with the inaccessible parent does not appear in a subtree for its parent: ' . $child_of_no_access->title);
+    $this->assertNoFieldByName($foreign_child->mlid . '[subtree][mlid:' . $child_of_no_access->mlid . ']' . '[plid]', $no_access->mlid, 'The link with the inaccessible parent does not appear in a subtree for the link with the accessible parent: ' . $child_of_no_access->title);
+    $this->assertLink($child_of_no_access->title);
+    $this->assertLinkByHref($child_of_no_access->edit, 0, 'The link with the inaccessible parent shows the edit operation.');
+    $this->assertNoLinkByHref($child_of_no_access->delete, 'The link with the inaccessible parent does not show the delete operation.');
+
     // Delete the link with the accessible parent.
     $options = array(
       'query' => array(
         'destination' => $ack_menu_url . $this->ackAdmin->uid,
       ),
     );
-    $this->drupalPost($ack_link_url . $mlid . '/delete', array(), 'Confirm', $options);
-    $this->assertText(t('The menu link @title has been deleted.', array('@title' => $this->items['mapped child link']['title'])));
-    $this->assertNoLinkByHref($ack_link_url . $this->items['mapped child link']['mlid'] . '/edit', 'The ACK user can delete a link.');
-    $this->assertNoLink($title, 'The child link no longer appears in the subtree.');
-    $this->assertLinkByHref($ack_link_url . $this->items['mapped child link with no access parent']['mlid'] . '/edit', 0, 'The link with the inaccessible parent is still available.');
+    $this->drupalPost($foreign_child->delete, array(), 'Confirm', $options);
+    $this->assertText(t('The menu link @title has been deleted.', array('@title' => $foreign_child->title)));
+    $this->assertNoLinkByHref($foreign_child->edit, 'The ACK user can delete a link.');
+    $this->assertLinkByHref($child_of_no_access->edit, 0, 'The link with the inaccessible parent is still available.');
+
     // Test editing an item with an inaccessible parent.
     $this->clickLink(t('Edit the parent link'));
-    $this->assertOptionSelected('edit-parent', 'navigation:' . $this->items['no access top link']['mlid'], 'The parent is selected.');
-    $this->assertNoFieldByXPath('//option[@value="navigation:' . $plid . '"]', TRUE, 'The parent link options were filtered.');
+    $this->assertFieldByName('link_title', $child_of_no_access->title);
+    $this->assertOptionSelected('edit-parent', 'navigation:' . $no_access->mlid, 'The parent is selected: ' . $no_access->title);
+    $this->assertNoFieldByXPath('//option[@value="navigation:' . $parent->mlid . '"]', TRUE, 'The parent link options were filtered.');
     $selector = $this->xpath('//select[@name=:name and @disabled="disabled"]', array(':name' => 'weight'));
     $this->assertTrue($selector, 'The weight element is disabled.');
 
@@ -616,8 +692,8 @@ class AckMenuAccessTest extends DrupalWebTestCase {
     $options = array(
       'mapped top link' => TRUE,
       'mapped child link' => TRUE,
-      'no access child link' => TRUE,
-      'no access grandchild link' => TRUE,
+      'no access child link' => FALSE,
+      'no access grandchild link' => FALSE,
       'mapped child link with no access parent' => TRUE,
       'not mapped' => FALSE,
       'no access top link' => FALSE,
@@ -648,6 +724,7 @@ class AckMenuAccessTest extends DrupalWebTestCase {
     $this->assertOptionSelected('edit-menu-parent', $parent);
     // Links from realms other than the one that currently owns this link should
     // be excluded from the parent options.
+    $options['mapped child link'] = FALSE;
     $options['mapped child link with no access parent'] = FALSE;
     foreach ($options as $key => $allowed) {
       $xpath = '//option[@value="navigation:' . $this->items[$key]['mlid'] . '"]';
@@ -721,12 +798,12 @@ class AckMenuAccessTest extends DrupalWebTestCase {
     }
 
     // Confirm that mappings are deleted when links are deleted.
-    $links = $scheme->handlers['menu_link']->realmLinks($this->ackUser->uid);
+    $links = ack_menu_realm_links($scheme, $this->ackUser->uid, NULL, TRUE);
     $this->assertEqual(count($links), 2, 'Two mappings found.');
     $link = reset($links);
     menu_link_delete($link['mlid']);
     $this->assertFalse(menu_link_load($link['mlid']), 'One link deleted.');
-    $links = $scheme->handlers['menu_link']->realmLinks($this->ackUser->uid);
+    $links = ack_menu_realm_links($scheme, $this->ackUser->uid, NULL, TRUE);
     $this->assertEqual(count($links), 1, 'One mapping remains.');
 
     // Create a second scheme with a mapped link.
@@ -739,11 +816,11 @@ class AckMenuAccessTest extends DrupalWebTestCase {
     $this->drupalPost('ack_menu/manage/' . $new_scheme->machine_name . '/' . $this->ackUser->uid . '/add', $edit, 'Save');
 
     // Confirm that mappings are deleted when schemes are deleted.
-    $new_links = $new_scheme->handlers['menu_link']->realmLinks($this->ackUser->uid);
+    $new_links = ack_menu_realm_links($new_scheme, $this->ackUser->uid, NULL, TRUE);
     $this->assertEqual(count($links) + count($new_links), 2, 'Two mappings found.');
     access_scheme_delete($new_scheme->sid);
     $this->assertFalse(access_scheme_load($new_scheme->sid), 'One scheme deleted.');
-    $new_links = $new_scheme->handlers['menu_link']->realmLinks($this->ackUser->uid);
+    $new_links = ack_menu_realm_links($new_scheme, $this->ackUser->uid, NULL, TRUE);
     $this->assertEqual(count($links) + count($new_links), 1, 'One mapping remains.');
   }
 
