@@ -20,3 +20,8 @@ files[] = handlers/ack_entity_taxonomy_term_reference.inc
 
 ; Test cases.
 files[] = access.test
+
+; Views handlers.
+files[] = views/access_handler_field_access_grant_role.inc
+files[] = views/access_handler_argument_access_grant_role.inc
+files[] = views/access_handler_filter_access_grant_role.inc
