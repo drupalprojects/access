@@ -72,7 +72,7 @@ class AckMenuMap extends AccessControlKitHandler implements AckMenuHandlerInterf
     parent::__construct($scheme, $settings);
     $this->schemeMachineName = $scheme->machine_name;
     $this->schemeName = $scheme->name;
-    $this->schemeRealms = $scheme->realms;
+    $this->schemeRealms = isset($scheme->realms) ? $scheme->realms : array();
     // Make sure that the configured menus actually exist.
     $this->menus = array();
     if (isset($settings['menus'])) {

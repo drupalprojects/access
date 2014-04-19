@@ -1219,3 +1219,18 @@ function access_views_api() {
     'api' => '3.0',
   );
 }
+
+/**
+ * Implements hook_features_api().
+ */
+function access_features_api() {
+  return array(
+    'access_scheme' => array(
+      'name' => t('Access schemes'),
+      'default_hook' => 'access_default_schemes',
+      'default_file' => FEATURES_DEFAULTS_INCLUDED,
+      'feature_source' => TRUE,
+      'file' => drupal_get_path('module', 'access') . '/access.features.inc',
+    ),
+  );
+}
