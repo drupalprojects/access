@@ -66,8 +66,10 @@ function access_scheme_features_export_render($module_name, $data, $export = NUL
   $code[] = '  $schemes = array();';
 
   foreach ($data as $scheme_machine_name) {
-    $scheme = access_scheme_machine_name_load($scheme_machine_name, TRUE);
-    if (!empty($scheme)) {
+    $original = access_scheme_machine_name_load($scheme_machine_name, TRUE);
+    if (!empty($original)) {
+      // Clone the scheme before we manipulate it, so as not to alter the cache.
+      $scheme = clone $original;
 
       // Remove properties that should not be exported.
       unset($scheme->sid);
