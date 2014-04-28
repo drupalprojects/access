@@ -175,8 +175,8 @@ function access_schema() {
  * Implements hook_uninstall().
  */
 function access_uninstall() {
-  $schemes = access_scheme_names();
-  foreach (array_keys($schemes) as $scheme) {
+  $schemes = db_query('SELECT machine_name FROM {access_scheme}')->fetchCol();
+  foreach ($schemes as $scheme) {
     variable_del('access_scheme_roles_' . $scheme);
   }
 }
