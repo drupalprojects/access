@@ -107,4 +107,57 @@ class ACKEntityField extends AccessControlKitHandler {
       }
     }
   }
+
+  /**
+   * Overrides AccessControlKitHandler::viewsDataAlter().
+   */
+  public function viewsDataAlter(&$data, $scheme_machine_name, $realm_field_table_name, $realm_field_table_value, $object_type) {
+    if (!empty($this->fieldName)) {
+      $entity_info = entity_get_info($object_type);
+      $entity_field = field_info_field($this->fieldName);
+
+      if (isset($entity_info['base table']) && $entity_field['storage']['type'] == 'field_sql_storage') {
+        $entity_field_table = $entity_field['storage']['details']['sql'][FIELD_LOAD_CURRENT];
+        $entity_field_table_name = key($entity_field_table);
+
+        if (isset($entity_field_table[$entity_field_table_name][$this->fieldValueKey])) {
+          $entity_field_table_value = $entity_field_table[$entity_field_table_name][$this->fieldValueKey];
+
+          $scheme_names = access_scheme_names();
+          $pseudo_field_name = 'access_grants_' . $scheme_machine_name;
+          $t_args = array(
+            '@entity' => $object_type,
+            '@scheme' => $scheme_names[$scheme_machine_name],
+          );
+
+          // Relate the entity to access grants for its realm.
+          $data[$entity_info['base table']][$pseudo_field_name]['relationship'] = array(
+            'title' => t('Access grants in @scheme', $t_args),
+            'help' => t('Relate the @entity entity to access grants in the @scheme scheme.', $t_args),
+            'handler' => 'access_handler_relationship_ack_entity_field',
+            'scheme' => $scheme_machine_name,
+            'base' => 'access_grant',
+            'base field' => 'gid',
+            'entity field' => $entity_info['entity keys']['id'],
+            'field table' => $entity_field_table_name,
+            'field field' => $entity_field_table_value,
+            'realm table' => $realm_field_table_name,
+            'realm field' => $realm_field_table_value,
+            'join_extra' => array(
+              array(
+                'field' => 'entity_type',
+                'value' => $object_type,
+              ),
+              array(
+                'field' => 'deleted',
+                'value' => 0,
+                'numeric' => TRUE,
+              ),
+            ),
+            'label' => t('@scheme access grants', $t_args),
+          );
+        }
+      }
+    }
+  }
 }

@@ -25,3 +25,4 @@ files[] = access.test
 files[] = views/access_handler_field_access_grant_role.inc
 files[] = views/access_handler_argument_access_grant_role.inc
 files[] = views/access_handler_filter_access_grant_role.inc
+files[] = views/access_handler_relationship_ack_entity_field.inc

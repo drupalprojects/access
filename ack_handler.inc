@@ -165,6 +165,22 @@ interface AccessControlKitHandlerInterface {
    * @see AccessControlKitHandlerInterface::objectFormAlter()
    */
   public function objectFormSubmit($object_type, $object, $form, &$form_state);
+
+  /**
+   * Relates realm field values to access-controlled objects for Views.
+   *
+   * @param array &$data
+   *   The Views data array, passed in from hook_views_data_alter().
+   * @param string $scheme_machine_name
+   *   The machine name of the scheme to which the handler is attached.
+   * @param string $realm_field_table_name
+   *   The name of the realm field table.
+   * @param string $realm_field_table_value
+   *   The name of the column that contains the realm value.
+   * @param string $object_type
+   *   A string indicating the type of $object (e.g., node, menu_link).
+   */
+  public function viewsDataAlter(&$data, $scheme_machine_name, $realm_field_table_name, $realm_field_table_value, $object_type);
 }
 
 /**
@@ -233,5 +249,12 @@ abstract class AccessControlKitHandler implements AccessControlKitHandlerInterfa
    */
   public function objectFormSubmit($object_type, $object, $form, &$form_state) {
     // No submit actions needed in the abstract class.
+  }
+
+  /**
+   * Implements AccessControlKitHandlerInterface::viewsDataAlter().
+   */
+  public function viewsDataAlter(&$data, $scheme_machine_name, $realm_field_table_name, $realm_field_table_value, $object_type) {
+    // No Views integration needed in the abstract class.
   }
 }

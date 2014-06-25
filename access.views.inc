@@ -156,4 +156,17 @@ function access_views_data_alter(&$data) {
       'label' => t('access grants'),
     ),
   );
+
+  // Relate realm fields to the objects that are members of the realm.
+  foreach (access_scheme_load_multiple() as $scheme) {
+    if ($scheme->realm_field['storage']['type'] != 'field_sql_storage') {
+      continue;
+    }
+    $field_table = $scheme->realm_field['storage']['details']['sql'][FIELD_LOAD_CURRENT];
+    $field_table_name = key($field_table);
+    $field_table_value = $field_table[$field_table_name]['value'];
+    foreach ($scheme->handlers as $object_type => $handler) {
+      $handler->viewsDataAlter($data, $scheme->machine_name, $field_table_name, $field_table_value, $object_type);
+    }
+  }
 }
