@@ -135,6 +135,7 @@ class ACKEntityField extends AccessControlKitHandler {
           // Relate the entity field to access grants through the realm field.
           $data[$entity_info['base table']][$pseudo_field_name] = array(
             'title' => t('Access grants on @entity for @scheme', $t_args),
+            'real field' => $entity_info['entity keys']['id'],
             'relationship' => array(
               'label' => t('@machine access grants', $t_args),
               'help' => t('Relate the @entity to @scheme access grants through the @field field.', $t_args),
