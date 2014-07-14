@@ -123,38 +123,31 @@ class ACKEntityField extends AccessControlKitHandler {
         if (isset($entity_field_table[$entity_field_table_name][$this->fieldValueKey])) {
           $entity_field_table_value = $entity_field_table[$entity_field_table_name][$this->fieldValueKey];
 
+          $pseudo_field_name = 'ack_' . $scheme_machine_name;
           $scheme_names = access_scheme_names();
-          $pseudo_field_name = 'access_grants_' . $scheme_machine_name;
           $t_args = array(
             '@entity' => $object_type,
+            '@field' => $entity_field['field_name'],
             '@scheme' => $scheme_names[$scheme_machine_name],
+            '@machine' => $scheme_machine_name,
           );
 
-          // Relate the entity to access grants for its realm.
-          $data[$entity_info['base table']][$pseudo_field_name]['relationship'] = array(
-            'title' => t('Access grants in @scheme', $t_args),
-            'help' => t('Relate the @entity entity to access grants in the @scheme scheme.', $t_args),
-            'handler' => 'access_handler_relationship_ack_entity_field',
-            'scheme' => $scheme_machine_name,
-            'base' => 'access_grant',
-            'base field' => 'gid',
-            'entity field' => $entity_info['entity keys']['id'],
-            'field table' => $entity_field_table_name,
-            'field field' => $entity_field_table_value,
-            'realm table' => $realm_field_table_name,
-            'realm field' => $realm_field_table_value,
-            'join_extra' => array(
-              array(
-                'field' => 'entity_type',
-                'value' => $object_type,
-              ),
-              array(
-                'field' => 'deleted',
-                'value' => 0,
-                'numeric' => TRUE,
-              ),
+          // Relate the entity field to access grants through the realm field.
+          $data[$entity_info['base table']][$pseudo_field_name] = array(
+            'title' => t('Access grants on @entity for @scheme', $t_args),
+            'relationship' => array(
+              'label' => t('@machine access grants', $t_args),
+              'help' => t('Relate the @entity to @scheme access grants through the @field field.', $t_args),
+              'handler' => 'access_handler_relationship_ack_entity_field',
+              'base' => 'access_grant',
+              'field' => $entity_info['entity keys']['id'],
+              'scheme' => $scheme_machine_name,
+              'entity type' => $object_type,
+              'entity table' => $entity_field_table_name,
+              'entity field' => $entity_field_table_value,
+              'realm table' => $realm_field_table_name,
+              'realm field' => $realm_field_table_value,
             ),
-            'label' => t('@scheme access grants', $t_args),
           );
         }
       }

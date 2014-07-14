@@ -8,6 +8,15 @@
 /**
  * Relates an entity to access grants through a field.
  *
+ * Definition items:
+ * - All definition items defined in views_handler_relationship.
+ * - scheme: The machine name of the access scheme to which the grants belong.
+ * - entity type: The type of entity to which we are relating access grants.
+ * - entity table: The name of the entity field table.
+ * - entity field: The column in the entity field table that contains the value.
+ * - realm table: The name of the realm field table.
+ * - realm field: The column in the realm field table that contains the value.
+ *
  * @ingroup views_relationship_handlers
  */
 class access_handler_relationship_ack_entity_field extends views_handler_relationship {
@@ -17,63 +26,45 @@ class access_handler_relationship_ack_entity_field extends views_handler_relatio
    */
   public function query() {
     $this->ensure_my_table();
+
     $def = $this->definition;
-    $type = empty($this->options['required']) ? 'LEFT' : 'INNER';
+    $def['table'] = 'access_grant';
 
-    // Join first from the entity to its access-managed field.
-    $first = array(
-      'left_table' => $this->table_alias,
-      'left_field' => $def['entity field'],
-      'table' => $def['field table'],
-      'field' => 'entity_id',
-      'type' => $type,
-    );
-    if (!empty($def['join_extra'])) {
-      $first['extra'] = $def['join_extra'];
-    }
-    $first_join = new views_join();
-    $first_join->definition = $first;
-    $first_join->construct();
-    $first_join->adjusted = TRUE;
-    $first_alias = $this->query->add_table($def['field table'], $this->relationship, $first_join);
+    // We use a subselect to get the grants table in order to filter by scheme.
+    // Thus, the entity base table is the left and the subselect is the right.
+    $def['left_table'] = $this->table_alias;
+    $def['left_field'] = $def['field'];
+    $def['field'] = 'entity_id';
+    $def['type'] = empty($this->options['required']) ? 'LEFT' : 'INNER';
 
-    // Next, join from the entity field to the realm field.
-    $second = array(
-      'left_table' => $first_alias,
-      'left_field' => $def['field field'],
-      'table' => $def['realm table'],
-      'field' => $def['realm field'],
-      'type' => $type,
-      'extra' => array(
-        array(
-          'field' => 'deleted',
-          'value' => 0,
-          'numeric' => TRUE,
-        ),
-      ),
-    );
-    $second_join = new views_join();
-    $second_join->definition = $second;
-    $second_join->construct();
-    $second_join->adjusted = TRUE;
-    $second_alias = $this->query->add_table($def['realm table'], $this->relationship, $second_join);
+    $query = db_select('access_grant', 'ag');
+    // Join the access grants table to the realm field table.
+    $query->addJoin($def['type'], $def['realm table'], 'rt', 'ag.gid = rt.entity_id');
+    // Join the realm field value to corresponding values in the entity field.
+    $realm_condition = 'rt.' . $def['realm field'] . ' = ' . 'et.' . $def['entity field'];
+    $query->addJoin($def['type'], $def['entity table'], 'et', $realm_condition);
+    // Only select grants from the designated access scheme.
+    $query->condition('ag.scheme', $def['scheme']);
+    // Make sure the realm field values apply to the selected grants.
+    $query->condition('rt.entity_type', 'access_grant');
+    $query->condition('rt.deleted', 0);
+    // Make sure the entity field values belong to the correct entity type.
+    $query->condition('et.entity_type', $def['entity type']);
+    $query->condition('et.deleted', 0);
+    // We need all values from the grant, plus the ID of the related entity
+    // obtained from the entity field table.
+    $query->fields('ag');
+    $query->fields('et', array('entity_id'));
+    $def['table formula'] = $query;
 
-    // Finally, join from the realm field to the access grant.
-    $third = array(
-      'left_table' => $second_alias,
-      'left_field' => 'entity_id',
-      'table' => 'access_grant',
-      'field' => 'gid',
-      'type' => $type,
-    );
-    $third_join = new views_join();
-    $third_join->definition = $third;
-    $third_join->construct();
-    $third_join->adjusted = TRUE;
-    // Use a short alias for the final join.
-    $alias = 'ack_' . $def['scheme'] . '_' . $this->table;
+    $join = new views_join();
+    $join->definition = $def;
+    $join->construct();
+    $join->adjusted = TRUE;
 
-    $this->alias = $this->query->add_relationship($alias, $third_join, $def['base'], $this->relationship);
+    // Use a short alias for the subselect; for example, "access_grant_node".
+    $alias = $def['table'] . '_' . $this->table;
+    $this->alias = $this->query->add_relationship($alias, $join, 'access_grant', $this->relationship);
   }
 
 }
