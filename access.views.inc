@@ -42,12 +42,17 @@ function access_views_data() {
       'help' => t('The user to whom access is granted. If you need more fields than the uid, add the "access grant: user" relationship.'),
       'field' => array(
         'handler' => 'views_handler_field_user',
+        'click sortable' => TRUE,
       ),
       'argument' => array(
-        'handler' => 'views_handler_argument_numeric',
+        'handler' => 'views_handler_argument_user_uid',
       ),
       'filter' => array(
+        'title' => t('User name'),
         'handler' => 'views_handler_filter_user_name',
+      ),
+      'sort' => array(
+        'handler' => 'views_handler_sort',
       ),
       'relationship' => array(
         'title' => t('User'),
@@ -55,7 +60,17 @@ function access_views_data() {
         'handler' => 'views_handler_relationship',
         'base' => 'users',
         'base field' => 'uid',
+        'field' => 'uid',
         'label' => t('user'),
+      ),
+    ),
+    'uid_current' => array(
+      'real field' => 'uid',
+      'title' => t('Current user'),
+      'help' => t('Filter the view to grants for the currently logged in user.'),
+      'filter' => array(
+        'handler' => 'views_handler_filter_user_current',
+        'type' => 'yes-no',
       ),
     ),
     'rid' => array(
