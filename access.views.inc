@@ -18,6 +18,7 @@ function access_views_data() {
         'title' => t('Access grants'),
         'help' => t('Access grants are user role assignments for realms in an access scheme.'),
       ),
+      'entity type' => 'access_grant',
     ),
     'gid' => array(
       'title' => t('Gid'),
@@ -86,6 +87,7 @@ function access_views_data() {
           'field' => 'machine_name',
         ),
       ),
+      'entity type' => 'access_scheme',
     ),
     'sid' => array(
       'title' => t('Sid'),
