@@ -81,6 +81,15 @@ function access_scheme_features_export_render($module_name, $data, $export = NUL
       // it again in the exported properties.
       unset($scheme->machine_name);
 
+      // Role IDs may differ between Drupal instances, so we need to export the
+      // enabled roles by name only.
+      $roles = array();
+      foreach ($scheme->roles as $role_name) {
+        $roles[$role_name] = $role_name;
+      }
+      ksort($roles);
+      $scheme->roles = $roles;
+
       // Put the attached handlers into an exportable format.
       $handlers = array();
       foreach ($scheme->handlers as $object_type => $handler) {
@@ -130,13 +139,28 @@ function access_scheme_features_rebuild($module_name) {
     foreach ($schemes as $scheme_machine_name => $scheme) {
       $scheme = (object) $scheme;
       $scheme->machine_name = $scheme_machine_name;
+
+      // See if this scheme already exists in the database.
       $existing = access_scheme_machine_name_load($scheme->machine_name, TRUE);
       if (!empty($existing)) {
         $scheme->sid = $existing->sid;
       }
+
+      // Match up the exported role names with their role IDs.
+      $roles = array();
+      foreach ($scheme->roles as $role_name) {
+        $role = user_role_load_by_name($role_name);
+        if ($role) {
+          $roles[$role->rid] = $role->name;
+        }
+      }
+      $scheme->roles = $roles;
+
+      // Reattach the handlers.
       foreach ($scheme->handlers as $object_type => $handler) {
         entity_get_controller('access_scheme')->attachHandler($scheme, $object_type, $handler['handler'], $handler['settings']);
       }
+
       access_scheme_save($scheme);
     }
   }
