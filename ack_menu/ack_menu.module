@@ -129,6 +129,17 @@ function ack_menu_menu_alter(&$items) {
 }
 
 /**
+ * Implements hook_admin_paths().
+ */
+function ack_menu_admin_paths() {
+  $paths = array(
+    'ack_menu' => TRUE,
+    'ack_menu/*' => TRUE,
+  );
+  return $paths;
+}
+
+/**
  * Menu title callback for the "manage realm links" page.
  *
  * @param object $scheme
