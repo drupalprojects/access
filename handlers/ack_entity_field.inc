@@ -77,32 +77,27 @@ class ACKEntityField extends AccessControlKitHandler {
       }
       // If the field widget uses the #options property, filter the options.
       elseif (isset($element['#options'])) {
-        $options = array();
-
-        // Preserve the empty option, if one was specified.
-        if (isset($element['#options']['_none'])) {
-          $options['_none'] = $element['#options']['_none'];
-        }
-
-        // Include only those options that correspond to allowed realms.
-        foreach ($realms as $realm) {
-          if (isset($element['#options'][$realm])) {
-            $options[$realm] = $element['#options'][$realm];
+        foreach ($element['#options'] as $option_value => $option_name) {
+          // Preserve options that correspond to allowed realms.
+          // Also preserve the empty option, if one was provided.
+          if (in_array($option_value, $realms) || $option_value == '_none') {
+            continue;
           }
+          // Remove unmatched options.
+          unset($element['#options'][$option_value]);
         }
 
         // If the element is required and only one option remains besides the
         // empty value, then remove the empty value as an option.
-        if (!empty($element['#required']) && isset($options['_none']) && count($options) == 2) {
-          unset($options['_none']);
+        if (isset($element['#options']['_none']) && !empty($element['#required']) && count($element['#options']) == 2) {
+          unset($element['#options']['_none']);
         }
 
-        $element['#options'] = $options;
         // If only one option remains, select it for the user.
         if (count($element['#options']) == 1) {
           $element['#disabled'] = TRUE;
-          $key = key($element['#options']);
-          $element['#default_value'] = is_array($element['#default_value']) ? array($key) : $key;
+          $option_value = key($element['#options']);
+          $element['#default_value'] = is_array($element['#default_value']) ? array($option_value) : $option_value;
         }
       }
     }
