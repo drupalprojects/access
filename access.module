@@ -216,18 +216,21 @@ function access_grant_delete($gid) {
  * @param int $weight
  *   (optional) An integer representing the weight of the first grant in the
  *   list. Defaults to 0.
+ * @param string|null $langcode
+ *   (optional) A language code to use for rendering. Defaults to NULL which is
+ *   the global content language of the current request.
  *
  * @return array
  *   An array in the format expected by drupal_render().
  *
  * @see drupal_render()
  */
-function access_grant_view_multiple($grants, $view_mode = 'full', $weight = 0) {
-  field_attach_prepare_view('access_grant', $grants, $view_mode);
-  entity_prepare_view('access_grant', $grants);
+function access_grant_view_multiple($grants, $view_mode = 'full', $weight = 0, $langcode = NULL) {
+  field_attach_prepare_view('access_grant', $grants, $view_mode, $langcode);
+  entity_prepare_view('access_grant', $grants, $langcode);
   $build = array();
   foreach ($grants as $grant) {
-    $build['grants'][$grant->gid] = access_grant_view($grant, $view_mode);
+    $build['grants'][$grant->gid] = access_grant_view($grant, $view_mode, $langcode);
     $build['grants'][$grant->gid]['#weight'] = $weight;
     $weight++;
   }
@@ -242,15 +245,22 @@ function access_grant_view_multiple($grants, $view_mode = 'full', $weight = 0) {
  *   An access grant.
  * @param string $view_mode
  *   (optional) The view mode. Defaults to 'full'.
+ * @param string|null $langcode
+ *   (optional) A language code to use for rendering. Defaults to the global
+ *   content language of the current request.
  *
  * @return array
  *   An array in the format expected by drupal_render().
  *
  * @see drupal_render()
  */
-function access_grant_view($grant, $view_mode = 'full') {
+function access_grant_view($grant, $view_mode = 'full', $langcode = NULL) {
+  if (!isset($langcode)) {
+    $langcode = $GLOBALS['language_content']->language;
+  }
+
   // Retrieve all fields and attach to $grant->content.
-  access_grant_build_content($grant, $view_mode);
+  access_grant_build_content($grant, $view_mode, $langcode);
 
   $build = $grant->content;
   // We don't need it twice.
@@ -260,6 +270,7 @@ function access_grant_view($grant, $view_mode = 'full') {
     '#theme' => 'access_grant',
     '#access_grant' => $grant,
     '#view_mode' => $view_mode,
+    '#language' => $langcode,
   );
 
   $type = 'access_grant';
@@ -275,18 +286,26 @@ function access_grant_view($grant, $view_mode = 'full') {
  *   An access grant.
  * @param string $view_mode
  *   (optional) The view mode. Defaults to 'full'.
+ * @param string|null $langcode
+ *   (optional) A language code to use for rendering. Defaults to the global
+ *   content language of the current request.
  */
-function access_grant_build_content($grant, $view_mode = 'full') {
+function access_grant_build_content($grant, $view_mode = 'full', $langcode = NULL) {
+  if (!isset($langcode)) {
+    $langcode = $GLOBALS['language_content']->language;
+  }
+
+  // Remove previously built content, if any exists.
   $grant->content = array();
 
   // Build fields content. An internal flag prevents this from happening twice,
   // such as when called through access_grant_view_multiple().
-  field_attach_prepare_view('access_grant', array($grant->gid => $grant), $view_mode);
-  entity_prepare_view('access_grant', array($grant->gid => $grant));
-  $grant->content += field_attach_view('access_grant', $grant, $view_mode);
+  field_attach_prepare_view('access_grant', array($grant->gid => $grant), $view_mode, $langcode);
+  entity_prepare_view('access_grant', array($grant->gid => $grant), $langcode);
+  $grant->content += field_attach_view('access_grant', $grant, $view_mode, $langcode);
 
-  module_invoke_all('access_grant_view', $grant, $view_mode);
-  module_invoke_all('entity_view', $grant, 'access_grant', $view_mode);
+  module_invoke_all('access_grant_view', $grant, $view_mode, $langcode);
+  module_invoke_all('entity_view', $grant, 'access_grant', $view_mode, $langcode);
 }
 
 /**
