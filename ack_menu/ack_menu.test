@@ -240,13 +240,13 @@ class AckMenuAccessTest extends DrupalWebTestCase {
     $this->assertLinkByHref($ack_menu_url . $this->noAccessUser->uid, 0, 'The no access user realm is listed.');
     // Test a realm with no mappings.
     $this->drupalGet($ack_menu_url . '1');
-    $this->assertTitle(t('Manage menu links for @realm', array('@realm' => 'placeholder-for-uid-1')) . ' | Drupal');
+    $this->assertTitle(t('Manage @realm menu links', array('@realm' => 'placeholder-for-uid-1')) . ' | Drupal');
     $this->assertText(t('There are no menu links yet for @realm.', array('@realm' => 'placeholder-for-uid-1')));
     $this->assertLink(t('Add a link'));
     $this->assertNoLink(t('Edit the parent link'));
     $edit = array();
     for ($i = 0; $i < 2; $i++) {
-      $this->clickLink(t('Add realm link'));
+      $this->clickLink(t('Add @realm menu link', array('@realm' => 'placeholder-for-uid-1')));
       $selector = $this->xpath('//select[@name=:name and @disabled="disabled"]', array(':name' => 'AckMenuMap[' . $this->schemeMachineName . ']'));
       $this->assertTrue($selector, 'The mapping element is disabled.');
       $this->assertOptionSelected('edit-ackmenumap-' . $this->schemeMachineName, 1, 'The realm mapping is selected.');
@@ -459,7 +459,7 @@ class AckMenuAccessTest extends DrupalWebTestCase {
     $this->assertNoFieldChecked($foreign_child->field_id . '-hidden', 'The foreign child link is disabled: ' . $foreign_child->title);
 
     // Add a link to the realm.
-    $this->clickLink(t('Add realm link'));
+    $this->clickLink(t('Add @realm menu link', array('@realm' => $this->ackUser->name)));
     $this->assertOptionSelected('edit-parent', 'navigation:' . $parent->mlid, 'The parent link is selected: ' . $parent->title);
     $this->assertFieldByXPath('//option[@value="navigation:' . $child->mlid . '"]', TRUE, 'The child link is an option: ' . $child->title);
     $this->assertNoFieldByXPath('//option[@value="navigation:' . $foreign_child->mlid . '"]', TRUE, 'The foreign child link is not an option: ' . $foreign_child->title);

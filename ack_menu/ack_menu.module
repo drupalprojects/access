@@ -74,7 +74,7 @@ function ack_menu_menu() {
     'weight' => -10,
   );
   $items['ack_menu/manage/%access_scheme_machine_name/%'] = array(
-    'title' => 'Manage realm links',
+    'title' => 'Manage realm menu links',
     'title callback' => 'ack_menu_overview_title',
     'title arguments' => array(2, 3),
     'page callback' => 'drupal_get_form',
@@ -89,7 +89,9 @@ function ack_menu_menu() {
     'weight' => -10,
   );
   $items['ack_menu/manage/%access_scheme_machine_name/%/add'] = array(
-    'title' => 'Add realm link',
+    'title' => 'Add realm menu link',
+    'title callback' => 'ack_menu_link_add_title',
+    'title arguments' => array(2, 3),
     'page callback' => 'ack_menu_link_add',
     'page arguments' => array(2, 3),
     'access callback' => 'ack_menu_realm_access',
@@ -151,7 +153,22 @@ function ack_menu_admin_paths() {
  *   The translated page title.
  */
 function ack_menu_overview_title($scheme, $realm) {
-  return t('Manage menu links for @realm', array('@realm' => $scheme->realms[$realm]));
+  return t('Manage @realm menu links', array('@realm' => $scheme->realms[$realm]));
+}
+
+/**
+ * Menu title callback for the "add realm link" page.
+ *
+ * @param object $scheme
+ *   An access scheme.
+ * @param int $realm
+ *   A realm value.
+ *
+ * @return string
+ *   The translated page title.
+ */
+function ack_menu_link_add_title($scheme, $realm) {
+  return t('Add @realm menu link', array('@realm' => $scheme->realms[$realm]));
 }
 
 /**
