@@ -232,6 +232,11 @@ function ack_menu_tree_data(array $links) {
 function _ack_menu_tree_data(&$links, $plid = 0) {
   $tree = array();
   while ($item = array_pop($links)) {
+    // _menu_tree_check_access() expects a value for 'in_active_trail', which
+    // we'll just set to FALSE here because ack_menu is not used when building
+    // the active trail and breadcrumb.
+    $item['in_active_trail'] = FALSE;
+    // Add the current link to the tree.
     $tree[$item['mlid']] = array(
       'link' => $item,
       'below' => array(),
