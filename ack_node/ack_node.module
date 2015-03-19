@@ -120,6 +120,12 @@ function ack_node_node_access($node, $op, $account) {
  */
 function ack_node_form_node_form_alter(&$form, &$form_state, $form_id) {
   global $user;
+
+  // Don't filter anything if the user can bypass access controls.
+  if (user_access('bypass node access')) {
+    return;
+  }
+
   $node = $form_state['node'];
   $schemes = access_object_schemes('node');
 
