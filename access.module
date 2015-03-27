@@ -563,14 +563,17 @@ function access_scheme_type_load($type) {
  *   (number or text), values of the array are the display labels.
  */
 function _access_field_allowed_values($field, $instance, $entity_type, $entity, &$cacheable) {
+  $values = array();
   if (!empty($field['bundles']['access_grant'])) {
     // A realm field should only be attached to one scheme, so we can just take
     // the first value in the bundle list.
     $machine_name = reset($field['bundles']['access_grant']);
     $scheme = access_scheme_machine_name_load($machine_name);
-    return $scheme->realms;
+    if ($scheme) {
+      $values = $scheme->realms;
+    }
   }
-  return array();
+  return $values;
 }
 
 /**
