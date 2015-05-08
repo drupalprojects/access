@@ -219,3 +219,30 @@ function access_access_grant_view($grant) {
     '#weight' => -4,
   );
 }
+
+/**
+ * Implements hook_access_scheme_views_data_alter().
+ */
+function access_access_scheme_views_data_alter(&$data, $field_value_name, $field_name, $scheme_type) {
+  switch ($scheme_type) {
+    case 'taxonomy_term':
+      // Add a relationship to the referenced taxonomy term.
+      $data[$field_value_name]['relationship'] = array(
+        'handler' => 'views_handler_relationship',
+        'base' => 'taxonomy_term_data',
+        'base field' => 'tid',
+        'label' => t('term from !field_name', array('!field_name' => $field_name)),
+      );
+      break;
+
+    case 'user':
+      // Add a relationship to the referenced user.
+      $data[$field_value_name]['relationship'] = array(
+        'handler' => 'views_handler_relationship',
+        'base' => 'users',
+        'base field' => 'uid',
+        'label' => t('user from !field_name', array('!field_name' => $field_name)),
+      );
+      break;
+  }
+}

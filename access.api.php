@@ -321,6 +321,66 @@ function hook_access_scheme_delete($scheme) {
 }
 
 /**
+ * Alters the realm fields' views table data.
+ *
+ * This hook is invoked from access_views_data_alter() for each access scheme.
+ *
+ * @param array &$data
+ *   The array of Views table data for a scheme's realm field table. This is in
+ *   the same format as a table in the return value of hook_views_data().
+ * @param string $field_value_name
+ *   The name of the table column that contains the realm field value.
+ * @param string $field_name
+ *   The name of the realm field.
+ * @param string $scheme_type
+ *   The access scheme type (e.g., 'list_integer').
+ *
+ * @see access_views_data_alter()
+ */
+function hook_access_scheme_views_data_alter(&$data, $field_value_name, $field_name, $scheme_type) {
+  // Add a relationship to the referenced taxonomy term.
+  if ($scheme_type == 'taxonomy_term') {
+    $data[$field_value_name]['relationship'] = array(
+      'handler' => 'views_handler_relationship',
+      'base' => 'taxonomy_term_data',
+      'base field' => 'tid',
+      'label' => t('term from !field_name', array('!field_name' => $field_name)),
+    );
+  }
+}
+
+/**
+ * Alters the realm field's views table data for a specific scheme type.
+ *
+ * Note that, due to the limitations of hook_hook_info() regarding dynamically
+ * named hooks, this hook (if used) must be declared in the .module file, not
+ * in MODULE.access.inc.
+ *
+ * @param array &$data
+ *   The array of Views table data for a scheme's realm field table. This is in
+ *   the same format as a table in the return value of hook_views_data().
+ * @param string $field_value_name
+ *   The name of the table column that contains the realm field value.
+ * @param string $field_name
+ *   The name of the realm field.
+ * @param string $scheme_type
+ *   The access scheme type (e.g., 'list_integer').
+ *
+ * @see hook_access_scheme_views_data_alter()
+ * @see access_views_data_alter()
+ */
+function hook_access_scheme_SCHEME_TYPE_views_data_alter(&$data, $field_value_name, $field_name, $scheme_type) {
+  // hook_access_scheme_taxonomy_term_views_data_alter():
+  // Add a relationship to the referenced taxonomy term.
+  $data[$field_value_name]['relationship'] = array(
+    'handler' => 'views_handler_relationship',
+    'base' => 'taxonomy_term_data',
+    'base field' => 'tid',
+    'label' => t('term from !field_name', array('!field_name' => $field_name)),
+  );
+}
+
+/**
  * Acts on an access grant that is about to be inserted or updated.
  *
  * This hook is invoked from AccessGrantEntityController::save() before the

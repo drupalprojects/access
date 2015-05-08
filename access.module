@@ -1177,6 +1177,7 @@ function access_hook_info() {
     'access_scheme_insert',
     'access_scheme_update',
     'access_scheme_delete',
+    'access_scheme_views_data_alter',
     'access_grant_presave',
     'access_grant_insert',
     'access_grant_update',

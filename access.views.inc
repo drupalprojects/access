@@ -174,7 +174,7 @@ function access_views_data_alter(&$data) {
     ),
   );
 
-  // Relate realm fields to the objects that are members of the realm.
+  // Views integration for realm fields.
   foreach (access_scheme_load_multiple() as $scheme) {
     if ($scheme->realm_field['storage']['type'] != 'field_sql_storage') {
       continue;
@@ -182,6 +182,11 @@ function access_views_data_alter(&$data) {
     $field_table = $scheme->realm_field['storage']['details']['sql'][FIELD_LOAD_CURRENT];
     $field_table_name = key($field_table);
     $field_table_value = $field_table[$field_table_name]['value'];
+
+    // Allow the scheme to modify its realm field's views data.
+    drupal_alter(array('access_scheme_views_data', 'access_scheme_' . $scheme->type . '_views_data'), $data[$field_table_name], $field_table_value, $scheme->realm_field_name, $scheme->type);
+
+    // Allow the object access handlers to modify the realm field's views data.
     foreach ($scheme->handlers as $object_type => $handler) {
       $handler->viewsDataAlter($data, $scheme->machine_name, $field_table_name, $field_table_value, $object_type);
     }
