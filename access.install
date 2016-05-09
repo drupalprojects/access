@@ -70,6 +70,7 @@ function access_schema() {
       'sid' => array(
         'description' => 'The scheme ID.',
         'type' => 'serial',
+        'not null' => TRUE,
       ),
       'machine_name' => array(
         'description' => 'The machine-readable name of this scheme.',
